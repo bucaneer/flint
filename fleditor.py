@@ -154,6 +154,12 @@ class NodeItem(QGraphicsItem):
     def iscollapsed (self):
         return "collapsed" in self.nodeobj.optvars and self.nodeobj.optvars["collapsed"]
     
+    def togglecollapse (self, collapse=None):
+        if collapse is None:
+            self.nodeobj.optvars["collapsed"] = not self.iscollapsed()
+        else:
+            self.nodeobj.optvars["collapsed"] = collapse
+    
     def y_up (self):
         return self.y() - self.boundingRect().height()//2
     
@@ -852,9 +858,8 @@ class TreeView (QGraphicsView):
         self.nodecontainer.siblingswap(parID, selID, sibID)
         self.updateview()
     
-    def collapse (self):
-        collapsed = self.selectednode.iscollapsed()
-        self.selectednode.nodeobj.optvars["collapsed"] = not collapsed
+    def collapse (self, collapse=None):
+        self.selectednode.togglecollapse(collapse)
         self.updateview()
     
     def search (self, query):
