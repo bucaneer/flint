@@ -67,7 +67,7 @@ class ChartNode (object):
 		else:
 			self.condition = self.container.defaultcond
 		self.script = 'script' in node_dict and ScriptCall(node_dict['script'])
-		self.optvars = 'vars' in node_dict and node_dict['vars']
+		self.optvars = node_dict['vars'] if 'vars' in node_dict else dict()
 		self.comment = 'comment' in node_dict and node_dict['comment']
 	
 	def checkcond (self):

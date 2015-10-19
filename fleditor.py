@@ -103,7 +103,7 @@ class NodeItem(QGraphicsItem):
     def __init__(self, nodeobj, parent=None, treeviewport=None, **args):
         super().__init__(**args)
         self.nodeobj = nodeobj
-        self.childlist = []
+        self.children = []
         if parent is None:
             self.parent = None
             self.ref = None
@@ -128,8 +128,14 @@ class NodeItem(QGraphicsItem):
         return self.getview().nodegraph
     
     def addchild (self, nodeitem):
-        self.childlist.append(nodeitem)
-        
+        self.children.append(nodeitem)
+    
+    def childlist (self):
+        if self.iscollapsed():
+            return []
+        else:
+            return self.children
+    
     def isghost (self):
         return self.ref != self.nodeobj.realref
     
@@ -144,6 +150,9 @@ class NodeItem(QGraphicsItem):
     
     def isselected (self):
         return self.getview().selectednode is self
+    
+    def iscollapsed (self):
+        return "collapsed" in self.nodeobj.optvars and self.nodeobj.optvars["collapsed"]
     
     def y_up (self):
         return self.y() - self.boundingRect().height()//2
@@ -177,13 +186,13 @@ class NodeItem(QGraphicsItem):
             self.setPos(QPoint(x, y))
             self.posinit = True
             #self.getview().updatedimensions(x, y)      
-        for child in self.childlist: #ren():
+        for child in self.childlist(): #ren():
             child.treeposition()
     
     def subtreerootdrop(self, recursive=False):
         """Reposition subtree root node to midpoint of subtree height."""
         
-        children = self.childlist #ren()
+        children = self.childlist() #ren()
         if children:
             if recursive:
                 for child in children:
@@ -195,14 +204,14 @@ class NodeItem(QGraphicsItem):
     
     def bulkshift (self, diff):
         self.setY(self.y() + diff)
-        for child in self.childlist:
+        for child in self.childlist():
             child.bulkshift(diff)
     
     def graphcompact (self, ranks=None):
         if ranks is None:
             ranks = dict()
         localranks = dict()
-        for child in self.childlist:
+        for child in self.childlist():
             localranks = child.graphcompact(localranks)
         rank = self.x() // FlGlobals.style.rankgap #RANKGAP
         self.subtreerootdrop()
@@ -223,7 +232,7 @@ class NodeItem(QGraphicsItem):
     def siblings (self):
         parent = self.parent #node()
         if parent:
-            return parent.childlist #ren()
+            return parent.childlist() #ren()
         else:
             return None
     
@@ -253,7 +262,7 @@ class NodeItem(QGraphicsItem):
         Returns min/max y coordinates up to given depth (negative depth means
         whole subtree)."""
 
-        children = self.childlist
+        children = self.childlist()
         maxdepth = abs(depth)
         if children and depth:
             nextdepth = depth-1
@@ -275,7 +284,11 @@ class NodeItem(QGraphicsItem):
         #margins = FlGlobals.style.nodemargin + FlGlobals.style.activemargin;
         #textheight = FlGlobals.style.basemetrics.boundingRect(QRect(0,0,width-2*margins,0),Qt.AlignLeft | Qt.TextWordWrap,self.nodeobj.text).height();
         #self.textheight = self.gettextheight();
-        height = baseheight + self.gettextheight();
+        if self.iscollapsed():
+            height = baseheight//2
+            width = width//2
+        else:
+            height = baseheight + self.gettextheight();
         return QRectF(-width//2, -height//2, width, height)
     
     def drawlabel (self, painter, rect, string, flags=Qt.AlignLeft):
@@ -357,12 +370,14 @@ class NodeItem(QGraphicsItem):
             title = "Node %s" % self.nodeobj.ID
         cur_y = self.drawlabel(painter, bound.marginsRemoved(itemmargins), title)
         
+        if self.iscollapsed():
+            return
+        
         bound.setTop(cur_y)
         painter.setFont(basefont)
         cur_y = self.drawlabel(painter, bound.marginsRemoved(itemmargins), self.nodeobj.speaker)
         
         bound.setTop(cur_y+lineleading)
-             
         textrect = bound.marginsRemoved(itemmargins)
         #text = metricsbase.elidedText(self.nodeobj.text, Qt.ElideRight, (textrect.height() // metricsbase.lineSpacing())*textrect.width())
         text = self.nodeobj.text
@@ -395,6 +410,7 @@ class NodeItem(QGraphicsItem):
     def contextMenuEvent (self, event):
         menu = QMenu()
         if self.isselected():
+            menu.addAction(FlGlobals.actions["collapse"])
             menu.addAction(FlGlobals.actions["copynode"])
             menu.addAction(FlGlobals.actions["pastenode"])
             menu.addAction(FlGlobals.actions["addnode"])
@@ -425,7 +441,7 @@ class EdgeItem(QGraphicsItem):
     def boundingRect(self):
         xmin = self.source.x()
         xmax = xmin + FlGlobals.style.rankgap #RANKGAP
-        children = self.source.childlist
+        children = self.source.childlist()
         if children:
             ymin = children[0].y()-self.arrowsize/2
             ymax = children[-1].y()+self.arrowsize/2
@@ -436,7 +452,7 @@ class EdgeItem(QGraphicsItem):
     
     def paint(self, painter, style, widget, color=None, off=0, main=True):
         assert(isinstance(painter, QPainter))
-        children = self.source.childlist
+        children = self.source.childlist()
         treeview = widget is self.treeviewport
         if not children:
             return
@@ -704,7 +720,7 @@ class TreeView (QGraphicsView):
         while queue:
             curID, ref, isghost = queue.pop(0)
             nodeitem = self.newitem(nodesdict[curID], ref, isghost)
-            if not isghost:
+            if not (isghost or ("collapsed" in nodesdict[curID].optvars and nodesdict[curID].optvars["collapsed"])):
                 for nextID, ghost in nodegraph[curID]:
                     ref = nodeitem
                     queue.append((nextID, ref, ghost)) 
@@ -836,6 +852,11 @@ class TreeView (QGraphicsView):
         self.nodecontainer.siblingswap(parID, selID, sibID)
         self.updateview()
     
+    def collapse (self):
+        collapsed = self.selectednode.iscollapsed()
+        self.selectednode.nodeobj.optvars["collapsed"] = not collapsed
+        self.updateview()
+    
     def search (self, query):
         if not query:
             self.hits = []
@@ -872,7 +893,7 @@ class TreeView (QGraphicsView):
             if sib:
                 self.setselectednode(sib)
         elif key == Qt.Key_Right:
-            children = node.childlist
+            children = node.childlist()
             count = len(children)-1
             if children:
                 self.setselectednode(children[count//2])
@@ -953,6 +974,8 @@ class EditorWindow (QMainWindow):
             None, ["go-up"], "Move node up")
         FlGlobals.actions["movedown"] = self.createaction("Move &Down", self.movedown,
             None, ["go-down"], "Move node down")
+        FlGlobals.actions["collapse"] = self.createaction("(Un)Collapse subtree", self.collapse,
+            None, None, "(Un)Collapse subtree")
         
         edittoolbar.addAction(FlGlobals.actions["addnode"])
         edittoolbar.addAction(FlGlobals.actions["createlink"])
@@ -1055,6 +1078,10 @@ class EditorWindow (QMainWindow):
     @pyqtSlot()
     def movedown (self):
         self.activeview().movedown()
+    
+    @pyqtSlot()
+    def collapse (self):
+        self.activeview().collapse()
 
 
 if __name__ == '__main__':
