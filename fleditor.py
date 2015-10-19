@@ -68,8 +68,8 @@ class FlNodeStyle (object):
         nodewidth = max(minnodewidth, prefnodewidth)
         self.nodewidth = nodewidth
         
-        minnodeheight = boldlspace+2*baselspace+2*(activemargin+nodemargin+3*itemmargin)
-        prefnodeheight = boldlspace+5*baselspace+2*(activemargin+nodemargin+3*itemmargin)
+        minnodeheight = boldlspace+1*baselspace+2*(activemargin+nodemargin+3*itemmargin)
+        prefnodeheight = boldlspace+1*baselspace+2*(activemargin+nodemargin+3*itemmargin)
         nodeheight = max(minnodeheight, prefnodeheight)
         self.nodeheight = nodeheight
         
@@ -77,8 +77,8 @@ class FlNodeStyle (object):
         rankgap = max(minrankgap, round(nodewidth*1.1))
         self.rankgap = rankgap
         
-        minrowgap = 3*activemargin + nodeheight
-        rowgap = max(minrowgap, round(nodeheight*1.1))
+        minrowgap = 3*activemargin #+ nodeheight
+        rowgap = max(minrowgap, round(nodeheight*0.1))
         self.rowgap = rowgap
 
 class FlGlobals (object):
@@ -145,11 +145,17 @@ class NodeItem(QGraphicsItem):
     def isselected (self):
         return self.getview().selectednode is self
     
+    def y_up (self):
+        return self.y() - self.boundingRect().height()//2
+    
+    def y_low (self):
+        return self.y() + self.boundingRect().height()//2
+    
     def gettextheight (self):
         width = FlGlobals.style.nodewidth
-        margins = 2*sum([FlGlobals.style.__dict__[x] for x in ["nodemargin", "activemargin", "itemmargin"]])
+        margins = sum([FlGlobals.style.__dict__[x] for x in ["nodemargin", "activemargin", "itemmargin"]])
         return FlGlobals.style.basemetrics.boundingRect(QRect(0,0,width-2*margins,0),Qt.AlignLeft | Qt.TextWordWrap,self.nodeobj.text).height()
-    
+       
     def treeposition (self):
         """Recursively set node position in a basic tree.
         
@@ -161,9 +167,9 @@ class NodeItem(QGraphicsItem):
             x = parent.x() + FlGlobals.style.rankgap #RANKGAP
             sib = self.siblingabove()
             if sib:
-                y = sib.subtreesize(-1)[1] + FlGlobals.style.rowgap #ROWGAP
+                y = sib.subtreesize(-1)[1] + (self.boundingRect().height()/2) + FlGlobals.style.rowgap #ROWGAP
             else:
-                y = parent.y()                
+                y = parent.y() #+ (self.gettextheight()-parent.gettextheight())/2
         else:
             x = 0
             y = 0 
@@ -181,7 +187,7 @@ class NodeItem(QGraphicsItem):
         if children:
             if recursive:
                 for child in children:
-                    child.subtreerootdrop()
+                    child.subtreerootdrop(recursive)
             top, bottom, depth = self.subtreesize(1)
             new_y = (top+bottom)//2
             if new_y != self.y():
@@ -200,7 +206,7 @@ class NodeItem(QGraphicsItem):
             localranks = child.graphcompact(localranks)
         rank = self.x() // FlGlobals.style.rankgap #RANKGAP
         self.subtreerootdrop()
-        localranks[rank] = [self.y, self.y]
+        localranks[rank] = [self.y_up, self.y_low]
         streeshift = None
         for r in localranks:
             if r in ranks:
@@ -259,16 +265,17 @@ class NodeItem(QGraphicsItem):
                 ymax = max(ymax, stree[1]) if ymax is not None else stree[1]
                 maxdepth = max(maxdepth, stree[2])
         else:
-            ymin = ymax = self.y()
+            ymin = self.y_up()
+            ymax = self.y_low()
         return ymin, ymax, maxdepth
         
     def boundingRect(self):
         width = FlGlobals.style.nodewidth
-        height = FlGlobals.style.nodeheight
+        baseheight = FlGlobals.style.nodeheight
         #margins = FlGlobals.style.nodemargin + FlGlobals.style.activemargin;
         #textheight = FlGlobals.style.basemetrics.boundingRect(QRect(0,0,width-2*margins,0),Qt.AlignLeft | Qt.TextWordWrap,self.nodeobj.text).height();
         #self.textheight = self.gettextheight();
-        #height = baseheight + self.textheight;
+        height = baseheight + self.gettextheight();
         return QRectF(-width//2, -height//2, width, height)
     
     def drawlabel (self, painter, rect, string, flags=Qt.AlignLeft):
@@ -582,7 +589,7 @@ class NodeEditWidget (QWidget):
     @pyqtSlot()
     def setnodetext (self):
         self.nodeobj.text = self.nodetext.toPlainText()
-        FlGlobals.window.activeview().scene().update()
+        FlGlobals.window.activeview().layoutgraph()
 
 class SearchWidget (QWidget):
     def __init__ (self, parent):
@@ -762,7 +769,7 @@ class TreeView (QGraphicsView):
     def shownode (self, nodeitem):
         self.ensureVisible(nodeitem, 
             FlGlobals.style.rankgap-FlGlobals.style.nodewidth, 
-            FlGlobals.style.rowgap-FlGlobals.style.nodeheight)
+            FlGlobals.style.rowgap)
     
     def setselectednode (self, nodeitem, signal=True):
         if nodeitem is not None:
