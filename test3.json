@@ -1,0 +1,124 @@
+{
+   "name": "Test dialog",
+   "nextID": "10",
+   "nodes": {
+      "0": {
+         "links": [
+            {
+               "toID": "1"
+            },
+            {
+               "toID": "7"
+            }
+         ],
+         "speaker": "def",
+         "text": "",
+         "type": "talk"
+      },
+      "1": {
+         "links": [
+            {
+               "toID": "2"
+            },
+            {
+               "toID": "3"
+            },
+            {
+               "toID": "6"
+            }
+         ],
+         "speaker": "def",
+         "text": "Hello, stranger!",
+         "type": "talk"
+      },
+      "2": {
+         "links": [
+            {
+               "toID": "4"
+            }
+         ],
+         "speaker": "def",
+         "text": "Nope.",
+         "type": "talk"
+      },
+      "3": {
+         "condition": {
+            "calls": [
+               {
+                  "command": "sc_wait",
+                  "type": "script"
+               }
+            ],
+            "operator": "and",
+            "type": "cond"
+         },
+         "links": [
+            {
+               "toID": "5"
+            }
+         ],
+         "speaker": "def",
+         "text": "Yup. asd asd asd asd as das das das dasd asd asd asd ad as das as asd asd sd as asd asd as da",
+         "type": "talk"
+      },
+      "4": {
+         "links": [
+            {
+               "toID": "3"
+            }
+         ],
+         "speaker": "def",
+         "text": "Hm...",
+         "type": "talk"
+      },
+      "5": {
+         "links": [
+            {
+               "toID": "1"
+            }
+         ],
+         "speaker": "def",
+         "text": "Ah.",
+         "type": "talk"
+      },
+      "6": {
+         "links": [],
+         "speaker": "def",
+         "text": "World",
+         "type": "talk"
+      },
+      "7": {
+         "links": [
+            {
+               "toID": "8"
+            },
+            {
+               "toID": "5"
+            }
+         ],
+         "speaker": "def",
+         "text": "Huh",
+         "type": "talk"
+      },
+      "8": {
+         "links": [
+            {
+               "toID": "9"
+            }
+         ],
+         "speaker": "def",
+         "text": "Indeed asd asd asd asd asd asd asd asd asd asd asd asd asd asd asd as das dasd as dasd sa",
+         "type": "talk"
+      },
+      "9": {
+         "links": [
+            {
+               "toID": "5"
+            }
+         ],
+         "speaker": "def",
+         "text": "Indeed",
+         "type": "talk"
+      }
+   }
+}
