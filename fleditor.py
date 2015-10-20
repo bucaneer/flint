@@ -104,6 +104,7 @@ class NodeItem(QGraphicsItem):
         super().__init__(**args)
         self.nodeobj = nodeobj
         self.children = []
+        self.referrers = []
         if parent is None:
             self.parent = None
             self.ref = None
@@ -138,14 +139,15 @@ class NodeItem(QGraphicsItem):
         else:
             return self.children
     
+    def addreferrer (self, refID):
+        self.referrers.append(refID)
+    
     def isghost (self):
-        return self.ref != self.nodeobj.realref
+        refs = self.realnode().referrers
+        return len(refs)>0 and self.ref != refs[0]
     
     def realnode (self):
-        if self.isghost():
-            return self.getview().nodegraph[self.nodeobj.ID]
-        else:
-            return self
+        return self.getview().nodegraph[self.nodeobj.ID]
     
     def isactive (self):
         return self.getview().activenode is self
@@ -724,18 +726,20 @@ class TreeView (QGraphicsView):
     
     def constructgraph (self, nodeID="0"):
         queue = []
-        queue.append((nodeID, None, False))
-        nodegraph = self.nodecontainer.nodegraph
-        nodesdict = self.nodecontainer.nodes       
-        itemdict = dict()
-                
+        queue.append((nodeID, None))
+        nodesdict = self.nodecontainer.nodes
+        visited = {nodeID: False}
+        
         while queue:
-            curID, ref, isghost = queue.pop(0)
-            nodeitem = self.newitem(nodesdict[curID], ref, isghost)
+            curID, ref = queue.pop(0)
+            isghost = visited[curID]
+            visited[curID] = True
+            curnodeobj = nodesdict[curID]
+            nodeitem = self.newitem(curnodeobj, ref, isghost)
             if not (isghost or ("collapsed" in nodesdict[curID].optvars and nodesdict[curID].optvars["collapsed"])):
-                for nextID, ghost in nodegraph[curID]:
-                    ref = nodeitem
-                    queue.append((nextID, ref, ghost)) 
+                for nextID in curnodeobj.linkIDs:
+                    queue.append((nextID, nodeitem))
+                    visited[nextID] = nextID in visited and visited[nextID]
     
     def newitem (self, nodeobj, parent, isghost=False):
         if parent is None:
@@ -750,6 +754,10 @@ class TreeView (QGraphicsView):
             self.nodegraph["<-".join([nodeobj.ID, refid])] = nodeitem
         else:
             self.nodegraph[nodeobj.ID] = nodeitem
+        
+        if refid is not None:
+            self.nodegraph[nodeobj.ID].addreferrer(refid)
+        
         return nodeitem
     
     def treeroot (self):
@@ -1072,7 +1080,7 @@ class EditorWindow (QMainWindow):
         selected = view.selectednode
         if selected.ref is None:
             return
-        if len(selected.nodeobj.referrers) == 1:
+        if len(selected.referrers) == 1:
             if inherit:
                 text = "This will remove the only instance of node %s.\n\nContinue?" % selected.id()
             else:

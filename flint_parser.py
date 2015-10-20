@@ -57,8 +57,6 @@ class ChartNode (object):
 		self.text = node_dict['text']
 		self.speaker = node_dict['speaker']
 		self.linkIDs = []
-		#self.children = []
-		self.referrers = []
 		self.realref = None
 		for link in node_dict['links']:
 			self.addlink(str(link['toID']))
@@ -85,16 +83,6 @@ class ChartNode (object):
 				self.linkIDs.append(nodeID)
 			else:
 				self.linkIDs.insert(pos, nodeID)
-	
-	"""def addchild (self, nodeobj):
-		self.children.append(nodeobj)"""
-	
-	def modreferrer (self, nodeID, isghost):
-		if nodeID not in self.referrers:
-			self.referrers.append(nodeID)
-		if not isghost:
-			self.realref = nodeID
-			#self.parent.nodes[nodeID].addchild(self)
 	
 	def todict (self):
 		node_dict = { "type": self.typename, "text": self.text, 
@@ -136,37 +124,9 @@ class NodesContainer (object):
 		self.name = nodes_dict['name']
 		self.nextID = str(nodes_dict['nextID'])
 		self.nodes = dict()
-		#self.nodegraph = dict()
 		for nodeID, nodedict in nodes_dict['nodes'].items():
 			nodeID = str(nodeID)
 			self.newnode(nodedict, nodeID, traverse=False)
-		self.traverse()
-	
-	def traverse (self, nodeID="0"):
-		self.nodegraph = dict()
-		nodeID = str(nodeID)
-		queue = []
-		rank = 0
-		visited = {nodeID: False}
-		queue.append((nodeID, rank))
-		while queue:
-			popped = queue.pop(0)
-			curID = popped[0]
-			curnode = self.nodes[curID]
-			ghostref = visited[curID]
-			rank = popped[1]
-			visited[curID] = True
-			if not ghostref:
-				if curID not in self.nodegraph:
-					self.nodegraph[curID] = []
-					for nextID in curnode.linkIDs:
-						isghost = nextID in visited
-						self.nodegraph[curID].append((nextID, isghost))
-						self.nodes[nextID].modreferrer(curID, isghost)
-						#curnode.modreferrer(nextID, isghost)						
-						queue.append((nextID, rank+1))
-						visited[nextID] = nextID in visited and visited[nextID]
-						#print("NODEGRAPH: ",self.nodegraph)
 	
 	def getnode (self, ID):
 		return self.nodes[ID]
@@ -181,20 +141,12 @@ class NodesContainer (object):
 		self.nodes[newID] = node
 		if refID:
 			self.nodes[refID].addlink(newID)
-			#if refID not in self.nodegraph:
-			#	self.nodegraph[refID] = []
-			#self.nodegraph[refID].append((newID, False))
-			#self.nodegraph[newID] = []
-		if traverse:
-			self.traverse()
-		#return newID
 		return node
 	
 	def newlink (self, fromID, toID, pos=None):
 		if fromID != toID and toID in self.nodes and toID != "0" and \
 		   fromID in self.nodes:			
 			self.nodes[fromID].addlink(toID, pos=pos)
-			self.traverse()
 	
 	def removenode (self, nodeID, forceinherit=False):		
 		nodeobj = self.nodes[nodeID]
@@ -204,7 +156,6 @@ class NodesContainer (object):
 			except:
 				raise RuntimeError("Link removal failed") 
 		del self.nodes[childID]
-		self.traverse()
 	
 	def removelink (self, refID, childID, forceinherit=False):
 		assert refID in self.nodes 
@@ -213,12 +164,10 @@ class NodesContainer (object):
 		childnode = self.nodes[childID]
 		childindex = refnode.linkIDs.index(childID)
 		for orphanID in childnode.linkIDs:
-			if forceinherit: # or len(childnode.referrers) == 1:
+			if forceinherit:
 				self.newlink(refID, orphanID, pos=childindex)
 				childindex += 1
-		del childnode.referrers[childnode.referrers.index(refID)]
 		del refnode.linkIDs[refnode.linkIDs.index(childID)]
-		self.traverse()
 		return True
 	
 	def siblingswap (self, parentID, childID1, childID2):
@@ -227,7 +176,6 @@ class NodesContainer (object):
 		ind1 = parlinks.index(childID1)
 		ind2 = parlinks.index(childID2)
 		parlinks[ind2], parlinks[ind1] = parlinks[ind1], parlinks[ind2]
-		self.traverse()
 	
 	def todict (self):
 		return {"name":self.name, "nextID":self.nextID, "nodes":self.nodes}
