@@ -116,6 +116,8 @@ class NodeItem(QGraphicsItem):
         #self.textdocument.setPlainText(self.nodeobj.text)
         self.setCursor(Qt.ArrowCursor)
         self.treeviewport = treeviewport
+        self.textlength = 0
+        self.textheight = 0
         self.textheight = self.gettextheight()
     
     def id (self):
@@ -167,9 +169,13 @@ class NodeItem(QGraphicsItem):
         return self.y() + self.boundingRect().height()//2
     
     def gettextheight (self):
+        if self.textlength == len(self.nodeobj.text):
+            return self.textheight
         width = FlGlobals.style.nodewidth
         margins = sum([FlGlobals.style.__dict__[x] for x in ["nodemargin", "activemargin", "itemmargin"]])
-        return FlGlobals.style.basemetrics.boundingRect(QRect(0,0,width-2*margins,0),Qt.AlignLeft | Qt.TextWordWrap,self.nodeobj.text).height()
+        self.textheight = FlGlobals.style.basemetrics.boundingRect(QRect(0,0,width-2*margins,0),Qt.AlignLeft | Qt.TextWordWrap,self.nodeobj.text).height()
+        self.textlength = len(self.nodeobj.text)
+        return self.textheight
        
     def treeposition (self):
         """Recursively set node position in a basic tree.
