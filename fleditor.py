@@ -156,13 +156,7 @@ class NodeItem(QGraphicsItem):
         return self.getview().selectednode is self
     
     def iscollapsed (self):
-        return "collapsed" in self.nodeobj.optvars and self.nodeobj.optvars["collapsed"]
-    
-    def togglecollapse (self, collapse=None):
-        if collapse is None:
-            self.nodeobj.optvars["collapsed"] = not self.iscollapsed()
-        else:
-            self.nodeobj.optvars["collapsed"] = collapse
+        return self.id() in self.getview().collapsednodes
     
     def y_up (self):
         return self.y() - self.boundingRect().height()//2
@@ -655,7 +649,7 @@ class TreeView (QGraphicsView):
         self.activenode = None
         self.selectednode = None
         #self.treewidth = self.treeheight = 0
-        
+        self.collapsednodes = []
         self.hits = []
         
         self.setOptimizationFlags(QGraphicsView.DontAdjustForAntialiasing | QGraphicsView.DontSavePainterState)
@@ -736,7 +730,7 @@ class TreeView (QGraphicsView):
             visited[curID] = True
             curnodeobj = nodesdict[curID]
             nodeitem = self.newitem(curnodeobj, ref, isghost)
-            if not (isghost or ("collapsed" in nodesdict[curID].optvars and nodesdict[curID].optvars["collapsed"])):
+            if not (isghost or nodeitem.iscollapsed()):
                 for nextID in curnodeobj.linkIDs:
                     queue.append((nextID, nodeitem))
                     visited[nextID] = nextID in visited and visited[nextID]
@@ -873,7 +867,13 @@ class TreeView (QGraphicsView):
         self.updateview()
     
     def collapse (self, collapse=None):
-        self.selectednode.togglecollapse(collapse)
+        selID = self.selectednode.id()
+        if selID in self.collapsednodes:
+            if collapse is None or not collapse:
+                self.collapsednodes.remove(selID)
+        else:
+            if collapse is None or collapse:
+                self.collapsednodes.append(selID)
         self.updateview()
     
     def search (self, query):
