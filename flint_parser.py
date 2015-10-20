@@ -155,7 +155,7 @@ class NodesContainer (object):
 				self.removelink(refID, nodeID, forceinherit)
 			except:
 				raise RuntimeError("Link removal failed") 
-		del self.nodes[childID]
+		self.nodes.pop(childID)
 	
 	def removelink (self, refID, childID, forceinherit=False):
 		assert refID in self.nodes 
@@ -167,7 +167,7 @@ class NodesContainer (object):
 			if forceinherit:
 				self.newlink(refID, orphanID, pos=childindex)
 				childindex += 1
-		del refnode.linkIDs[refnode.linkIDs.index(childID)]
+		refnode.linkIDs.remove(childID)
 		return True
 	
 	def siblingswap (self, parentID, childID1, childID2):
