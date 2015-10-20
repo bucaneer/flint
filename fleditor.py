@@ -100,7 +100,7 @@ class FlGlobals (object):
         FlGlobals.actions["pastenode"].setEnabled(True)
 
 class NodeItem(QGraphicsItem):
-    def __init__(self, nodeobj, parent=None, treeviewport=None, **args):
+    def __init__(self, nodeobj, parent=None, view=None, **args):
         super().__init__(**args)
         self.nodeobj = nodeobj
         self.children = []
@@ -116,7 +116,8 @@ class NodeItem(QGraphicsItem):
         #self.textdocument.setDocumentLayout(QPlainTextDocumentLayout(self.textdocument))
         #self.textdocument.setPlainText(self.nodeobj.text)
         self.setCursor(Qt.ArrowCursor)
-        self.treeviewport = treeviewport
+        self.view = view
+        self.treeviewport = view.viewport()
         self.textlength = 0
         self.textheight = 0
         self.textheight = self.gettextheight()
@@ -128,7 +129,7 @@ class NodeItem(QGraphicsItem):
             return self.nodeobj.ID
     
     def nodeitems (self):
-        return self.getview().nodegraph
+        return self.view.nodegraph
     
     def addchild (self, nodeitem):
         self.children.append(nodeitem)
@@ -147,16 +148,16 @@ class NodeItem(QGraphicsItem):
         return len(refs)>0 and self.ref != refs[0]
     
     def realnode (self):
-        return self.getview().nodegraph[self.nodeobj.ID]
+        return self.view.nodegraph[self.nodeobj.ID]
     
     def isactive (self):
-        return self.getview().activenode is self
+        return self.view.activenode is self
     
     def isselected (self):
-        return self.getview().selectednode is self
+        return self.view.selectednode is self
     
     def iscollapsed (self):
-        return self.id() in self.getview().collapsednodes
+        return self.id() in self.view.collapsednodes
     
     def y_up (self):
         return self.y() - self.boundingRect().height()//2
@@ -372,7 +373,7 @@ class NodeItem(QGraphicsItem):
         painter.setPen(QPen(FlPalette.light))
         painter.setFont(boldfont)
         
-        if self.isghost():
+        if ghost:
             title = "Ghost %s" % self.nodeobj.ID
         else:
             title = "Node %s" % self.nodeobj.ID
@@ -393,7 +394,7 @@ class NodeItem(QGraphicsItem):
         
         #painter.setBrush(lightbrush)
         #painter.setPen(QPen(0))
-        if self.nodeobj in self.getview().hits:
+        if self.nodeobj in self.view.hits:
             painter.fillRect(bound, QBrush(QColor(255, 255, 100)))
         else:
             painter.fillRect(bound, lightbrush)
@@ -401,19 +402,16 @@ class NodeItem(QGraphicsItem):
         painter.setPen(QPen(FlPalette.dark))
         
         painter.drawText(textrect, Qt.AlignLeft | Qt.TextWordWrap, text)
-        
-    def getview (self):
-        return self.scene().views()[0]
-        
+    
     def mouseDoubleClickEvent (self, event):
         super().mouseDoubleClickEvent(event)
         if event.button() == Qt.LeftButton:
-            self.getview().setactivenode(self)
+            self.view.setactivenode(self)
     
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
         if event.button() & (Qt.LeftButton | Qt.RightButton) :
-            self.getview().setselectednode(self)
+            self.view.setselectednode(self)
     
     def contextMenuEvent (self, event):
         menu = QMenu()
@@ -441,10 +439,10 @@ class EdgeItem(QGraphicsItem):
     shadowoffset = 2
     pensize = 2
     
-    def __init__(self, source, treeviewport, **args):
+    def __init__(self, source, view, **args):
         super().__init__(**args)
         self.source = source
-        self.treeviewport = treeviewport
+        self.treeviewport = view.viewport()
     
     def boundingRect(self):
         xmin = self.source.x()
@@ -497,9 +495,9 @@ class EdgeItem(QGraphicsItem):
             painter.drawLine(vert_x+off, vert_top+off, vert_x+off, vert_bottom+off)
 
 class FrameItem (QGraphicsItem):
-    def __init__ (self, treeview):
+    def __init__ (self, view):
         super().__init__()
-        self.treeview = treeview
+        self.treeview = view
         self.setZValue(1)
     
     def boundingRect (self):
@@ -701,7 +699,7 @@ class TreeView (QGraphicsView):
         self.scene().clear()
         self.nodegraph = dict()
         #self.treewidth = self.treeheight = 0
-        self.viewframe = FrameItem(treeview=self)
+        self.viewframe = FrameItem(view=self)
         self.scene().addItem(self.viewframe)
         self.constructgraph()
         self.layoutgraph()
@@ -740,8 +738,8 @@ class TreeView (QGraphicsView):
             refid = None
         else:
             refid = parent.id()
-        nodeitem = NodeItem(nodeobj, parent=parent, treeviewport=self.viewport())
-        edgeitem = EdgeItem(nodeitem, treeviewport=self.viewport())
+        nodeitem = NodeItem(nodeobj, parent=parent, view=self)
+        edgeitem = EdgeItem(nodeitem, view=self)
         self.scene().addItem(edgeitem)
         self.scene().addItem(nodeitem)
         if isghost:
