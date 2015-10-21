@@ -68,6 +68,8 @@ class FlNodeStyle (object):
         nodewidth = max(minnodewidth, prefnodewidth)
         self.nodewidth = nodewidth
         
+        self.nodetextwidth = basemetrics.averageCharWidth()*40
+        
         minnodeheight = boldlspace+1*baselspace+2*(activemargin+nodemargin+3*itemmargin)
         prefnodeheight = boldlspace+1*baselspace+2*(activemargin+nodemargin+3*itemmargin)
         nodeheight = max(minnodeheight, prefnodeheight)
@@ -100,7 +102,7 @@ class FlGlobals (object):
         FlGlobals.actions["pastenode"].setEnabled(True)
 
 class NodeItem(QGraphicsItem):
-    def __init__(self, nodeobj, parent=None, view=None, **args):
+    def __init__(self, nodeobj, parent=None, view=None, ghost=False, **args):
         super().__init__(**args)
         self.nodeobj = nodeobj
         self.children = []
@@ -112,15 +114,90 @@ class NodeItem(QGraphicsItem):
             self.ref = parent.id()
             self.parent = parent
             self.parent.addchild(self)
-        #self.textdocument = QTextDocument()
-        #self.textdocument.setDocumentLayout(QPlainTextDocumentLayout(self.textdocument))
-        #self.textdocument.setPlainText(self.nodeobj.text)
         self.setCursor(Qt.ArrowCursor)
         self.view = view
         self.treeviewport = view.viewport()
-        self.textlength = 0
-        self.textheight = 0
-        self.textheight = self.gettextheight()
+        self.ghost = ghost
+        self.graphicsetup()
+    
+    def graphicsetup (self):
+        if int(self.nodeobj.ID) % 2 == 0:
+            self.maincolor = FlPalette.hl2var
+            self.altcolor = FlPalette.hl2
+        else:
+            self.maincolor = FlPalette.hl1var
+            self.altcolor = FlPalette.hl1
+        lightbrush = QBrush(FlPalette.light)
+        mainbrush = QBrush(self.maincolor)
+        nopen = QPen(0)
+        
+        self.graphgroup = QGraphicsItemGroup(self)
+        
+        self.shadowbox = QGraphicsRectItem(self)
+        self.shadowbox.setBrush(FlPalette.dark)
+        self.shadowbox.setPen(nopen)
+        self.shadowbox.setPos(2, 2)
+        self.graphgroup.addToGroup(self.shadowbox)
+        
+        self.selectbox = QGraphicsRectItem(self)
+        self.selectbox.setBrush(lightbrush)
+        self.selectbox.setPen(nopen)
+        self.graphgroup.addToGroup(self.selectbox)
+        
+        self.activebox = QGraphicsRectItem(self)
+        self.activebox.setBrush(lightbrush)
+        self.activebox.setPen(nopen)
+        self.graphgroup.addToGroup(self.activebox)
+        
+        self.mainbox = QGraphicsRectItem(self)
+        self.mainbox.setBrush(mainbrush)
+        self.mainbox.setPen(nopen)
+        self.graphgroup.addToGroup(self.mainbox)
+        
+        self.textbox = QGraphicsRectItem(self)
+        self.textbox.setBrush(lightbrush)
+        self.textbox.setPen(nopen)
+        self.graphgroup.addToGroup(self.textbox)
+        
+        self.nodelabel = QGraphicsSimpleTextItem(self)
+        self.nodelabel.setBrush(lightbrush)
+        self.nodelabel.setFont(FlGlobals.style.boldfont)
+        self.nodelabel.setText("Node %s" % self.nodeobj.ID)
+        self.nodelabel.setPos(FlGlobals.style.itemmargin, FlGlobals.style.itemmargin)
+        self.graphgroup.addToGroup(self.nodelabel)
+        
+        self.nodespeaker = QGraphicsSimpleTextItem(self)
+        self.nodespeaker.setBrush(lightbrush)
+        self.nodespeaker.setText(self.nodeobj.speaker)
+        self.nodespeaker.setPos(FlGlobals.style.itemmargin, self.nodelabel.y()+self.nodelabel.boundingRect().height()+FlGlobals.style.itemmargin*2)
+        self.graphgroup.addToGroup(self.nodespeaker)
+        
+        self.nodetext = QGraphicsTextItem(self)
+        self.nodetext.setTextWidth(FlGlobals.style.nodetextwidth)
+        self.nodetext.setPos(0, self.nodespeaker.y()+self.nodespeaker.boundingRect().height()+FlGlobals.style.itemmargin)
+        self.graphgroup.addToGroup(self.nodetext)
+                
+        self.view.nodedocs[self.nodeobj.ID]["text"].contentsChanged.connect(self.updatetext)
+        self.updatetext()
+        
+        if self.isghost():
+            self.graphgroup.setOpacity(0.7)
+            self.shadowbox.hide()
+    
+    @pyqtSlot()
+    def updatetext (self):
+        ndtxt = self.nodetext
+        ndtxt.setPlainText(self.view.nodedocs[self.nodeobj.ID]["text"].toPlainText())
+        textrect = ndtxt.mapRectToParent(ndtxt.boundingRect())
+        self.textbox.setRect(textrect)
+        mainrect = textrect.united(self.nodelabel.mapRectToParent(self.nodelabel.boundingRect())).marginsAdded(QMarginsF(*[FlGlobals.style.nodemargin]*4))
+        self.mainbox.setRect(mainrect)
+        self.shadowbox.setRect(mainrect)
+        self.selectbox.setRect(mainrect.marginsAdded(QMarginsF(*[FlGlobals.style.selectmargin]*4)))
+        activerect = mainrect.marginsAdded(QMarginsF(*[FlGlobals.style.activemargin]*4))
+        self.activebox.setRect(activerect)
+        self.graphgroup.setPos(-activerect.width()//2-activerect.x(), -activerect.height()//2-activerect.y())
+        self.rect = self.graphgroup.mapRectToParent(self.activebox.boundingRect())
     
     def id (self):
         if self.isghost():
@@ -144,8 +221,7 @@ class NodeItem(QGraphicsItem):
         self.referrers.append(refID)
     
     def isghost (self):
-        refs = self.realnode().referrers
-        return len(refs)>0 and self.ref != refs[0]
+        return self.ghost
     
     def realnode (self):
         return self.view.nodegraph[self.nodeobj.ID]
@@ -158,22 +234,13 @@ class NodeItem(QGraphicsItem):
     
     def iscollapsed (self):
         return self.id() in self.view.collapsednodes
-    
+        
     def y_up (self):
         return self.y() - self.boundingRect().height()//2
     
     def y_low (self):
         return self.y() + self.boundingRect().height()//2
-    
-    def gettextheight (self):
-        if self.textlength == len(self.nodeobj.text):
-            return self.textheight
-        width = FlGlobals.style.nodewidth
-        margins = sum([FlGlobals.style.__dict__[x] for x in ["nodemargin", "activemargin", "itemmargin"]])
-        self.textheight = FlGlobals.style.basemetrics.boundingRect(QRect(0,0,width-2*margins,0),Qt.AlignLeft | Qt.TextWordWrap,self.nodeobj.text).height()
-        self.textlength = len(self.nodeobj.text)
-        return self.textheight
-       
+           
     def treeposition (self):
         """Recursively set node position in a basic tree.
         
@@ -288,120 +355,23 @@ class NodeItem(QGraphicsItem):
         return ymin, ymax, maxdepth
         
     def boundingRect(self):
-        width = FlGlobals.style.nodewidth
-        baseheight = FlGlobals.style.nodeheight
-        #margins = FlGlobals.style.nodemargin + FlGlobals.style.activemargin;
-        #textheight = FlGlobals.style.basemetrics.boundingRect(QRect(0,0,width-2*margins,0),Qt.AlignLeft | Qt.TextWordWrap,self.nodeobj.text).height();
-        #self.textheight = self.gettextheight();
-        if self.iscollapsed():
-            height = baseheight//2
-            width = width//2
-        else:
-            height = baseheight + self.gettextheight();
-        return QRectF(-width//2, -height//2, width, height)
-    
-    def drawlabel (self, painter, rect, string, flags=Qt.AlignLeft):
-        textrect = painter.boundingRect(rect, flags | Qt.TextDontClip, string)
-        painter.drawText(textrect, flags, string)
-        return textrect.bottom()
-    
+        return self.rect
+        
     def paint(self, painter, style, widget):
-        assert isinstance(painter, QPainter)
-        
-        boxmargins = QMarginsF(*[FlGlobals.style.nodemargin]*4)
-        itemmargins = QMarginsF(*[FlGlobals.style.itemmargin]*4)
-        activeborder = FlGlobals.style.activemargin
-        fullbound = self.boundingRect()
-        smallbound = fullbound.marginsRemoved(QMarginsF(*[activeborder]*4))
-        
-        ghost = self.isghost()
-        active = self.isactive()
-        selected = self.isselected()
-        mapview = widget is not self.treeviewport
-        
-        if ghost:
-            painter.setOpacity(0.7)
-        
-        if int(self.nodeobj.ID) % 2 == 0:
-            color1 = FlPalette.hl2var
-            color2 = FlPalette.hl2
+        if self.isactive():
+            self.mainbox.setBrush(QColor(self.altcolor))
+            self.activebox.show()
         else:
-            color1 = FlPalette.hl1var
-            color2 = FlPalette.hl1
-                
-        lightbrush = QBrush(FlPalette.light)
-        darkbrush = QBrush(FlPalette.dark)
-        
-        if active:
-            maincolor = color2
-        else: 
-            maincolor = color1
-        
-        mainbrush = QBrush(maincolor)
-        painter.setBrush(mainbrush)
-        
-        if mapview:
-            pen = QPen(maincolor, 0)
-            pen.setCosmetic(True)
-            painter.setPen(pen)
-            painter.setBrush(mainbrush)
-            painter.drawRect(fullbound)
-            return
-        
-        metricsbold = FlGlobals.style.boldmetrics
-        metricsbase = FlGlobals.style.basemetrics
-        boldfont = FlGlobals.style.boldfont
-        basefont = FlGlobals.style.basefont
-        
-        lineleading = metricsbold.leading()
-        linespace = metricsbold.lineSpacing()
-        
-        painter.setPen(QPen(0))
-                
-        if not ghost:                
-            painter.fillRect(smallbound.translated(2, 2), darkbrush)
-        
-        if active:
-            painter.fillRect(fullbound, lightbrush)
-        elif selected:
-            painter.fillRect(fullbound.marginsRemoved(QMarginsF(*[activeborder//2]*4)), lightbrush)        
-        
-        painter.drawRect(smallbound)
-        
-        bound = smallbound.marginsRemoved(boxmargins)
-        
-        painter.setPen(QPen(FlPalette.light))
-        painter.setFont(boldfont)
-        
-        if ghost:
-            title = "Ghost %s" % self.nodeobj.ID
-        else:
-            title = "Node %s" % self.nodeobj.ID
-        cur_y = self.drawlabel(painter, bound.marginsRemoved(itemmargins), title)
-        
-        if self.iscollapsed():
-            return
-        
-        bound.setTop(cur_y)
-        painter.setFont(basefont)
-        cur_y = self.drawlabel(painter, bound.marginsRemoved(itemmargins), self.nodeobj.speaker)
-        
-        bound.setTop(cur_y+lineleading)
-        textrect = bound.marginsRemoved(itemmargins)
-        #text = metricsbase.elidedText(self.nodeobj.text, Qt.ElideRight, (textrect.height() // metricsbase.lineSpacing())*textrect.width())
-        text = self.nodeobj.text
-        mainrect = painter.boundingRect(bound.marginsRemoved(itemmargins), Qt.AlignLeft | Qt.TextWordWrap, text)
-        
-        #painter.setBrush(lightbrush)
-        #painter.setPen(QPen(0))
+            self.mainbox.setBrush(QColor(self.maincolor))
+            self.activebox.hide()
+            if self.isselected():
+                self.selectbox.show()
+            else:
+                self.selectbox.hide()
         if self.nodeobj in self.view.hits:
-            painter.fillRect(bound, QBrush(QColor(255, 255, 100)))
+            self.textbox.setBrush(QBrush(QColor(255, 255, 100)))
         else:
-            painter.fillRect(bound, lightbrush)
-        
-        painter.setPen(QPen(FlPalette.dark))
-        
-        painter.drawText(textrect, Qt.AlignLeft | Qt.TextWordWrap, text)
+            self.textbox.setBrush(QBrush(QColor(FlPalette.light)))
     
     def mouseDoubleClickEvent (self, event):
         super().mouseDoubleClickEvent(event)
@@ -738,7 +708,7 @@ class TreeView (QGraphicsView):
             refid = None
         else:
             refid = parent.id()
-        nodeitem = NodeItem(nodeobj, parent=parent, view=self)
+        nodeitem = NodeItem(nodeobj, parent=parent, view=self, ghost=isghost)
         edgeitem = EdgeItem(nodeitem, view=self)
         self.scene().addItem(edgeitem)
         self.scene().addItem(nodeitem)
