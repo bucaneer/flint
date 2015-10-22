@@ -50,24 +50,6 @@ class FlNodeStyle (object):
         rowgap = 3*activemargin
         self.rowgap = rowgap
 
-class FlGlobals (object):
-    defaultNodeDict = {"type":"talk","text":"","speaker":"def","links":[]}
-    copiedNodeDict = None
-    actions = dict()
-    ranks = dict()
-    
-    def newnode (paste=False):
-        if paste:
-            return FlGlobals.copiedNodeDict
-        else:
-            return FlGlobals.defaultNodeDict
-    
-    def copynode (nodeitem):
-        nodedict = nodeitem.nodeobj.todict()
-        nodedict["links"] = []
-        FlGlobals.copiedNodeDict = nodedict
-        FlGlobals.actions["pastenode"].setEnabled(True)
-
 class NodeItem(QGraphicsItem):
     def __init__(self, nodeobj, parent=None, view=None, ghost=False, **args):
         super().__init__(**args)
@@ -86,6 +68,7 @@ class NodeItem(QGraphicsItem):
         self.treeviewport = view.viewport()
         self.textheight = 0
         self.ghost = ghost
+        self.style = view.window().style
         self.graphicsetup()
     
     def graphicsetup (self):
@@ -98,7 +81,7 @@ class NodeItem(QGraphicsItem):
         lightbrush = QBrush(FlPalette.light)
         mainbrush = QBrush(self.maincolor)
         nopen = QPen(0)
-        
+         
         self.graphgroup = QGraphicsItemGroup(self)
         
         self.shadowbox = QGraphicsRectItem(self)
@@ -129,20 +112,20 @@ class NodeItem(QGraphicsItem):
         
         self.nodelabel = QGraphicsSimpleTextItem(self)
         self.nodelabel.setBrush(lightbrush)
-        self.nodelabel.setFont(FlGlobals.style.boldfont)
+        self.nodelabel.setFont(self.style.boldfont)
         self.nodelabel.setText("Node %s" % self.nodeobj.ID)
-        self.nodelabel.setPos(FlGlobals.style.itemmargin, FlGlobals.style.itemmargin)
+        self.nodelabel.setPos(self.style.itemmargin, self.style.itemmargin)
         self.graphgroup.addToGroup(self.nodelabel)
         
         self.nodespeaker = QGraphicsSimpleTextItem(self)
         self.nodespeaker.setBrush(lightbrush)
         self.nodespeaker.setText(self.nodeobj.speaker)
-        self.nodespeaker.setPos(FlGlobals.style.itemmargin, self.nodelabel.y()+self.nodelabel.boundingRect().height()+FlGlobals.style.itemmargin*2)
+        self.nodespeaker.setPos(self.style.itemmargin, self.nodelabel.y()+self.nodelabel.boundingRect().height()+self.style.itemmargin*2)
         self.graphgroup.addToGroup(self.nodespeaker)
         
         self.nodetext = QGraphicsTextItem(self)
-        self.nodetext.setTextWidth(FlGlobals.style.nodetextwidth)
-        self.nodetext.setPos(0, self.nodespeaker.y()+self.nodespeaker.boundingRect().height()+FlGlobals.style.itemmargin)
+        self.nodetext.setTextWidth(self.style.nodetextwidth)
+        self.nodetext.setPos(0, self.nodespeaker.y()+self.nodespeaker.boundingRect().height()+self.style.itemmargin)
         self.graphgroup.addToGroup(self.nodetext)
                 
         self.view.nodedocs[self.nodeobj.ID]["text"].contentsChanged.connect(self.updatetext)
@@ -162,11 +145,11 @@ class NodeItem(QGraphicsItem):
             return
         self.textheight = textheight
         self.textbox.setRect(textrect)
-        mainrect = textrect.united(self.nodelabel.mapRectToParent(self.nodelabel.boundingRect())).marginsAdded(QMarginsF(*[FlGlobals.style.nodemargin]*4))
+        mainrect = textrect.united(self.nodelabel.mapRectToParent(self.nodelabel.boundingRect())).marginsAdded(QMarginsF(*[self.style.nodemargin]*4))
         self.mainbox.setRect(mainrect)
         self.shadowbox.setRect(mainrect)
-        self.selectbox.setRect(mainrect.marginsAdded(QMarginsF(*[FlGlobals.style.selectmargin]*4)))
-        activerect = mainrect.marginsAdded(QMarginsF(*[FlGlobals.style.activemargin]*4))
+        self.selectbox.setRect(mainrect.marginsAdded(QMarginsF(*[self.style.selectmargin]*4)))
+        activerect = mainrect.marginsAdded(QMarginsF(*[self.style.activemargin]*4))
         self.activebox.setRect(activerect)
         self.graphgroup.setPos(-activerect.width()//2-activerect.x(), -activerect.height()//2-activerect.y())
         self.rect = self.graphgroup.mapRectToParent(self.activebox.boundingRect())
@@ -222,10 +205,10 @@ class NodeItem(QGraphicsItem):
         
         parent = self.parent
         if parent:
-            x = parent.x() + FlGlobals.style.rankwidth
+            x = parent.x() + self.style.rankwidth
             sib = self.siblingabove()
             if sib:
-                y = sib.subtreesize(-1)[1] + (self.boundingRect().height()/2) + FlGlobals.style.rowgap
+                y = sib.subtreesize(-1)[1] + (self.boundingRect().height()/2) + self.style.rowgap
             else:
                 y = parent.y()
         else:
@@ -257,13 +240,13 @@ class NodeItem(QGraphicsItem):
         localranks = dict()
         for child in self.childlist():
             localranks = child.graphcompact(localranks)
-        rank = self.x() // FlGlobals.style.rankwidth
+        rank = self.x() // self.style.rankwidth
         self.subtreerootdrop()
         localranks[rank] = [self.y_up, self.y_low]
         streeshift = None
         for r in localranks:
             if r in ranks:
-                rankshift = ranks[r][1]() + FlGlobals.style.rowgap - localranks[r][0]()
+                rankshift = ranks[r][1]() + self.style.rowgap - localranks[r][0]()
                 if streeshift is None or rankshift > streeshift:
                     streeshift = rankshift
                 ranks[r][1] = localranks[r][1]
@@ -354,15 +337,16 @@ class NodeItem(QGraphicsItem):
     def contextMenuEvent (self, event):
         menu = QMenu()
         if self.isselected():
-            menu.addAction(FlGlobals.actions["collapse"])
-            menu.addAction(FlGlobals.actions["copynode"])
-            menu.addAction(FlGlobals.actions["pastenode"])
-            menu.addAction(FlGlobals.actions["addnode"])
-            menu.addAction(FlGlobals.actions["moveup"])
-            menu.addAction(FlGlobals.actions["movedown"])
-            menu.addAction(FlGlobals.actions["createlink"])
-            menu.addAction(FlGlobals.actions["unlinknode"])
-            menu.addAction(FlGlobals.actions["unlinkstree"])
+            window = self.view.window()
+            menu.addAction(window.actions["collapse"])
+            menu.addAction(window.actions["copynode"])
+            menu.addAction(window.actions["pastenode"])
+            menu.addAction(window.actions["addnode"])
+            menu.addAction(window.actions["moveup"])
+            menu.addAction(window.actions["movedown"])
+            menu.addAction(window.actions["createlink"])
+            menu.addAction(window.actions["unlinknode"])
+            menu.addAction(window.actions["unlinkstree"])
         if not menu.isEmpty():
             menu.exec_(event.screenPos())
     
@@ -381,10 +365,11 @@ class EdgeItem(QGraphicsItem):
         super().__init__(**args)
         self.source = source
         self.treeviewport = view.viewport()
+        self.style = view.window().style
     
     def boundingRect(self):
         xmin = self.source.x()
-        xmax = xmin + FlGlobals.style.rankwidth
+        xmax = xmin + self.style.rankwidth
         children = self.source.childlist()
         if children:
             ymin = children[0].y()-self.arrowsize/2
@@ -414,7 +399,7 @@ class EdgeItem(QGraphicsItem):
         painter.setBrush(brush)
         x0 = self.source.x() + self.source.boundingRect().right()
         y0 = self.source.y()
-        vert_x = self.source.x() + FlGlobals.style.rankwidth/2
+        vert_x = self.source.x() + self.style.rankwidth/2
         painter.drawLine(x0+off, y0+off, vert_x+off, y0+off)
         for target in children:
             tx = target.x() + target.boundingRect().left()
@@ -593,6 +578,8 @@ class TreeView (QGraphicsView):
         scene.setBackgroundBrush(FlPalette.bg)
         self.setScene(scene)
         
+        self.style = self.window().style
+        
         self.nodecontainer = fp.loadjson("test3.json")
         self.nodedocs = dict()
         self.updateview()
@@ -694,8 +681,8 @@ class TreeView (QGraphicsView):
     def updatescenerect (self, root):
         top, bottom, depth = root.subtreesize(-1)
         height = abs(bottom - top)
-        rank = FlGlobals.style.rankwidth
-        row = FlGlobals.style.rowgap
+        rank = self.style.rankwidth
+        row = self.style.rowgap
         self.setSceneRect(QRectF(-rank/2, top-row/2, depth*(rank+0.5), height+row))
     
     def zoomstep (self, step):
@@ -713,8 +700,8 @@ class TreeView (QGraphicsView):
     
     def shownode (self, nodeitem):
         self.ensureVisible(nodeitem, 
-            FlGlobals.style.rankgap/2,
-            FlGlobals.style.rowgap/2)
+            self.style.rankgap/2,
+            self.style.rowgap/2)
     
     def setselectednode (self, nodeitem, signal=True):
         if nodeitem is not None:
@@ -737,10 +724,10 @@ class TreeView (QGraphicsView):
         self.nodecontainer.newlink(fromID, toID)
         self.updateview()
     
-    def addnode (self, paste=False):
+    def addnode (self, nodedict):
         selected = self.selectednode.realnode()
         selectedid = selected.id()        
-        newobj = self.nodecontainer.newnode(FlGlobals.newnode(paste), refID=selectedid)
+        newobj = self.nodecontainer.newnode(nodedict, refID=selectedid)
         newid = newobj.ID
         self.updateview()
         self.shownode(self.nodegraph[newid])
@@ -831,11 +818,13 @@ class TreeView (QGraphicsView):
             super().keyPressEvent(event)
 
 class EditorWindow (QMainWindow):
+    defaultNodeDict = {"type":"talk","text":"","speaker":"def","links":[]}
+    copiedNodeDict = None
+    
     def __init__ (self):
         super().__init__()
         
-        FlGlobals.window = self
-        FlGlobals.style = FlNodeStyle(QFont())
+        self.style = FlNodeStyle(QFont())
         
         self.view = TreeView(parent=self)
         
@@ -864,62 +853,63 @@ class EditorWindow (QMainWindow):
         
         self.setCentralWidget(splitter)
         
+        self.actions = dict()
+        
         viewtoolbar = QToolBar("View control")
-        FlGlobals.actions["zoomin"] = self.createaction("Zoom In", self.zoomin, 
+        self.actions["zoomin"] = self.createaction("Zoom In", self.zoomin, 
             [QKeySequence.ZoomIn, QKeySequence(Qt.ControlModifier + Qt.KeypadModifier + Qt.Key_Plus)], 
             ["gtk-zoom-in", "zoom-in"], "Zoom in")
-        FlGlobals.actions["zoomout"] = self.createaction("Zoom Out", self.zoomout, 
+        self.actions["zoomout"] = self.createaction("Zoom Out", self.zoomout, 
             [QKeySequence.ZoomOut, QKeySequence(Qt.ControlModifier + Qt.KeypadModifier + Qt.Key_Minus)], 
             ["gtk-zoom-out", "zoom-out"], "Zoom out")
-        FlGlobals.actions["zoomorig"] = self.createaction("Zoom Original", self.zoomorig, 
+        self.actions["zoomorig"] = self.createaction("Zoom Original", self.zoomorig, 
             [QKeySequence(Qt.ControlModifier + Qt.Key_0), QKeySequence(Qt.ControlModifier + Qt.KeypadModifier + Qt.Key_0)], 
             ["gtk-zoom-100", "zoom-original"], "Zoom to original size")
-        FlGlobals.actions["gotoactive"] = self.createaction("Go To Active", self.gotoactive, 
+        self.actions["gotoactive"] = self.createaction("Go To Active", self.gotoactive, 
             None, ["go-jump"], "Center on active node")
         
-        viewtoolbar.addAction(FlGlobals.actions["zoomorig"])
-        viewtoolbar.addAction(FlGlobals.actions["zoomin"])
-        viewtoolbar.addAction(FlGlobals.actions["zoomout"])
-        viewtoolbar.addAction(FlGlobals.actions["gotoactive"])
+        viewtoolbar.addAction(self.actions["zoomorig"])
+        viewtoolbar.addAction(self.actions["zoomin"])
+        viewtoolbar.addAction(self.actions["zoomout"])
+        viewtoolbar.addAction(self.actions["gotoactive"])
         self.addToolBar(viewtoolbar)
         
         edittoolbar = QToolBar("Tree editing")
-        FlGlobals.actions["addnode"] = self.createaction("&Add Node", self.addnode,
+        self.actions["addnode"] = self.createaction("&Add Node", self.addnode,
             None, ["insert-object"], "Add new node")
-        FlGlobals.actions["createlink"] = self.createaction("&Link to active node", self.createlink,
+        self.actions["createlink"] = self.createaction("&Link to active node", self.createlink,
             None, ["insert-link"], "Create link from active node to selected node")
-        FlGlobals.actions["copynode"] = self.createaction("&Copy Node", self.copynode,
+        self.actions["copynode"] = self.createaction("&Copy Node", self.copynode,
             None, ["edit-copy"], "Copy node")
-        FlGlobals.actions["pastenode"] = self.createaction("&Paste Node", self.pastenode,
+        self.actions["pastenode"] = self.createaction("&Paste Node", self.pastenode,
             None, ["edit-paste"], "Paste node")
-        FlGlobals.actions["pastenode"].setEnabled(False)
-        FlGlobals.actions["unlinkstree"] = self.createaction("Unlink &Subtree", self.unlink,
+        self.actions["pastenode"].setEnabled(False)
+        self.actions["unlinkstree"] = self.createaction("Unlink &Subtree", self.unlink,
             None, ["edit-clear"], "Unlink subtree from parent")
-        FlGlobals.actions["unlinknode"] = self.createaction("Unlink &Node", self.unlinkinherit,
+        self.actions["unlinknode"] = self.createaction("Unlink &Node", self.unlinkinherit,
             None, ["edit-delete"], "Unlink node and let parent inherit its child nodes")
-        FlGlobals.actions["moveup"] = self.createaction("Move &Up", self.moveup,
+        self.actions["moveup"] = self.createaction("Move &Up", self.moveup,
             None, ["go-up"], "Move node up")
-        FlGlobals.actions["movedown"] = self.createaction("Move &Down", self.movedown,
+        self.actions["movedown"] = self.createaction("Move &Down", self.movedown,
             None, ["go-down"], "Move node down")
-        FlGlobals.actions["collapse"] = self.createaction("(Un)Collapse subtree", self.collapse,
+        self.actions["collapse"] = self.createaction("(Un)Collapse subtree", self.collapse,
             None, None, "(Un)Collapse subtree")
         
-        edittoolbar.addAction(FlGlobals.actions["addnode"])
-        edittoolbar.addAction(FlGlobals.actions["createlink"])
-        edittoolbar.addAction(FlGlobals.actions["copynode"])
-        edittoolbar.addAction(FlGlobals.actions["pastenode"])
-        edittoolbar.addAction(FlGlobals.actions["unlinknode"])
-        edittoolbar.addAction(FlGlobals.actions["unlinkstree"])
-        edittoolbar.addAction(FlGlobals.actions["moveup"])
-        edittoolbar.addAction(FlGlobals.actions["movedown"])
+        edittoolbar.addAction(self.actions["addnode"])
+        edittoolbar.addAction(self.actions["createlink"])
+        edittoolbar.addAction(self.actions["copynode"])
+        edittoolbar.addAction(self.actions["pastenode"])
+        edittoolbar.addAction(self.actions["unlinknode"])
+        edittoolbar.addAction(self.actions["unlinkstree"])
+        edittoolbar.addAction(self.actions["moveup"])
+        edittoolbar.addAction(self.actions["movedown"])
         self.addToolBar(edittoolbar)
         
         searchtoolbar = QToolBar("Search")
         searchwidget = SearchWidget(self)
         searchtoolbar.addWidget(searchwidget)
         self.addToolBar(searchtoolbar)
-                
-        
+    
     def activeview (self):
         return self.tabs.currentWidget()
     
@@ -964,7 +954,7 @@ class EditorWindow (QMainWindow):
     
     @pyqtSlot()
     def addnode (self):
-        self.activeview().addnode()
+        self.activeview().addnode(self.defaultNodeDict)
        
     @pyqtSlot()
     def createlink (self):
@@ -972,11 +962,14 @@ class EditorWindow (QMainWindow):
     
     @pyqtSlot()
     def copynode (self):
-        FlGlobals.copynode(self.activeview().selectednode)
+        nodedict = self.activeview().selectednode.nodeobj.todict()
+        nodedict["links"] = []
+        self.copiedNodeDict = nodedict
+        self.actions["pastenode"].setEnabled(True)
     
     @pyqtSlot()
     def pastenode (self):
-        self.activeview().addnode(paste=True)
+        self.activeview().addnode(self.copiedNodeDict)
     
     @pyqtSlot()
     def unlinkinherit (self):
