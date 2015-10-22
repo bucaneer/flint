@@ -340,11 +340,13 @@ class NodeItem(QGraphicsItem):
             window = self.view.window()
             menu.addAction(window.actions["collapse"])
             menu.addAction(window.actions["copynode"])
-            menu.addAction(window.actions["pastenode"])
+            pastemenu = QMenu("Paste...")
+            pastemenu.addAction(window.actions["pasteclone"])
+            pastemenu.addAction(window.actions["pastelink"])
+            menu.addMenu(pastemenu)
             menu.addAction(window.actions["addnode"])
             menu.addAction(window.actions["moveup"])
             menu.addAction(window.actions["movedown"])
-            menu.addAction(window.actions["createlink"])
             menu.addAction(window.actions["unlinknode"])
             menu.addAction(window.actions["unlinkstree"])
         if not menu.isEmpty():
@@ -718,9 +720,8 @@ class TreeView (QGraphicsView):
                 self.activeChanged.emit(self.activenode.nodeobj.ID)
             self.scene().update()
     
-    def createlink (self):
-        fromID = self.activenode.nodeobj.ID
-        toID = self.selectednode.nodeobj.ID
+    def createlink (self, toID):
+        fromID = self.selectednode.nodeobj.ID
         self.nodecontainer.newlink(fromID, toID)
         self.updateview()
     
@@ -877,13 +878,14 @@ class EditorWindow (QMainWindow):
         edittoolbar = QToolBar("Tree editing")
         self.actions["addnode"] = self.createaction("&Add Node", self.addnode,
             None, ["insert-object"], "Add new node")
-        self.actions["createlink"] = self.createaction("&Link to active node", self.createlink,
-            None, ["insert-link"], "Create link from active node to selected node")
         self.actions["copynode"] = self.createaction("&Copy Node", self.copynode,
             None, ["edit-copy"], "Copy node")
-        self.actions["pastenode"] = self.createaction("&Paste Node", self.pastenode,
-            None, ["edit-paste"], "Paste node")
-        self.actions["pastenode"].setEnabled(False)
+        self.actions["pasteclone"] = self.createaction("Paste as &Clone", self.pasteclone,
+            None, ["edit-paste"], "Paste cloned node")
+        self.actions["pastelink"] = self.createaction("Paste as &Link", self.pastelink,
+            None, ["insert-link"], "Paste link to node")
+        self.actions["pasteclone"].setEnabled(False)
+        self.actions["pastelink"].setEnabled(False)
         self.actions["unlinkstree"] = self.createaction("Unlink &Subtree", self.unlink,
             None, ["edit-clear"], "Unlink subtree from parent")
         self.actions["unlinknode"] = self.createaction("Unlink &Node", self.unlinkinherit,
@@ -892,13 +894,13 @@ class EditorWindow (QMainWindow):
             None, ["go-up"], "Move node up")
         self.actions["movedown"] = self.createaction("Move &Down", self.movedown,
             None, ["go-down"], "Move node down")
-        self.actions["collapse"] = self.createaction("(Un)Collapse subtree", self.collapse,
+        self.actions["collapse"] = self.createaction("(Un)Colla&pse subtree", self.collapse,
             None, None, "(Un)Collapse subtree")
         
         edittoolbar.addAction(self.actions["addnode"])
-        edittoolbar.addAction(self.actions["createlink"])
         edittoolbar.addAction(self.actions["copynode"])
-        edittoolbar.addAction(self.actions["pastenode"])
+        edittoolbar.addAction(self.actions["pasteclone"])
+        edittoolbar.addAction(self.actions["pastelink"])
         edittoolbar.addAction(self.actions["unlinknode"])
         edittoolbar.addAction(self.actions["unlinkstree"])
         edittoolbar.addAction(self.actions["moveup"])
@@ -955,21 +957,24 @@ class EditorWindow (QMainWindow):
     @pyqtSlot()
     def addnode (self):
         self.activeview().addnode(self.defaultNodeDict)
-       
-    @pyqtSlot()
-    def createlink (self):
-        self.activeview().createlink()
     
     @pyqtSlot()
     def copynode (self):
-        nodedict = self.activeview().selectednode.nodeobj.todict()
+        nodeobj = self.activeview().selectednode.nodeobj
+        nodedict = nodeobj.todict()
         nodedict["links"] = []
-        self.copiedNodeDict = nodedict
-        self.actions["pastenode"].setEnabled(True)
+        self.copiedNodeDict = (nodeobj.ID, nodedict)
+        self.actions["pasteclone"].setEnabled(True)
+        self.actions["pastelink"].setEnabled(True)
     
     @pyqtSlot()
-    def pastenode (self):
-        self.activeview().addnode(self.copiedNodeDict)
+    def pasteclone (self):
+        self.activeview().addnode(self.copiedNodeDict[1])
+    
+    @pyqtSlot()
+    def pastelink (self):
+        self.activeview().createlink(self.copiedNodeDict[0])
+        #FIXME: won't work with multiple TreeViews
     
     @pyqtSlot()
     def unlinkinherit (self):
