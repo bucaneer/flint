@@ -198,14 +198,6 @@ class NodeItem(QGraphicsItem):
     def y_low (self):
         return self.y() + self.boundingRect().height()//2
     
-    def subtreerootdrop(self):
-        children = self.childlist()
-        if children:
-            top, bottom, depth = self.subtreesize(1)
-            new_y = (top+bottom)//2
-            if new_y != self.y():
-                self.setY(new_y)
-    
     def bulkshift (self, diff):
         self.setY(self.y() + diff)
         for child in self.childlist():
@@ -215,10 +207,13 @@ class NodeItem(QGraphicsItem):
         if ranks is None:
             ranks = dict()
         localranks = dict()
-        for child in self.childlist():
+        children = self.childlist()
+        for child in children:
             localranks = child.graphcompact(localranks)
         rank = self.x() // self.style.rankwidth
-        self.subtreerootdrop()
+        if children:
+            top, bottom, depth = self.subtreesize(1)
+            self.setY((top+bottom)//2)
         localranks[rank] = [self.y_up, self.y_low]
         streeshift = None
         for r in localranks:
