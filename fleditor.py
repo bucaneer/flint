@@ -117,6 +117,7 @@ class NodeItem(QGraphicsItem):
         self.setCursor(Qt.ArrowCursor)
         self.view = view
         self.treeviewport = view.viewport()
+        self.textheight = 0
         self.ghost = ghost
         self.graphicsetup()
     
@@ -189,6 +190,10 @@ class NodeItem(QGraphicsItem):
         ndtxt = self.nodetext
         ndtxt.setPlainText(self.view.nodedocs[self.nodeobj.ID]["text"].toPlainText())
         textrect = ndtxt.mapRectToParent(ndtxt.boundingRect())
+        textheight = textrect.height()
+        if textheight == self.textheight:
+            return
+        self.textheight = textheight
         self.textbox.setRect(textrect)
         mainrect = textrect.united(self.nodelabel.mapRectToParent(self.nodelabel.boundingRect())).marginsAdded(QMarginsF(*[FlGlobals.style.nodemargin]*4))
         self.mainbox.setRect(mainrect)
@@ -198,6 +203,7 @@ class NodeItem(QGraphicsItem):
         self.activebox.setRect(activerect)
         self.graphgroup.setPos(-activerect.width()//2-activerect.x(), -activerect.height()//2-activerect.y())
         self.rect = self.graphgroup.mapRectToParent(self.activebox.boundingRect())
+        self.view.layoutgraph()
     
     def id (self):
         if self.isghost():
@@ -581,7 +587,7 @@ class NodeEditWidget (QWidget):
     @pyqtSlot()
     def setnodetext (self):
         self.nodeobj.text = self.nodetext.toPlainText()
-        FlGlobals.window.activeview().layoutgraph()
+        FlGlobals.window.activeview().scene().update()
 
 class SearchWidget (QWidget):
     def __init__ (self, parent):
@@ -625,9 +631,9 @@ class TreeView (QGraphicsView):
         self.setRenderHints(QPainter.SmoothPixmapTransform | QPainter.Antialiasing)
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         """OPTIONS: OpenGL rendering; FullViewportUpdate; MinimalViewportUpdate"""
-        #self.setViewport(QGLWidget(QGLFormat(QGL.SampleBuffers)))
+        self.setViewport(QGLWidget(QGLFormat(QGL.SampleBuffers)))
         #self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
-        self.setViewportUpdateMode(QGraphicsView.MinimalViewportUpdate)
+        #self.setViewportUpdateMode(QGraphicsView.MinimalViewportUpdate)
         
         scene =  QGraphicsScene()
         scene.setBackgroundBrush(FlPalette.bg)
@@ -665,13 +671,14 @@ class TreeView (QGraphicsView):
             if selparent is not None:
                 selparentID = selparent.id()
         
+        self.constructed = False
         self.updatedocs()
         self.scene().clear()
         self.nodegraph = dict()
         #self.treewidth = self.treeheight = 0
         self.viewframe = FrameItem(view=self)
         self.scene().addItem(self.viewframe)
-        self.constructgraph()
+        self.constructed = self.constructgraph()
         self.layoutgraph()
         
         if activeID and activeID in self.nodegraph:
@@ -702,6 +709,7 @@ class TreeView (QGraphicsView):
                 for nextID in curnodeobj.linkIDs:
                     queue.append((nextID, nodeitem))
                     visited[nextID] = nextID in visited and visited[nextID]
+        return True
     
     def newitem (self, nodeobj, parent, isghost=False):
         if parent is None:
@@ -726,6 +734,8 @@ class TreeView (QGraphicsView):
         return self.nodegraph["0"]
     
     def layoutgraph (self):
+        if not self.constructed:
+            return
         root = self.treeroot()
         root.treeposition()
         # OPTION : 
