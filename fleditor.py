@@ -56,6 +56,7 @@ class NodeItem(QGraphicsItem):
         self.nodeobj = nodeobj
         self.children = []
         self.referrers = []
+        self.style = view.window().style
         if parent is None:
             self.parent = None
             self.ref = None
@@ -63,12 +64,12 @@ class NodeItem(QGraphicsItem):
             self.ref = parent.id()
             self.parent = parent
             self.parent.addchild(self)
+            self.setX(parent.x()+self.style.rankwidth)
         self.setCursor(Qt.ArrowCursor)
         self.view = view
         self.treeviewport = view.viewport()
         self.textheight = 0
         self.ghost = ghost
-        self.style = view.window().style
         self.graphicsetup()
     
     def graphicsetup (self):
@@ -196,32 +197,8 @@ class NodeItem(QGraphicsItem):
     
     def y_low (self):
         return self.y() + self.boundingRect().height()//2
-           
-    def treeposition (self):
-        """Recursively set node position in a basic tree.
-        
-        Postion of all ancestor and previous sibling nodes has to be known for
-        proper positioning."""
-        
-        parent = self.parent
-        if parent:
-            x = parent.x() + self.style.rankwidth
-            sib = self.siblingabove()
-            if sib:
-                y = sib.subtreesize(-1)[1] + (self.boundingRect().height()/2) + self.style.rowgap
-            else:
-                y = parent.y()
-        else:
-            x = 0
-            y = 0 
-        if x != self.x() or y != self.y():
-            self.setPos(QPoint(x, y))
-        for child in self.childlist():
-            child.treeposition()
     
     def subtreerootdrop(self):
-        """Reposition subtree root node to midpoint of subtree height."""
-        
         children = self.childlist()
         if children:
             top, bottom, depth = self.subtreesize(1)
@@ -675,7 +652,6 @@ class TreeView (QGraphicsView):
         if not self.constructed:
             return
         root = self.treeroot()
-        root.treeposition()
         root.graphcompact()
         self.updatescenerect(root)
         self.scene().update()
