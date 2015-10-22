@@ -7,16 +7,6 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtOpenGL import *
 import flint_parser as fp
 
-"""NODETEXTWIDTH = 300
-NODEHEIGHT = 140
-
-MINRANKGAP = 50
-MINROWGAP = 30
-RANKGAP = max(int(NODETEXTWIDTH * 1.1), NODETEXTWIDTH + MINRANKGAP)
-ROWGAP = max(int(NODEHEIGHT * 1.1), NODEHEIGHT + MINROWGAP)"""
-
-nextID = 100
-
 class FlPalette (object):
     """Palette of custom colors for quick reference."""
     dark    = QColor( 38,  39,  41)
@@ -36,23 +26,8 @@ class FlNodeStyle (object):
         self.boldfont = boldfont
         
         basemetrics = QFontMetrics(basefont)
-        boldmetrics = QFontMetrics(boldfont)
-        self.basemetrics = basemetrics
-        self.boldmetrics = boldmetrics
-        
         baseem = basemetrics.height()
         baseen = baseem // 2
-        boldem = boldmetrics.height()
-        bolden = boldem // 2
-        """self.baseem = baseem
-        self.baseen = baseen
-        self.boldem = boldem
-        self.bolden = bolden"""
-        
-        baselead = basemetrics.leading()
-        baselspace = basemetrics.lineSpacing()
-        boldlead = boldmetrics.leading()
-        boldlspace = boldmetrics.lineSpacing()
         
         nodemargin = baseen*3//5
         itemmargin = baseen//2
@@ -63,24 +38,16 @@ class FlNodeStyle (object):
         self.activemargin = activemargin
         self.selectmargin = selectmargin
         
-        minnodewidth = min(boldmetrics.width("Node 0000")*2, boldem*6)+2*(activemargin+nodemargin+itemmargin)
-        prefnodewidth = basemetrics.averageCharWidth()*40 + 2*(activemargin+nodemargin+itemmargin)
-        nodewidth = max(minnodewidth, prefnodewidth)
-        self.nodewidth = nodewidth
-        
         self.nodetextwidth = basemetrics.averageCharWidth()*40
         
-        minnodeheight = boldlspace+1*baselspace+2*(activemargin+nodemargin+3*itemmargin)
-        prefnodeheight = boldlspace+1*baselspace+2*(activemargin+nodemargin+3*itemmargin)
-        nodeheight = max(minnodeheight, prefnodeheight)
-        self.nodeheight = nodeheight
+        nodewidth = self.nodetextwidth + 2*(activemargin+nodemargin+itemmargin)
+        self.nodewidth = nodewidth
         
-        minrankgap = 5*activemargin + nodewidth
-        rankgap = max(minrankgap, round(nodewidth*1.1))
+        rankgap = 7*activemargin
         self.rankgap = rankgap
+        self.rankwidth = rankgap + nodewidth
         
-        minrowgap = 3*activemargin #+ nodeheight
-        rowgap = max(minrowgap, round(nodeheight*0.1))
+        rowgap = 3*activemargin
         self.rowgap = rowgap
 
 class FlGlobals (object):
@@ -253,32 +220,27 @@ class NodeItem(QGraphicsItem):
         Postion of all ancestor and previous sibling nodes has to be known for
         proper positioning."""
         
-        parent = self.parent #node()
+        parent = self.parent
         if parent:
-            x = parent.x() + FlGlobals.style.rankgap #RANKGAP
+            x = parent.x() + FlGlobals.style.rankwidth
             sib = self.siblingabove()
             if sib:
-                y = sib.subtreesize(-1)[1] + (self.boundingRect().height()/2) + FlGlobals.style.rowgap #ROWGAP
+                y = sib.subtreesize(-1)[1] + (self.boundingRect().height()/2) + FlGlobals.style.rowgap
             else:
-                y = parent.y() #+ (self.gettextheight()-parent.gettextheight())/2
+                y = parent.y()
         else:
             x = 0
             y = 0 
         if x != self.x() or y != self.y():
             self.setPos(QPoint(x, y))
-            self.posinit = True
-            #self.getview().updatedimensions(x, y)      
-        for child in self.childlist(): #ren():
+        for child in self.childlist():
             child.treeposition()
     
-    def subtreerootdrop(self, recursive=False):
+    def subtreerootdrop(self):
         """Reposition subtree root node to midpoint of subtree height."""
         
-        children = self.childlist() #ren()
+        children = self.childlist()
         if children:
-            if recursive:
-                for child in children:
-                    child.subtreerootdrop(recursive)
             top, bottom, depth = self.subtreesize(1)
             new_y = (top+bottom)//2
             if new_y != self.y():
@@ -295,7 +257,7 @@ class NodeItem(QGraphicsItem):
         localranks = dict()
         for child in self.childlist():
             localranks = child.graphcompact(localranks)
-        rank = self.x() // FlGlobals.style.rankgap #RANKGAP
+        rank = self.x() // FlGlobals.style.rankwidth
         self.subtreerootdrop()
         localranks[rank] = [self.y_up, self.y_low]
         streeshift = None
@@ -312,9 +274,9 @@ class NodeItem(QGraphicsItem):
         return ranks
     
     def siblings (self):
-        parent = self.parent #node()
+        parent = self.parent
         if parent:
-            return parent.childlist() #ren()
+            return parent.childlist()
         else:
             return None
     
@@ -422,7 +384,7 @@ class EdgeItem(QGraphicsItem):
     
     def boundingRect(self):
         xmin = self.source.x()
-        xmax = xmin + FlGlobals.style.rankgap #RANKGAP
+        xmax = xmin + FlGlobals.style.rankwidth
         children = self.source.childlist()
         if children:
             ymin = children[0].y()-self.arrowsize/2
@@ -452,7 +414,7 @@ class EdgeItem(QGraphicsItem):
         painter.setBrush(brush)
         x0 = self.source.x() + self.source.boundingRect().right()
         y0 = self.source.y()
-        vert_x = self.source.x() + FlGlobals.style.rankgap/2 #RANKGAP/2 #(RANKGAP-arrow)/2
+        vert_x = self.source.x() + FlGlobals.style.rankwidth/2
         painter.drawLine(x0+off, y0+off, vert_x+off, y0+off)
         for target in children:
             tx = target.x() + target.boundingRect().left()
@@ -480,7 +442,7 @@ class FrameItem (QGraphicsItem):
         viewport = self.treeview.viewport()
         viewportrect = QRect(0, 0, viewport.width(), viewport.height())
         visiblerect = self.treeview.mapToScene(viewportrect).boundingRect()
-        return visiblerect #.intersected(self.treeview.sceneRect())
+        return visiblerect
     
     def paint (self, painter, style, widget):
         if widget is not self.treeview.viewport():
@@ -495,7 +457,6 @@ class MapView (QGraphicsView):
         super().__init__(parent)
         self.setOptimizationFlags(QGraphicsView.DontAdjustForAntialiasing | QGraphicsView.DontSavePainterState)
         self.setRenderHints(QPainter.SmoothPixmapTransform | QPainter.Antialiasing)
-        #self.setViewportUpdateMode(QGraphicsView.NoViewportUpdate)
         self.treeview = None
         self.scenerect = self.viewrect = QRectF()
     
@@ -514,7 +475,7 @@ class MapView (QGraphicsView):
     @pyqtSlot()
     def update (self):
         change = False
-        window = FlGlobals.window
+        window = self.window()
         activeview = window.activeview()
         if activeview is not self.treeview:
             self.treeview = activeview
@@ -542,7 +503,7 @@ class ParagraphEdit (QPlainTextEdit):
         key = event.key()
         mod = event.modifiers()
         if not (mod & Qt.ShiftModifier) and (key == Qt.Key_Enter or key == Qt.Key_Return):
-            FlGlobals.window.activeview().setFocus()
+            self.window().activeview().setFocus()
         else:
             super().keyPressEvent(event)
 
@@ -569,12 +530,10 @@ class NodeEditWidget (QWidget):
         
     @pyqtSlot(str)
     def loadnode (self, nodeID):
-        view = FlGlobals.window.activeview()
+        view = self.window().activeview()
         self.nodeobj = view.nodecontainer.nodes[nodeID]
         nodetextdoc = view.nodedocs[nodeID]["text"]
-        #self.nodeitem = FlGlobals.window.activeview().nodegraph[nodeID]
         self.speaker.setText(self.nodeobj.speaker)
-        #self.nodetext.setPlainText(self.nodeobj.text)
         self.nodetext.setDocument(nodetextdoc)
         self.nodetext.setFocus()
         self.nodetext.moveCursor(QTextCursor.End)
@@ -582,12 +541,10 @@ class NodeEditWidget (QWidget):
     @pyqtSlot()
     def setnodespeaker (self):
         self.nodeobj.speaker = self.speaker.text()
-        FlGlobals.window.activeview().scene().update()
     
     @pyqtSlot()
     def setnodetext (self):
         self.nodeobj.text = self.nodetext.toPlainText()
-        FlGlobals.window.activeview().scene().update()
 
 class SearchWidget (QWidget):
     def __init__ (self, parent):
@@ -596,12 +553,10 @@ class SearchWidget (QWidget):
         self.inputline = QLineEdit(self)
         self.inputline.editingFinished.connect(self.search)
         self.inputline.setPlaceholderText("Search")
-        #self.inputline.setMaximumWidth(200)
         searchbutton = QPushButton(self)
         searchbutton.setIcon(QIcon.fromTheme("edit-find"))
         searchbutton.setToolTip("Search")
         searchbutton.clicked.connect(self.search)
-        #searchbutton.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Maximum)
         self.setMaximumWidth(200)
         
         layout.addWidget(self.inputline)
@@ -609,7 +564,7 @@ class SearchWidget (QWidget):
     
     def search (self):
         query = self.inputline.text().casefold()
-        view = FlGlobals.window.activeview()
+        view = self.window().activeview()
         view.search(query)   
 
 class TreeView (QGraphicsView):
@@ -622,7 +577,6 @@ class TreeView (QGraphicsView):
         self.zoomscale = 1
         self.activenode = None
         self.selectednode = None
-        #self.treewidth = self.treeheight = 0
         self.collapsednodes = []
         self.hits = []
         
@@ -641,10 +595,6 @@ class TreeView (QGraphicsView):
         
         self.nodecontainer = fp.loadjson("test3.json")
         self.nodedocs = dict()
-        """self.nodegraph = dict()
-        self.constructgraph()
-        self.layoutgraph()
-        scene.addItem(FrameItem(widget=self.viewport()))"""
         self.updateview()
         self.setactivenode(self.treeroot())
         self.setselectednode(self.treeroot())
@@ -675,7 +625,6 @@ class TreeView (QGraphicsView):
         self.updatedocs()
         self.scene().clear()
         self.nodegraph = dict()
-        #self.treewidth = self.treeheight = 0
         self.viewframe = FrameItem(view=self)
         self.scene().addItem(self.viewframe)
         self.constructed = self.constructgraph()
@@ -738,29 +687,17 @@ class TreeView (QGraphicsView):
             return
         root = self.treeroot()
         root.treeposition()
-        # OPTION : 
-        #if compactlayout:
         root.graphcompact()
-        #else:
-        #root.subtreerootdrop(recursive=True)
         self.updatescenerect(root)
         self.scene().update()
     
     def updatescenerect (self, root):
         top, bottom, depth = root.subtreesize(-1)
         height = abs(bottom - top)
-        #print(treedims)
-        rank = FlGlobals.style.rankgap
+        rank = FlGlobals.style.rankwidth
         row = FlGlobals.style.rowgap
         self.setSceneRect(QRectF(-rank/2, top-row/2, depth*(rank+0.5), height+row))
-        #self.setSceneRect(QRectF(-RANKGAP/2, -ROWGAP/2, self.treewidth+RANKGAP, self.treeheight+ROWGAP))
     
-    """def updatedimensions (self, x, y):
-        if x > self.treewidth:
-            self.treewidth = x
-        if y > self.treeheight:
-            self.treeheight = y"""
-       
     def zoomstep (self, step):
         self.zoomview(1.1 ** step)
     
@@ -776,8 +713,8 @@ class TreeView (QGraphicsView):
     
     def shownode (self, nodeitem):
         self.ensureVisible(nodeitem, 
-            FlGlobals.style.rankgap-FlGlobals.style.nodewidth, 
-            FlGlobals.style.rowgap)
+            FlGlobals.style.rankgap/2,
+            FlGlobals.style.rowgap/2)
     
     def setselectednode (self, nodeitem, signal=True):
         if nodeitem is not None:
@@ -790,7 +727,6 @@ class TreeView (QGraphicsView):
     def setactivenode (self, nodeitem, signal=True):
         if nodeitem is not None:
             self.activenode = nodeitem.realnode()
-            #self.shownode(self.activenode)
             if signal:
                 self.activeChanged.emit(self.activenode.nodeobj.ID)
             self.scene().update()
@@ -803,16 +739,11 @@ class TreeView (QGraphicsView):
     
     def addnode (self, paste=False):
         selected = self.selectednode.realnode()
-        #if selected.isghost():
-        #    return
         selectedid = selected.id()        
         newobj = self.nodecontainer.newnode(FlGlobals.newnode(paste), refID=selectedid)
         newid = newobj.ID
         self.updateview()
         self.shownode(self.nodegraph[newid])
-        """newitem = self.newitem(newobj, selected)
-        self.layoutgraph()
-        self.shownode(newitem)"""
     
     def unlink (self, inherit=False):
         selID = self.selectednode.nodeobj.ID
@@ -876,7 +807,6 @@ class TreeView (QGraphicsView):
     
     def keyPressEvent(self, event):
         key = event.key()
-        #mod = event.modifiers() & ~Qt.KeypadModifier
         node = self.selectednode
         if key == Qt.Key_Left:
             if node.parent:
