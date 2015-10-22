@@ -203,13 +203,13 @@ class NodeItem(QGraphicsItem):
         for child in self.childlist():
             child.bulkshift(diff)
     
-    def graphcompact (self, ranks=None):
+    def treeposition (self, ranks=None):
         if ranks is None:
             ranks = dict()
         localranks = dict()
         children = self.childlist()
         for child in children:
-            localranks = child.graphcompact(localranks)
+            localranks = child.treeposition(localranks)
         rank = self.x() // self.style.rankwidth
         if children:
             top, bottom, depth = self.subtreesize(1)
@@ -647,7 +647,7 @@ class TreeView (QGraphicsView):
         if not self.constructed:
             return
         root = self.treeroot()
-        root.graphcompact()
+        root.treeposition()
         self.updatescenerect(root)
         self.scene().update()
     
