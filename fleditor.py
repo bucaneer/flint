@@ -96,6 +96,7 @@ class NodeItem(QGraphicsItem):
         self.view = view
         self.treeviewport = view.viewport()
         self.textheight = 0
+        self.collapselayout = False
         self.ghost = ghost
         self.graphicsetup()
     
@@ -138,7 +139,7 @@ class NodeItem(QGraphicsItem):
         self.graphgroup.addToGroup(self.mainbox)
         
         self.textbox = QGraphicsRectItemCond(self, 
-            lambda s,w: w is self.treeviewport)
+            lambda s,w: w is self.treeviewport and not self.iscollapsed())
         self.textbox.setBrush(lightbrush)
         self.textbox.setPen(nopen)
         self.graphgroup.addToGroup(self.textbox)
@@ -152,35 +153,42 @@ class NodeItem(QGraphicsItem):
         self.graphgroup.addToGroup(self.nodelabel)
         
         self.nodespeaker = QGraphicsSimpleTextItemCond(self, 
-            lambda s,w: w is self.treeviewport)
+            lambda s,w: w is self.treeviewport and not self.iscollapsed())
         self.nodespeaker.setBrush(lightbrush)
         self.nodespeaker.setText(self.nodeobj.speaker)
         self.nodespeaker.setPos(self.style.itemmargin, self.nodelabel.y()+self.nodelabel.boundingRect().height()+self.style.itemmargin*2)
         self.graphgroup.addToGroup(self.nodespeaker)
         
         self.nodetext = QGraphicsTextItemCond(self, 
-            lambda s,w: w is self.treeviewport)
+            lambda s,w: w is self.treeviewport and not self.iscollapsed())
         self.nodetext.setTextWidth(self.style.nodetextwidth)
         self.nodetext.setPos(0, self.nodespeaker.y()+self.nodespeaker.boundingRect().height()+self.style.itemmargin)
         self.graphgroup.addToGroup(self.nodetext)
         
-        self.view.nodedocs[self.nodeobj.ID]["text"].contentsChanged.connect(self.updatetext)
-        self.updatetext()
+        self.view.nodedocs[self.nodeobj.ID]["text"].contentsChanged.connect(self.updatelayout)
+        self.updatelayout()
         
         if self.isghost():
             self.graphgroup.setOpacity(0.7)
             self.shadowbox.hide()
     
     @pyqtSlot()
-    def updatetext (self):
-        ndtxt = self.nodetext
-        ndtxt.setPlainText(self.view.nodedocs[self.nodeobj.ID]["text"].toPlainText())
-        textrect = ndtxt.mapRectToParent(ndtxt.boundingRect())
-        textheight = textrect.height()
-        if textheight == self.textheight:
-            return
-        self.textheight = textheight
-        self.textbox.setRect(textrect)
+    def updatelayout (self):
+        if self.iscollapsed():
+            if self.collapselayout:
+                return
+            else:
+                textrect = QRectF()
+                self.collapselayout = True
+        else:
+            ndtxt = self.nodetext
+            ndtxt.setPlainText(self.view.nodedocs[self.nodeobj.ID]["text"].toPlainText())
+            textrect = ndtxt.mapRectToParent(ndtxt.boundingRect())
+            textheight = textrect.height()
+            if textheight == self.textheight:
+                return
+            self.textheight = textheight
+            self.textbox.setRect(textrect)
         mainrect = textrect.united(self.nodelabel.mapRectToParent(self.nodelabel.boundingRect())).marginsAdded(QMarginsF(*[self.style.nodemargin]*4))
         self.mainbox.setRect(mainrect)
         self.shadowbox.setRect(mainrect)
