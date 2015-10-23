@@ -97,6 +97,7 @@ class NodeItem(QGraphicsItem):
         self.treeviewport = view.viewport()
         self.textheight = 0
         self.collapselayout = False
+        self.edge = None
         self.ghost = ghost
         self.graphicsetup()
     
@@ -196,6 +197,7 @@ class NodeItem(QGraphicsItem):
         activerect = mainrect.marginsAdded(QMarginsF(*[self.style.activemargin]*4))
         self.activebox.setRect(activerect)
         self.graphgroup.setPos(-activerect.width()//2-activerect.x(), -activerect.height()//2-activerect.y())
+        self.prepareGeometryChange()
         self.rect = self.graphgroup.mapRectToParent(self.activebox.boundingRect())
         self.view.layoutgraph()
     
@@ -220,6 +222,9 @@ class NodeItem(QGraphicsItem):
     def addreferrer (self, refID):
         self.referrers.append(refID)
     
+    def setedge (self, edge):
+        self.edge = edge
+    
     def isghost (self):
         return self.ghost
     
@@ -234,7 +239,11 @@ class NodeItem(QGraphicsItem):
     
     def iscollapsed (self):
         return self.id() in self.view.collapsednodes
-        
+    
+    def setY (self, *args):
+        self.edge.prepareGeometryChange()
+        super().setY(*args)    
+    
     def y_up (self):
         return self.y() - self.boundingRect().height()//2
     
@@ -371,6 +380,7 @@ class EdgeItem(QGraphicsItem):
     def __init__(self, source, view, **args):
         super().__init__(**args)
         self.source = source
+        source.setedge(self)
         self.treeviewport = view.viewport()
         self.style = view.window().style
     
