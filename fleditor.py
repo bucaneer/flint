@@ -50,6 +50,33 @@ class FlNodeStyle (object):
         rowgap = 3*activemargin
         self.rowgap = rowgap
 
+class QGraphicsRectItemCond (QGraphicsRectItem):
+    def __init__(self, parent=0, cond=None, **args):
+        super().__init__(parent, **args)
+        self.cond = cond
+    
+    def paint(self, painter, style, widget):
+        if self.cond(self, widget):
+            super().paint(painter, style, widget)
+
+class QGraphicsSimpleTextItemCond (QGraphicsSimpleTextItem):
+    def __init__(self, parent=0, cond=None, **args):
+        super().__init__(parent, **args)
+        self.cond = cond
+    
+    def paint(self, painter, style, widget):
+        if self.cond(self, widget):
+            super().paint(painter, style, widget)
+
+class QGraphicsTextItemCond (QGraphicsTextItem):
+    def __init__(self, parent=0, cond=None, **args):
+        super().__init__(parent, **args)
+        self.cond = cond
+    
+    def paint(self, painter, style, widget):
+        if self.cond(self, widget):
+            super().paint(painter, style, widget)
+
 class NodeItem(QGraphicsItem):
     def __init__(self, nodeobj, parent=None, view=None, ghost=False, **args):
         super().__init__(**args)
@@ -81,54 +108,62 @@ class NodeItem(QGraphicsItem):
             self.altcolor = FlPalette.hl1
         lightbrush = QBrush(FlPalette.light)
         mainbrush = QBrush(self.maincolor)
+        altbrush = QBrush(self.altcolor)
         nopen = QPen(0)
          
         self.graphgroup = QGraphicsItemGroup(self)
         
-        self.shadowbox = QGraphicsRectItem(self)
+        self.shadowbox = QGraphicsRectItemCond(self, 
+            lambda s,w: w is self.treeviewport)
         self.shadowbox.setBrush(FlPalette.dark)
         self.shadowbox.setPen(nopen)
         self.shadowbox.setPos(2, 2)
         self.graphgroup.addToGroup(self.shadowbox)
         
-        self.selectbox = QGraphicsRectItem(self)
+        self.selectbox = QGraphicsRectItemCond(self,
+            lambda s,w: w is self.treeviewport and self.isselected())
         self.selectbox.setBrush(lightbrush)
         self.selectbox.setPen(nopen)
         self.graphgroup.addToGroup(self.selectbox)
         
-        self.activebox = QGraphicsRectItem(self)
+        self.activebox = QGraphicsRectItemCond(self, 
+            lambda s,w: w is self.treeviewport and self.isactive())
         self.activebox.setBrush(lightbrush)
         self.activebox.setPen(nopen)
         self.graphgroup.addToGroup(self.activebox)
         
-        self.mainbox = QGraphicsRectItem(self)
-        self.mainbox.setBrush(mainbrush)
+        self.mainbox = QGraphicsRectItemCond(self, 
+            lambda s,w: self.isactive() and (s.setBrush(altbrush) or True) or s.setBrush(mainbrush) or True)
         self.mainbox.setPen(nopen)
         self.graphgroup.addToGroup(self.mainbox)
         
-        self.textbox = QGraphicsRectItem(self)
+        self.textbox = QGraphicsRectItemCond(self, 
+            lambda s,w: w is self.treeviewport)
         self.textbox.setBrush(lightbrush)
         self.textbox.setPen(nopen)
         self.graphgroup.addToGroup(self.textbox)
         
-        self.nodelabel = QGraphicsSimpleTextItem(self)
+        self.nodelabel = QGraphicsSimpleTextItemCond(self, 
+            lambda s,w: w is self.treeviewport)
         self.nodelabel.setBrush(lightbrush)
         self.nodelabel.setFont(self.style.boldfont)
         self.nodelabel.setText("Node %s" % self.nodeobj.ID)
         self.nodelabel.setPos(self.style.itemmargin, self.style.itemmargin)
         self.graphgroup.addToGroup(self.nodelabel)
         
-        self.nodespeaker = QGraphicsSimpleTextItem(self)
+        self.nodespeaker = QGraphicsSimpleTextItemCond(self, 
+            lambda s,w: w is self.treeviewport)
         self.nodespeaker.setBrush(lightbrush)
         self.nodespeaker.setText(self.nodeobj.speaker)
         self.nodespeaker.setPos(self.style.itemmargin, self.nodelabel.y()+self.nodelabel.boundingRect().height()+self.style.itemmargin*2)
         self.graphgroup.addToGroup(self.nodespeaker)
         
-        self.nodetext = QGraphicsTextItem(self)
+        self.nodetext = QGraphicsTextItemCond(self, 
+            lambda s,w: w is self.treeviewport)
         self.nodetext.setTextWidth(self.style.nodetextwidth)
         self.nodetext.setPos(0, self.nodespeaker.y()+self.nodespeaker.boundingRect().height()+self.style.itemmargin)
         self.graphgroup.addToGroup(self.nodetext)
-                
+        
         self.view.nodedocs[self.nodeobj.ID]["text"].contentsChanged.connect(self.updatetext)
         self.updatetext()
         
@@ -281,16 +316,6 @@ class NodeItem(QGraphicsItem):
         return self.rect
         
     def paint(self, painter, style, widget):
-        if self.isactive():
-            self.mainbox.setBrush(QColor(self.altcolor))
-            self.activebox.show()
-        else:
-            self.mainbox.setBrush(QColor(self.maincolor))
-            self.activebox.hide()
-            if self.isselected():
-                self.selectbox.show()
-            else:
-                self.selectbox.hide()
         if self.nodeobj in self.view.hits:
             self.textbox.setBrush(QBrush(QColor(255, 255, 100)))
         else:
