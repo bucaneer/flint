@@ -123,19 +123,22 @@ class NodeItem(QGraphicsItem):
         self.graphgroup.addToGroup(self.shadowbox)
         
         self.selectbox = QGraphicsRectItemCond(self,
-            lambda s,w: w is self.treeviewport and self.isselected())
+            lambda s,w: w is self.treeviewport)
         self.selectbox.setBrush(lightbrush)
         self.selectbox.setPen(nopen)
+        self.selectbox.hide()
         self.graphgroup.addToGroup(self.selectbox)
         
         self.activebox = QGraphicsRectItemCond(self, 
-            lambda s,w: w is self.treeviewport and self.isactive())
+            lambda s,w: w is self.treeviewport)
         self.activebox.setBrush(lightbrush)
         self.activebox.setPen(nopen)
+        self.activebox.hide()
         self.graphgroup.addToGroup(self.activebox)
         
         self.mainbox = QGraphicsRectItemCond(self, 
-            lambda s,w: self.isactive() and (s.setBrush(altbrush) or True) or s.setBrush(mainbrush) or True)
+            lambda s,w: True)
+        self.mainbox.setBrush(mainbrush)
         self.mainbox.setPen(nopen)
         self.graphgroup.addToGroup(self.mainbox)
         
@@ -224,6 +227,20 @@ class NodeItem(QGraphicsItem):
     
     def setedge (self, edge):
         self.edge = edge
+    
+    def setactive (self, active):
+        if active:
+            self.activebox.show()
+            self.mainbox.setBrush(QBrush(self.altcolor))
+        else:
+            self.activebox.hide()
+            self.mainbox.setBrush(QBrush(self.maincolor))
+    
+    def setselected (self, selected):
+        if selected:
+            self.selectbox.show()
+        else:
+            self.selectbox.hide()
     
     def isghost (self):
         return self.ghost
@@ -624,6 +641,7 @@ class TreeView (QGraphicsView):
             selparent = self.selectednode.parent
             if selparent is not None:
                 selparentID = selparent.id()
+        self.activenode = self.selectednode = None
         
         self.constructed = False
         self.updatedocs()
@@ -721,7 +739,10 @@ class TreeView (QGraphicsView):
     
     def setselectednode (self, nodeitem, signal=True):
         if nodeitem is not None:
+            if self.selectednode:
+                self.selectednode.setselected(False)
             self.selectednode = nodeitem
+            self.selectednode.setselected(True)
             self.shownode(self.selectednode)
             if signal:
                 self.selectedChanged.emit(self.selectednode.nodeobj.ID)
@@ -729,7 +750,10 @@ class TreeView (QGraphicsView):
     
     def setactivenode (self, nodeitem, signal=True):
         if nodeitem is not None:
+            if self.activenode:
+                self.activenode.setactive(False)
             self.activenode = nodeitem.realnode()
+            self.activenode.setactive(True)
             if signal:
                 self.activeChanged.emit(self.activenode.nodeobj.ID)
             self.scene().update()
