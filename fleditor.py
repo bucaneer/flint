@@ -37,6 +37,7 @@ class FlNodeStyle (object):
         self.itemmargin = itemmargin
         self.activemargin = activemargin
         self.selectmargin = selectmargin
+        self.shadowoffset = selectmargin
         
         self.nodetextwidth = basemetrics.averageCharWidth()*40
         
@@ -119,22 +120,22 @@ class NodeItem(QGraphicsItem):
             lambda s,w: w is self.treeviewport)
         self.shadowbox.setBrush(FlPalette.dark)
         self.shadowbox.setPen(nopen)
-        self.shadowbox.setPos(2, 2)
+        self.shadowbox.setPos(*[self.style.shadowoffset]*2)
         self.graphgroup.addToGroup(self.shadowbox)
         
+        self.activebox = QGraphicsRectItemCond(self, 
+            lambda s,w: True)
+        self.activebox.setBrush(mainbrush)
+        self.activebox.setPen(nopen)
+        self.activebox.hide()
+        self.graphgroup.addToGroup(self.activebox)
+        
         self.selectbox = QGraphicsRectItemCond(self,
-            lambda s,w: w is self.treeviewport)
+            lambda s,w: True)
         self.selectbox.setBrush(lightbrush)
         self.selectbox.setPen(nopen)
         self.selectbox.hide()
         self.graphgroup.addToGroup(self.selectbox)
-        
-        self.activebox = QGraphicsRectItemCond(self, 
-            lambda s,w: w is self.treeviewport)
-        self.activebox.setBrush(lightbrush)
-        self.activebox.setPen(nopen)
-        self.activebox.hide()
-        self.graphgroup.addToGroup(self.activebox)
         
         self.mainbox = QGraphicsRectItemCond(self, 
             lambda s,w: True)
@@ -391,7 +392,6 @@ class EdgeItem(QGraphicsItem):
     arrowsize = 10
     fgcolor = FlPalette.light
     bgcolor = FlPalette.dark
-    shadowoffset = 2
     pensize = 2
     
     def __init__(self, source, view, **args):
@@ -420,7 +420,7 @@ class EdgeItem(QGraphicsItem):
         if not children:
             return
         if main and treeview:
-            self.paint(painter, style, widget, color=self.bgcolor, off=self.shadowoffset, main=False)
+            self.paint(painter, style, widget, color=self.bgcolor, off=self.style.shadowoffset, main=False)
         arrow = self.arrowsize
         if color is None:
             color = self.fgcolor
