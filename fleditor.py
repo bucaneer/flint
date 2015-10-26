@@ -98,7 +98,6 @@ class NodeItem(QGraphicsItem):
         else:
             self.nodebank = parent
             self.parent = parent
-        print("ID: ", nodeobj.ID, ", bank: ", self.nodebank)
         self.setCursor(Qt.ArrowCursor)
         self.view = view
         self.treeviewport = view.viewport()
@@ -186,7 +185,6 @@ class NodeItem(QGraphicsItem):
     
     @pyqtSlot()
     def updatelayout (self, force=False):
-        print("UPDATE ", self.id())
         if self.iscollapsed():
             if self.collapselayout and not force:
                 return
@@ -372,12 +370,10 @@ class NodeItem(QGraphicsItem):
             self.view.setactivenode(self)
     
     def mousePressEvent(self, event):
-        print("node click", self.id())
         super().mousePressEvent(event)
-        print("node click done")
-        """event.accept()
         if event.button() & (Qt.LeftButton | Qt.RightButton) :
-            self.view.setselectednode(self)"""
+            self.view.setselectednode(self)
+            event.accept()
     
     def contextMenuEvent (self, event):
         menu = QMenu()
@@ -401,13 +397,7 @@ class NodeItem(QGraphicsItem):
         return "<NodeItem %s>" % self.id()
 
 class TalkNodeItem(NodeItem):
-    def mousePressEvent(self, event):
-        print("talk click", self.id())
-        super().mousePressEvent(event)
-        if event.button() & (Qt.LeftButton | Qt.RightButton) :
-            self.view.setselectednode(self)
-            event.accept()
-        print("talk click done")
+    pass
 
 class ResponseNodeItem(NodeItem):
     pass
@@ -420,19 +410,11 @@ class BankNodeItem (NodeItem):
         super().__init__(nodeobj, parent, view, ghost, **args)
         self.subnodes = []
         self.setZValue(-1)
-        #self.setFiltersChildEvents(False)
-        #self.graphgroup.setFiltersChildEvents(False)
-        #self.setAcceptedMouseButtons(Qt.NoButton)
         for subnodeID in nodeobj.subnodes:
-            print("adding ", subnodeID, " to subnodes")
             subnode = view.newitem(view.nodecontainer.nodes[subnodeID], self, ghost)
             self.subnodes.append(subnode)
-            #subnode.setParentItem(self)
-            #self.graphgroup.addToGroup(subnode)
-            #subnode.setX(subnode.boundingRect().width()//2)
             subnode.setX(self.x())
             subnode.updatelayout(force=True)
-            #subnode.setY(self.boundingRect().height())
     
     def graphicsetup (self):
         lightbrush = QBrush(FlPalette.light)
@@ -491,37 +473,24 @@ class BankNodeItem (NodeItem):
             self.shadowbox.hide()
     
     def updatelayout (self):
-        print("bank layout")
         if self.iscollapsed():
-            print("...is collapsed")
-            """if self.collapselayout:
-                return
-            else:"""
             for subnode in self.subnodes:
                 subnode.hide()
             centerrect = QRectF()
-                #self.collapselayout = True
         else:
             verticalpos = self.centerbox.y()
-            print("before: ", verticalpos)
             maxwidth = 0
             for subnode in self.subnodes:
-                print(subnode)
                 noderect = subnode.boundingRect()
                 nodeheight = noderect.height()
                 nodewidth = noderect.width()
                 subnode.show()
-                #subnode.setX(nodewidth//2)
                 subnode.yoffset = self.mapToScene(0,verticalpos + nodeheight/2+self.style.activemargin).y()-self.y_low()
-                print("offset", subnode.yoffset)
                 verticalpos += nodeheight
                 maxwidth = max(maxwidth, nodewidth)
-            print("after: ", verticalpos)
             centerrect = self.centerbox.rect()
             centerrect.setWidth(maxwidth)
             centerrect.setHeight(verticalpos-self.centerbox.y())
-            """if centerrect == self.centerbox.rect():
-                return"""
             self.centerbox.setRect(centerrect)
             centerrect = self.centerbox.mapRectToParent(centerrect)
         mainrect = centerrect.united(self.nodelabel.mapRectToParent(self.nodelabel.boundingRect())).marginsAdded(QMarginsF(*[self.style.nodemargin]*4))
@@ -534,7 +503,6 @@ class BankNodeItem (NodeItem):
         self.graphgroup.setPos(-activerect.width()//2-activerect.x(), -activerect.height()//2-activerect.y())
         newypos = self.centerbox.mapToScene(self.centerbox.pos()).y()
         for subnode in self.subnodes:
-            print("diff", newypos - oldypos)
             subnode.yoffset += newypos - oldypos
         self.prepareGeometryChange()
         self.rect = self.graphgroup.mapRectToParent(self.activebox.boundingRect())
@@ -547,14 +515,6 @@ class BankNodeItem (NodeItem):
     
     def boundingRect (self):
         return self.rect
-    
-    def mousePressEvent(self, event):
-        print ("bank click", self.id())
-        super().mousePressEvent(event)
-        if event.button() & (Qt.LeftButton | Qt.RightButton) :
-            self.view.setselectednode(self)
-            event.ignore()
-        print("bank click done")
 
 
 class EdgeItem(QGraphicsItem):
