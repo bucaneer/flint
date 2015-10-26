@@ -11,9 +11,7 @@
                "toID": "7"
             }
          ],
-         "speaker": "def",
-         "text": "",
-         "type": "talk"
+         "type": "root"
       },
       "1": {
          "links": [
@@ -29,7 +27,7 @@
          ],
          "speaker": "def",
          "text": "Hello, stranger!",
-         "type": "talk"
+         "type": "response"
       },
       "2": {
          "links": [
@@ -69,7 +67,7 @@
          ],
          "speaker": "def",
          "text": "Hm...",
-         "type": "talk"
+         "type": "response"
       },
       "5": {
          "links": [
@@ -98,7 +96,7 @@
          ],
          "speaker": "def",
          "text": "Huh",
-         "type": "talk"
+         "type": "response"
       },
       "8": {
          "links": [
@@ -125,8 +123,6 @@
       },
       "10": {
         "links": [],
-        "speaker": "derp",
-        "text": "",
         "type": "bank",
         "subnodes": ["11", "12", "13"]
       },

@@ -17,6 +17,8 @@ class FlPalette (object):
     hl2var  = QColor(108, 158, 171)
     bank    = QColor(150, 170, 160)
     bankvar = QColor(130, 150, 140)
+    root    = QColor(128, 128, 128)
+    rootvar = QColor(112, 112, 112)
     bg      = QColor( 90,  94,  98)
 
 class FlNodeStyle (object):    
@@ -81,8 +83,8 @@ class QGraphicsTextItemCond (QGraphicsTextItem):
             super().paint(painter, style, widget)
 
 class NodeItem(QGraphicsItem):
-    def __init__(self, nodeobj, parent=None, view=None, ghost=False, **args):
-        super().__init__(**args)
+    def __init__(self, nodeobj, parent=None, view=None, ghost=False):
+        super().__init__()
         self.nodeobj = nodeobj
         self.children = []
         self.referrers = []
@@ -101,116 +103,11 @@ class NodeItem(QGraphicsItem):
         self.setCursor(Qt.ArrowCursor)
         self.view = view
         self.treeviewport = view.viewport()
-        self.textheight = 0
-        self.collapselayout = False
         self.edge = None
         self.ghost = ghost
         self.yoffset = 0
         self.graphicsetup()
-    
-    def graphicsetup (self):
-        if int(self.nodeobj.ID) % 2 == 0:
-            self.maincolor = FlPalette.hl2var
-            self.altcolor = FlPalette.hl2
-        else:
-            self.maincolor = FlPalette.hl1var
-            self.altcolor = FlPalette.hl1
-        lightbrush = QBrush(FlPalette.light)
-        mainbrush = QBrush(self.maincolor)
-        altbrush = QBrush(self.altcolor)
-        nopen = QPen(0)
-         
-        self.graphgroup = QGraphicsItemGroup(self)
         
-        self.shadowbox = QGraphicsRectItemCond(self, 
-            lambda s,w: True)
-        self.shadowbox.setBrush(FlPalette.dark)
-        self.shadowbox.setPen(nopen)
-        self.shadowbox.setPos(*[self.style.shadowoffset]*2)
-        self.graphgroup.addToGroup(self.shadowbox)
-        
-        self.activebox = QGraphicsRectItemCond(self, 
-            lambda s,w: True)
-        self.activebox.setBrush(mainbrush)
-        self.activebox.setPen(nopen)
-        self.activebox.hide()
-        self.graphgroup.addToGroup(self.activebox)
-        
-        self.selectbox = QGraphicsRectItemCond(self,
-            lambda s,w: True)
-        self.selectbox.setBrush(lightbrush)
-        self.selectbox.setPen(nopen)
-        self.selectbox.hide()
-        self.graphgroup.addToGroup(self.selectbox)
-        
-        self.mainbox = QGraphicsRectItemCond(self, 
-            lambda s,w: True)
-        self.mainbox.setBrush(mainbrush)
-        self.mainbox.setPen(nopen)
-        self.graphgroup.addToGroup(self.mainbox)
-        
-        self.textbox = QGraphicsRectItemCond(self, 
-            lambda s,w: w is self.treeviewport and not self.iscollapsed())
-        self.textbox.setBrush(lightbrush)
-        self.textbox.setPen(nopen)
-        self.graphgroup.addToGroup(self.textbox)
-        
-        self.nodelabel = QGraphicsSimpleTextItemCond(self, 
-            lambda s,w: w is self.treeviewport)
-        self.nodelabel.setBrush(lightbrush)
-        self.nodelabel.setFont(self.style.boldfont)
-        self.nodelabel.setText("Node %s" % self.nodeobj.ID)
-        self.nodelabel.setPos(self.style.itemmargin, self.style.itemmargin)
-        self.graphgroup.addToGroup(self.nodelabel)
-        
-        self.nodespeaker = QGraphicsSimpleTextItemCond(self, 
-            lambda s,w: w is self.treeviewport and not self.iscollapsed())
-        self.nodespeaker.setBrush(lightbrush)
-        self.nodespeaker.setText(self.nodeobj.speaker)
-        self.nodespeaker.setPos(self.style.itemmargin, self.nodelabel.y()+self.nodelabel.boundingRect().height()+self.style.itemmargin*2)
-        self.graphgroup.addToGroup(self.nodespeaker)
-        
-        self.nodetext = QGraphicsTextItemCond(self, 
-            lambda s,w: w is self.treeviewport and not self.iscollapsed())
-        self.nodetext.setTextWidth(self.style.nodetextwidth)
-        self.nodetext.setPos(0, self.nodespeaker.y()+self.nodespeaker.boundingRect().height()+self.style.itemmargin)
-        self.graphgroup.addToGroup(self.nodetext)
-        
-        self.view.nodedocs[self.nodeobj.ID]["text"].contentsChanged.connect(self.updatelayout)
-        self.updatelayout()
-        
-        if self.isghost():
-            self.graphgroup.setOpacity(0.7)
-            self.shadowbox.hide()
-    
-    @pyqtSlot()
-    def updatelayout (self, force=False):
-        if self.iscollapsed():
-            if self.collapselayout and not force:
-                return
-            else:
-                textrect = QRectF()
-                self.collapselayout = True
-        else:
-            ndtxt = self.nodetext
-            ndtxt.setPlainText(self.view.nodedocs[self.nodeobj.ID]["text"].toPlainText())
-            textrect = ndtxt.mapRectToParent(ndtxt.boundingRect())
-            textheight = textrect.height()
-            if textheight == self.textheight and not force:
-                return
-            self.textheight = textheight
-            self.textbox.setRect(textrect)
-        mainrect = textrect.united(self.nodelabel.mapRectToParent(self.nodelabel.boundingRect())).marginsAdded(QMarginsF(*[self.style.nodemargin]*4))
-        self.mainbox.setRect(mainrect)
-        self.shadowbox.setRect(mainrect)
-        self.selectbox.setRect(mainrect.marginsAdded(QMarginsF(*[self.style.selectmargin]*4)))
-        activerect = mainrect.marginsAdded(QMarginsF(*[self.style.activemargin]*4))
-        self.activebox.setRect(activerect)
-        self.graphgroup.setPos(-activerect.width()//2-activerect.x(), -activerect.height()//2-activerect.y())
-        self.prepareGeometryChange()
-        self.rect = self.graphgroup.mapRectToParent(self.activebox.boundingRect())
-        self.nodebank.updatelayout()
-    
     def id (self):
         if self.isghost():
             return "<-".join([self.nodeobj.ID, self.parent.id()])
@@ -308,7 +205,10 @@ class NodeItem(QGraphicsItem):
     def siblings (self):
         parent = self.parent
         if parent:
-            return parent.childlist()
+            if self.nodebank is self.view:
+                return parent.childlist()
+            else:
+                return parent.subnodes
         else:
             return None
     
@@ -363,6 +263,49 @@ class NodeItem(QGraphicsItem):
         else:
             self.textbox.setBrush(QBrush(QColor(FlPalette.light)))"""
     
+    def graphicsetup (self):
+        lightbrush = QBrush(FlPalette.light)
+        mainbrush = QBrush(self.maincolor)
+        altbrush = QBrush(self.altcolor)
+        nopen = QPen(0)
+        
+        self.graphgroup = QGraphicsItemGroup(self)
+        
+        self.shadowbox = QGraphicsRectItem(self)
+        self.shadowbox.setBrush(FlPalette.dark)
+        self.shadowbox.setPen(nopen)
+        self.shadowbox.setPos(*[self.style.shadowoffset]*2)
+        self.graphgroup.addToGroup(self.shadowbox)
+        
+        self.activebox = QGraphicsRectItem(self)
+        self.activebox.setBrush(mainbrush)
+        self.activebox.setPen(nopen)
+        self.activebox.hide()
+        self.graphgroup.addToGroup(self.activebox)
+        
+        self.selectbox = QGraphicsRectItem(self)
+        self.selectbox.setBrush(lightbrush)
+        self.selectbox.setPen(nopen)
+        self.selectbox.hide()
+        self.graphgroup.addToGroup(self.selectbox)
+        
+        self.mainbox = QGraphicsRectItem(self)
+        self.mainbox.setBrush(mainbrush)
+        self.mainbox.setPen(nopen)
+        self.graphgroup.addToGroup(self.mainbox)
+        
+        self.nodelabel = QGraphicsSimpleTextItemCond(self, 
+            lambda s,w: w is self.treeviewport)
+        self.nodelabel.setBrush(lightbrush)
+        self.nodelabel.setFont(self.style.boldfont)
+        self.nodelabel.setText(self.label % self.nodeobj.ID)
+        self.nodelabel.setPos(self.style.itemmargin, self.style.itemmargin)
+        self.graphgroup.addToGroup(self.nodelabel)
+        
+        if self.isghost():
+            self.graphgroup.setOpacity(0.7)
+            self.shadowbox.hide()
+    
     def mouseDoubleClickEvent (self, event):
         super().mouseDoubleClickEvent(event)
         event.accept()
@@ -374,6 +317,95 @@ class NodeItem(QGraphicsItem):
         if event.button() & (Qt.LeftButton | Qt.RightButton) :
             self.view.setselectednode(self)
             event.accept()
+    
+    def __repr__(self):
+        return "<NodeItem %s>" % self.id()
+
+
+class RootNodeItem (NodeItem):
+    maincolor = FlPalette.root
+    altcolor = FlPalette.rootvar
+    label = "%s Root"
+    
+    def graphicsetup (self):
+        super().graphicsetup()
+        self.updatelayout()
+    
+    def updatelayout (self):
+        mainrect = self.nodelabel.mapRectToParent(self.nodelabel.boundingRect()).marginsAdded(QMarginsF(*[self.style.nodemargin]*4))
+        self.mainbox.setRect(mainrect)
+        self.shadowbox.setRect(mainrect)
+        self.selectbox.setRect(mainrect.marginsAdded(QMarginsF(*[self.style.selectmargin]*4)))
+        activerect = mainrect.marginsAdded(QMarginsF(*[self.style.activemargin]*4))
+        self.activebox.setRect(activerect)
+        self.graphgroup.setPos(-activerect.width()//2-activerect.x(), -activerect.height()//2-activerect.y())
+        self.prepareGeometryChange()
+        self.rect = self.graphgroup.mapRectToParent(self.activebox.boundingRect())
+        self.nodebank.updatelayout()
+
+
+class TextNodeItem (NodeItem):
+    def __init__(self, nodeobj, parent=None, view=None, ghost=False):
+        self.textheight = 0
+        self.collapselayout = False
+        super().__init__(nodeobj, parent, view, ghost)
+    
+    def graphicsetup (self):
+        super().graphicsetup()
+        
+        lightbrush = QBrush(FlPalette.light)
+        nopen = QPen(0)
+        
+        self.textbox = QGraphicsRectItemCond(self, 
+            lambda s,w: w is self.treeviewport and not self.iscollapsed())
+        self.textbox.setBrush(lightbrush)
+        self.textbox.setPen(nopen)
+        self.graphgroup.addToGroup(self.textbox)
+        
+        self.nodespeaker = QGraphicsSimpleTextItemCond(self, 
+            lambda s,w: w is self.treeviewport and not self.iscollapsed())
+        self.nodespeaker.setBrush(lightbrush)
+        self.nodespeaker.setText(self.nodeobj.speaker)
+        self.nodespeaker.setPos(self.style.itemmargin, self.nodelabel.y()+self.nodelabel.boundingRect().height()+self.style.itemmargin*2)
+        self.graphgroup.addToGroup(self.nodespeaker)
+        
+        self.nodetext = QGraphicsTextItemCond(self, 
+            lambda s,w: w is self.treeviewport and not self.iscollapsed())
+        self.nodetext.setTextWidth(self.style.nodetextwidth)
+        self.nodetext.setDefaultTextColor(FlPalette.dark)
+        self.nodetext.setPos(0, self.nodespeaker.y()+self.nodespeaker.boundingRect().height()+self.style.itemmargin)
+        self.graphgroup.addToGroup(self.nodetext)
+        
+        self.view.nodedocs[self.nodeobj.ID]["text"].contentsChanged.connect(self.updatelayout)
+        self.updatelayout()
+    
+    @pyqtSlot()
+    def updatelayout (self, force=False):
+        if self.iscollapsed():
+            if self.collapselayout and not force:
+                return
+            else:
+                textrect = QRectF()
+                self.collapselayout = True
+        else:
+            ndtxt = self.nodetext
+            ndtxt.setPlainText(self.view.nodedocs[self.nodeobj.ID]["text"].toPlainText())
+            textrect = ndtxt.mapRectToParent(ndtxt.boundingRect())
+            textheight = textrect.height()
+            if textheight == self.textheight and not force:
+                return
+            self.textheight = textheight
+            self.textbox.setRect(textrect)
+        mainrect = textrect.united(self.nodelabel.mapRectToParent(self.nodelabel.boundingRect())).marginsAdded(QMarginsF(*[self.style.nodemargin]*4))
+        self.mainbox.setRect(mainrect)
+        self.shadowbox.setRect(mainrect)
+        self.selectbox.setRect(mainrect.marginsAdded(QMarginsF(*[self.style.selectmargin]*4)))
+        activerect = mainrect.marginsAdded(QMarginsF(*[self.style.activemargin]*4))
+        self.activebox.setRect(activerect)
+        self.graphgroup.setPos(-activerect.width()//2-activerect.x(), -activerect.height()//2-activerect.y())
+        self.prepareGeometryChange()
+        self.rect = self.graphgroup.mapRectToParent(self.activebox.boundingRect())
+        self.nodebank.updatelayout()
     
     def contextMenuEvent (self, event):
         menu = QMenu()
@@ -392,19 +424,21 @@ class NodeItem(QGraphicsItem):
             menu.addAction(window.actions["unlinkstree"])
         if not menu.isEmpty():
             menu.exec_(event.screenPos())
-    
-    def __repr__(self):
-        return "<NodeItem %s>" % self.id()
 
-class TalkNodeItem(NodeItem):
-    pass
+class TalkNodeItem(TextNodeItem):
+    maincolor = FlPalette.hl1var
+    altcolor = FlPalette.hl1
+    label = "%s Talk"
 
-class ResponseNodeItem(NodeItem):
-    pass
+class ResponseNodeItem(TextNodeItem):
+    maincolor = FlPalette.hl2var
+    altcolor = FlPalette.hl2
+    label = "%s Response"
 
 class BankNodeItem (NodeItem):
     maincolor = FlPalette.bank
     altcolor = FlPalette.bankvar
+    label = "%s Bank"
     
     def __init__ (self, nodeobj, parent=None, view=None, ghost=False, **args):
         super().__init__(nodeobj, parent, view, ghost, **args)
@@ -417,48 +451,9 @@ class BankNodeItem (NodeItem):
             subnode.updatelayout(force=True)
     
     def graphicsetup (self):
-        lightbrush = QBrush(FlPalette.light)
+        super().graphicsetup()
         darkbrush = QBrush(FlPalette.bg)
-        mainbrush = QBrush(self.maincolor)
-        altbrush = QBrush(self.altcolor)
         nopen = QPen(0)
-        
-        self.graphgroup = QGraphicsItemGroup(self)
-        
-        self.shadowbox = QGraphicsRectItemCond(self, 
-            lambda s,w: w is self.treeviewport)
-        self.shadowbox.setBrush(FlPalette.dark)
-        self.shadowbox.setPen(nopen)
-        self.shadowbox.setPos(*[self.style.shadowoffset]*2)
-        self.graphgroup.addToGroup(self.shadowbox)
-        
-        self.activebox = QGraphicsRectItemCond(self, 
-            lambda s,w: True)
-        self.activebox.setBrush(mainbrush)
-        self.activebox.setPen(nopen)
-        self.activebox.hide()
-        self.graphgroup.addToGroup(self.activebox)
-        
-        self.selectbox = QGraphicsRectItemCond(self,
-            lambda s,w: True)
-        self.selectbox.setBrush(lightbrush)
-        self.selectbox.setPen(nopen)
-        self.selectbox.hide()
-        self.graphgroup.addToGroup(self.selectbox)
-        
-        self.mainbox = QGraphicsRectItemCond(self, 
-            lambda s,w: True)
-        self.mainbox.setBrush(mainbrush)
-        self.mainbox.setPen(nopen)
-        self.graphgroup.addToGroup(self.mainbox)
-        
-        self.nodelabel = QGraphicsSimpleTextItemCond(self, 
-            lambda s,w: w is self.treeviewport)
-        self.nodelabel.setBrush(lightbrush)
-        self.nodelabel.setFont(self.style.boldfont)
-        self.nodelabel.setText("Node %s" % self.nodeobj.ID)
-        self.nodelabel.setPos(self.style.itemmargin, self.style.itemmargin)
-        self.graphgroup.addToGroup(self.nodelabel)
         
         self.centerbox = QGraphicsRectItemCond(self, 
             lambda s,w: w is self.treeviewport and not self.iscollapsed())
@@ -467,10 +462,6 @@ class BankNodeItem (NodeItem):
         self.centerbox.setPen(nopen)
         self.centerbox.setPos(0, self.nodelabel.y()+self.nodelabel.boundingRect().height()+self.style.itemmargin*2)
         self.graphgroup.addToGroup(self.centerbox)
-                
-        if self.isghost():
-            self.graphgroup.setOpacity(0.7)
-            self.shadowbox.hide()
     
     def updatelayout (self):
         if self.iscollapsed():
@@ -680,6 +671,8 @@ class NodeEditWidget (QWidget):
     def loadnode (self, nodeID):
         view = self.window().activeview()
         self.nodeobj = view.nodecontainer.nodes[nodeID]
+        if not isinstance(self.nodeobj, fp.TextNode):
+            return
         nodetextdoc = view.nodedocs[nodeID]["text"]
         self.speaker.setText(self.nodeobj.speaker)
         self.nodetext.setDocument(nodetextdoc)
@@ -719,7 +712,8 @@ class TreeView (QGraphicsView):
     
     activeChanged = pyqtSignal(str)
     selectedChanged = pyqtSignal(str)
-    __types = {'talk': TalkNodeItem, 'response': ResponseNodeItem, 'bank': BankNodeItem}
+    __types = {'talk': TalkNodeItem, 'response': ResponseNodeItem, 
+        'bank': BankNodeItem, 'root': RootNodeItem}
     
     def __init__ (self, parent=None):
         super().__init__(parent)
@@ -755,7 +749,7 @@ class TreeView (QGraphicsView):
         for nodeID, nodeobj in self.nodecontainer.nodes.items():
             if nodeID in self.nodedocs:
                 newnodedocs[nodeID] = self.nodedocs[nodeID]
-            else:
+            elif isinstance(nodeobj, fp.TextNode):
                 textdoc = QTextDocument()
                 textdoc.setDocumentLayout(QPlainTextDocumentLayout(textdoc))
                 textdoc.setPlainText(nodeobj.text)
@@ -1131,6 +1125,7 @@ class EditorWindow (QMainWindow):
         nodeobj = self.activeview().selectednode.nodeobj
         nodedict = nodeobj.todict()
         nodedict["links"] = []
+        nodedict["nodebank"] = -1
         self.copiedNodeDict = (nodeobj.ID, nodedict)
         self.actions["pasteclone"].setEnabled(True)
         self.actions["pastelink"].setEnabled(True)

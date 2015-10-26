@@ -54,8 +54,6 @@ class ChartNode (object):
 		self.container = container
 		self.typename = node_dict['type']
 		self.ID = str(nodeID)
-		self.text = node_dict['text']
-		self.speaker = node_dict['speaker']
 		self.linkIDs = []
 		self.realref = None
 		for link in node_dict['links']:
@@ -89,8 +87,8 @@ class ChartNode (object):
 				self.linkIDs.insert(pos, nodeID)
 	
 	def todict (self):
-		node_dict = { "type": self.typename, "text": self.text, 
-			"speaker": self.speaker, "links": [{'toID':i} for i in self.linkIDs] }
+		node_dict = { "type": self.typename, 
+			"links": [{'toID':i} for i in self.linkIDs] }
 		if self.condition is not self.container.defaultcond:
 			node_dict['condition'] = self.condition.todict()
 		if self.script:
@@ -99,9 +97,22 @@ class ChartNode (object):
 			node_dict['vars']      = self.optvars
 		if self.comment:
 			node_dict['comment']   = self.comment
+		if self.nodebank != -1:
+			node_dict['nodebank']  = self.nodebank
 		return node_dict
 
-class TalkNode (ChartNode):
+class TextNode (ChartNode):
+	def __init__ (self, container, node_dict, nodeID):
+		super().__init__(container, node_dict, nodeID)
+		self.text = node_dict['text']
+		self.speaker = node_dict['speaker']
+	
+	def todict (self):
+		node_dict = super().todict()
+		node_dict.update({ "text": self.text, "speaker": self.speaker })
+		return node_dict
+
+class TalkNode (TextNode):
 	def display (self):
 		return self.text
 	
@@ -115,7 +126,7 @@ class TalkNode (ChartNode):
 				if nodeobj.typename == "response":
 					break
 
-class ResponseNode (ChartNode):
+class ResponseNode (TextNode):
 	pass
 
 class BankNode (ChartNode):
@@ -127,7 +138,8 @@ class BankNode (ChartNode):
 		
 
 class NodesContainer (object):
-	__types = {'talk': TalkNode, 'response': ResponseNode, 'bank': BankNode}
+	__types = { 'talk': TalkNode, 'response': ResponseNode, 'bank': BankNode,
+		'root': ChartNode }
 	def __init__ (self, nodes_dict):
 		self.defaultcond = ConditionCall({"type":"cond","operator":"and","calls":[]})
 		self.name = nodes_dict['name']
