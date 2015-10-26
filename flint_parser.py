@@ -67,6 +67,10 @@ class ChartNode (object):
 		self.script = 'script' in node_dict and ScriptCall(node_dict['script'])
 		self.optvars = node_dict['vars'] if 'vars' in node_dict else dict()
 		self.comment = 'comment' in node_dict and node_dict['comment']
+		if 'nodebank' in node_dict:
+			self.nodebank = node_dict['nodebank']
+		else:
+			self.nodebank = -1
 	
 	def checkcond (self):
 		return self.condition.run()
@@ -115,7 +119,12 @@ class ResponseNode (ChartNode):
 	pass
 
 class BankNode (ChartNode):
-	pass
+	def __init__ (self, container, node_dict, nodeID):
+		super().__init__(container, node_dict, nodeID)
+		self.subnodes = []
+		for subnode in node_dict['subnodes']:
+			self.subnodes.append(subnode)
+		
 
 class NodesContainer (object):
 	__types = {'talk': TalkNode, 'response': ResponseNode, 'bank': BankNode}

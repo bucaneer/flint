@@ -1,6 +1,6 @@
 {
    "name": "Test dialog",
-   "nextID": "10",
+   "nextID": "14",
    "nodes": {
       "0": {
          "links": [
@@ -114,11 +114,42 @@
          "links": [
             {
                "toID": "5"
+            },
+            {
+               "toID": "10"
             }
          ],
          "speaker": "def",
          "text": "Indeed",
          "type": "talk"
+      },
+      "10": {
+        "links": [],
+        "speaker": "derp",
+        "text": "",
+        "type": "bank",
+        "subnodes": ["11", "12", "13"]
+      },
+      "11": {
+         "links": [],
+         "speaker": "def",
+         "text": "AAA",
+         "type": "talk",
+         "nodebank": "10"
+      },
+      "12": {
+         "links": [],
+         "speaker": "def",
+         "text": "BBB",
+         "type": "talk",
+         "nodebank": "10"
+      },
+      "13": {
+         "links": [],
+         "speaker": "def",
+         "text": "CCC",
+         "type": "talk",
+         "nodebank": "10"
       }
    }
 }
