@@ -348,8 +348,8 @@ class NodeItem(QGraphicsItem):
             """Doing this as a single list comprehension causes slowdowns with big trees."""
             for child in children:
                 stree = child.subtreesize(nextdepth)
-                ymin = min(ymin, stree[0]) if ymin is not None else stree[0]
-                ymax = max(ymax, stree[1]) if ymax is not None else stree[1]
+                ymin = min(ymin, child.y_up(), stree[0]) if ymin is not None else stree[0]
+                ymax = max(ymax, child.y_low(), stree[1]) if ymax is not None else stree[1]
                 maxdepth = max(maxdepth, stree[2])
         else:
             ymin = self.y_up()
