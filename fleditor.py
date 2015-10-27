@@ -114,6 +114,9 @@ class NodeItem(QGraphicsItem):
         else:
             return self.nodeobj.ID
     
+    def realid (self):
+        return self.nodeobj.ID
+    
     def nodeitems (self):
         return self.view.nodegraph
     
@@ -301,7 +304,7 @@ class NodeItem(QGraphicsItem):
             lambda s,w: w is self.treeviewport)
         self.nodelabel.setBrush(lightbrush)
         self.nodelabel.setFont(self.style.boldfont)
-        self.nodelabel.setText(self.label % self.nodeobj.ID)
+        self.nodelabel.setText(self.label % self.realid())
         self.nodelabel.setPos(self.style.itemmargin, self.style.itemmargin)
         self.graphgroup.addToGroup(self.nodelabel)
         
@@ -392,7 +395,7 @@ class TextNodeItem (NodeItem):
         self.nodetext.setPos(0, self.nodespeaker.y()+self.nodespeaker.boundingRect().height()+self.style.itemmargin)
         self.graphgroup.addToGroup(self.nodetext)
         
-        self.view.nodedocs[self.nodeobj.ID]["text"].contentsChanged.connect(self.updatelayout)
+        self.view.nodedocs[self.realid()]["text"].contentsChanged.connect(self.updatelayout)
         self.updatelayout()
     
     @pyqtSlot()
@@ -405,7 +408,7 @@ class TextNodeItem (NodeItem):
                 self.collapselayout = True
         else:
             ndtxt = self.nodetext
-            ndtxt.setPlainText(self.view.nodedocs[self.nodeobj.ID]["text"].toPlainText())
+            ndtxt.setPlainText(self.view.nodedocs[self.realid()]["text"].toPlainText())
             textrect = ndtxt.mapRectToParent(ndtxt.boundingRect())
             textheight = textrect.height()
             if textheight == self.textheight and not force:
@@ -908,7 +911,7 @@ class TreeView (QGraphicsView):
             self.selectednode.setselected(True)
             self.shownode(self.selectednode)
             if signal:
-                self.selectedChanged.emit(self.selectednode.nodeobj.ID)
+                self.selectedChanged.emit(self.selectednode.realid())
             self.scene().update()
     
     def setactivenode (self, nodeitem, signal=True):
@@ -918,11 +921,11 @@ class TreeView (QGraphicsView):
             self.activenode = nodeitem.realnode()
             self.activenode.setactive(True)
             if signal:
-                self.activeChanged.emit(self.activenode.nodeobj.ID)
+                self.activeChanged.emit(self.activenode.realid())
             self.scene().update()
     
     def createlink (self, toID):
-        fromID = self.selectednode.nodeobj.ID
+        fromID = self.selectednode.realid()
         self.nodecontainer.newlink(fromID, toID)
         self.updateview()
     
@@ -940,7 +943,7 @@ class TreeView (QGraphicsView):
         self.shownode(self.nodegraph[newid])
     
     def unlink (self, inherit=False):
-        selID = self.selectednode.nodeobj.ID
+        selID = self.selectednode.realid()
         refID = self.selectednode.parent.id()
         if self.selectednode.issubnode():
             self.nodecontainer.removesubnode(refID, selID)
@@ -954,9 +957,9 @@ class TreeView (QGraphicsView):
         parent = selnode.parent
         if sibling is None or parent is None:
             return
-        selID = selnode.nodeobj.ID
-        sibID = sibling.nodeobj.ID
-        parID = parent.nodeobj.ID
+        selID = selnode.realid()
+        sibID = sibling.realid()
+        parID = parent.realid()
         if selnode.issubnode():
             self.nodecontainer.subnodeswap(parID, selID, sibID)
         else:
