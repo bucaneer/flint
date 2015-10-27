@@ -345,6 +345,19 @@ class RootNodeItem (NodeItem):
         self.prepareGeometryChange()
         self.rect = self.graphgroup.mapRectToParent(self.activebox.boundingRect())
         self.nodebank.updatelayout()
+    
+    def contextMenuEvent (self, event):
+        menu = QMenu()
+        if self.isselected():
+            window = self.view.window()
+            menu.addAction(window.actions["collapse"])
+            pastemenu = QMenu("Paste...")
+            pastemenu.addAction(window.actions["pasteclone"])
+            pastemenu.addAction(window.actions["pastelink"])
+            menu.addMenu(pastemenu)
+            menu.addAction(window.actions["addnode"])
+        if not menu.isEmpty():
+            menu.exec_(event.screenPos())
 
 
 class TextNodeItem (NodeItem):
@@ -510,6 +523,24 @@ class BankNodeItem (NodeItem):
     
     def boundingRect (self):
         return self.rect
+    
+    def contextMenuEvent (self, event):
+        menu = QMenu()
+        if self.isselected():
+            window = self.view.window()
+            menu.addAction(window.actions["collapse"])
+            menu.addAction(window.actions["copynode"])
+            pastemenu = QMenu("Paste...")
+            pastemenu.addAction(window.actions["pasteclone"])
+            pastemenu.addAction(window.actions["pastelink"])
+            menu.addMenu(pastemenu)
+            menu.addAction(window.actions["addnode"])
+            menu.addAction(window.actions["moveup"])
+            menu.addAction(window.actions["movedown"])
+            menu.addAction(window.actions["unlinknode"])
+            menu.addAction(window.actions["unlinkstree"])
+        if not menu.isEmpty():
+            menu.exec_(event.screenPos())
 
 
 class EdgeItem(QGraphicsItem):
@@ -742,6 +773,8 @@ class TreeView (QGraphicsView):
         
         self.style = self.window().style
         
+        self.selectedChanged.connect(self.filteractions)
+        
         self.nodecontainer = fp.loadjson("test3.json")
         self.nodedocs = dict()
         self.updateview()
@@ -948,6 +981,41 @@ class TreeView (QGraphicsView):
                 self.collapsednodes.append(selID)
         self.updateview()
     
+    @pyqtSlot(str)
+    def filteractions (self, nodeID):
+        nodeitem = self.nodegraph[nodeID]
+        genericactions = ["zoomin", "zoomout", "zoomorig", "gotoactive"]
+        if isinstance(nodeitem, TextNodeItem):
+            actions = ["copynode", "moveup", "movedown", "unlinknode", 
+                "unlinkstree", "collapse"]
+            if not nodeitem.issubnode():
+                actions.extend(["addnode", "pasteclone", "pastelink"])
+        elif isinstance(nodeitem, BankNodeItem):
+            actions = ["copynode", "moveup", "movedown", "unlinknode", 
+                "collapse", "addnode", "pasteclone", "pastelink", "unlinkstree"]
+        elif isinstance(nodeitem, RootNodeItem):
+            actions = ["addnode", "pasteclone", "pastelink", "collapse"]
+        
+        actions.extend(genericactions)
+        windowactions = self.window().actions
+        copiednode = self.window().copiedNodeDict
+        for name, action in windowactions.items():
+            if name in actions:
+                if name == "pasteclone":
+                    if copiednode[2] is not None:
+                        action.setEnabled(False)
+                    else:
+                        action.setEnabled(True)
+                elif name == "pastelink":
+                    if copiednode[0] is not None and copiednode[1] is self:
+                        action.setEnabled(True)
+                    else:
+                        action.setEnabled(False)
+                else:
+                    action.setEnabled(True)
+            else:
+                action.setEnabled(False)
+    
     def search (self, query):
         if not query:
             self.hits = []
@@ -995,7 +1063,8 @@ class TreeView (QGraphicsView):
 
 class EditorWindow (QMainWindow):
     defaultNodeDict = {"type":"talk","text":"","speaker":"def","links":[]}
-    copiedNodeDict = None
+    copiedNodeDict = (None, None, None)
+    actions = dict()
     
     def __init__ (self):
         super().__init__()
@@ -1029,8 +1098,6 @@ class EditorWindow (QMainWindow):
         
         self.setCentralWidget(splitter)
         
-        self.actions = dict()
-        
         viewtoolbar = QToolBar("View control")
         self.actions["zoomin"] = self.createaction("Zoom In", self.zoomin, 
             [QKeySequence.ZoomIn, QKeySequence(Qt.ControlModifier + Qt.KeypadModifier + Qt.Key_Plus)], 
@@ -1059,8 +1126,6 @@ class EditorWindow (QMainWindow):
             None, ["edit-paste"], "Paste cloned node")
         self.actions["pastelink"] = self.createaction("Paste as &Link", self.pastelink,
             None, ["insert-link"], "Paste link to node")
-        self.actions["pasteclone"].setEnabled(False)
-        self.actions["pastelink"].setEnabled(False)
         self.actions["unlinkstree"] = self.createaction("Unlink &Subtree", self.unlink,
             None, ["edit-clear"], "Unlink subtree from parent")
         self.actions["unlinknode"] = self.createaction("Unlink &Node", self.unlinkinherit,
@@ -1135,22 +1200,23 @@ class EditorWindow (QMainWindow):
     
     @pyqtSlot()
     def copynode (self):
-        nodeobj = self.activeview().selectednode.nodeobj
+        view = self.activeview()
+        nodeobj = view.selectednode.nodeobj
         nodedict = nodeobj.todict()
         nodedict["links"] = []
         nodedict["nodebank"] = -1
-        self.copiedNodeDict = (nodeobj.ID, nodedict)
-        self.actions["pasteclone"].setEnabled(True)
-        self.actions["pastelink"].setEnabled(True)
+        if view.selectednode.issubnode():
+            self.copiedNodeDict = (None, None, nodedict)
+        else:
+            self.copiedNodeDict = (nodeobj.ID, view, nodedict)
     
     @pyqtSlot()
     def pasteclone (self):
-        self.activeview().addnode(self.copiedNodeDict[1])
+        self.activeview().addnode(self.copiedNodeDict[2])
     
     @pyqtSlot()
     def pastelink (self):
         self.activeview().createlink(self.copiedNodeDict[0])
-        #FIXME: won't work with multiple TreeViews
     
     @pyqtSlot()
     def unlinkinherit (self):
