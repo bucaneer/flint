@@ -190,6 +190,14 @@ class NodesContainer (object):
 				childindex += 1
 		refnode.linkIDs.remove(childID)
 		return True
+		
+	def removesubnode (self, bankID, subID):
+		banknode = self.nodes[bankID]
+		assert isinstance(banknode, BankNode)
+		assert subID in banknode.subnodes
+		subnode = self.nodes[subID]
+		banknode.subnodes.remove(subID)
+		return True
 	
 	def siblingswap (self, parentID, childID1, childID2):
 		parlinks = self.nodes[parentID].linkIDs
@@ -197,6 +205,14 @@ class NodesContainer (object):
 		ind1 = parlinks.index(childID1)
 		ind2 = parlinks.index(childID2)
 		parlinks[ind2], parlinks[ind1] = parlinks[ind1], parlinks[ind2]
+	
+	def subnodeswap (self, bankID, subID1, subID2):
+		assert isinstance(self.nodes[bankID], BankNode)
+		subnodes = self.nodes[bankID].subnodes
+		assert subID1 in subnodes and subID2 in subnodes
+		ind1 = subnodes.index(subID1)
+		ind2 = subnodes.index(subID2)
+		subnodes[ind2], subnodes[ind1] = subnodes[ind1], subnodes[ind2]
 	
 	def todict (self):
 		return {"name":self.name, "nextID":self.nextID, "nodes":self.nodes}

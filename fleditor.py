@@ -146,6 +146,9 @@ class NodeItem(QGraphicsItem):
         else:
             self.selectbox.hide()
     
+    def issubnode (self):
+        return self.nodebank is self.parent
+    
     def isghost (self):
         return self.ghost
     
@@ -899,7 +902,10 @@ class TreeView (QGraphicsView):
     def unlink (self, inherit=False):
         selID = self.selectednode.nodeobj.ID
         refID = self.selectednode.parent.id()
-        self.nodecontainer.removelink(refID, selID, forceinherit=inherit)
+        if self.selectednode.issubnode():
+            self.nodecontainer.removesubnode(refID, selID)
+        else:
+            self.nodecontainer.removelink(refID, selID, forceinherit=inherit)
         self.updateview()
     
     def moveup (self):
@@ -911,7 +917,10 @@ class TreeView (QGraphicsView):
         selID = selnode.nodeobj.ID
         sibID = sibling.nodeobj.ID
         parID = parent.nodeobj.ID
-        self.nodecontainer.siblingswap(parID, selID, sibID)
+        if selnode.issubnode():
+            self.nodecontainer.subnodeswap(parID, selID, sibID)
+        else:
+            self.nodecontainer.siblingswap(parID, selID, sibID)
         self.updateview()
     
     def movedown (self):
@@ -923,7 +932,10 @@ class TreeView (QGraphicsView):
         selID = selnode.nodeobj.ID
         sibID = sibling.nodeobj.ID
         parID = parent.nodeobj.ID
-        self.nodecontainer.siblingswap(parID, selID, sibID)
+        if selnode.nodebank is parent:
+            self.nodecontainer.subnodeswap(parID, selID, sibID)
+        else:
+            self.nodecontainer.siblingswap(parID, selID, sibID)
         self.updateview()
     
     def collapse (self, collapse=None):
