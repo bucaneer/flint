@@ -1225,6 +1225,9 @@ class EditorWindow (QMainWindow):
         nodedict = nodeobj.todict()
         nodedict["links"] = []
         nodedict["nodebank"] = -1
+        if "subnodes" in nodedict:
+            nodedict["subnodes"] = []
+        
         if view.selectednode.issubnode():
             self.copiednode = (None, None, nodedict)
         else:

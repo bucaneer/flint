@@ -135,6 +135,11 @@ class BankNode (ChartNode):
 		self.subnodes = []
 		for subnode in node_dict['subnodes']:
 			self.subnodes.append(subnode)
+	
+	def todict (self):
+		node_dict = super().todict()
+		node_dict.update({"subnodes": self.subnodes})
+		return node_dict
 		
 
 class NodesContainer (object):
