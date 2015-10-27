@@ -531,9 +531,11 @@ class BankNodeItem (NodeItem):
             menu.addAction(window.actions["collapse"])
             menu.addAction(window.actions["copynode"])
             pastemenu = QMenu("Paste...")
+            pastemenu.addAction(window.actions["pastesubnode"])
             pastemenu.addAction(window.actions["pasteclone"])
             pastemenu.addAction(window.actions["pastelink"])
             menu.addMenu(pastemenu)
+            menu.addAction(window.actions["addsubnode"])
             menu.addAction(window.actions["addnode"])
             menu.addAction(window.actions["moveup"])
             menu.addAction(window.actions["movedown"])
@@ -924,10 +926,15 @@ class TreeView (QGraphicsView):
         self.nodecontainer.newlink(fromID, toID)
         self.updateview()
     
-    def addnode (self, nodedict):
+    def addnode (self, nodedict, subnode=False):
         selected = self.selectednode.realnode()
-        selectedid = selected.id()        
-        newobj = self.nodecontainer.newnode(nodedict, refID=selectedid)
+        selectedid = selected.id()
+        if subnode:
+            nodedictmod = nodedict.copy()
+            nodedictmod["nodebank"] = selectedid
+            newobj = self.nodecontainer.newnode(nodedictmod, bankID=selectedid)
+        else:
+            newobj = self.nodecontainer.newnode(nodedict, refID=selectedid)
         newid = newobj.ID
         self.updateview()
         self.shownode(self.nodegraph[newid])
@@ -992,16 +999,17 @@ class TreeView (QGraphicsView):
                 actions.extend(["addnode", "pasteclone", "pastelink"])
         elif isinstance(nodeitem, BankNodeItem):
             actions = ["copynode", "moveup", "movedown", "unlinknode", 
-                "collapse", "addnode", "pasteclone", "pastelink", "unlinkstree"]
+                "collapse", "addnode", "pasteclone", "pastelink", "unlinkstree",
+                "addsubnode", "pastesubnode"]
         elif isinstance(nodeitem, RootNodeItem):
             actions = ["addnode", "pasteclone", "pastelink", "collapse"]
         
         actions.extend(genericactions)
         windowactions = self.window().actions
-        copiednode = self.window().copiedNodeDict
+        copiednode = self.window().copiednode
         for name, action in windowactions.items():
             if name in actions:
-                if name == "pasteclone":
+                if name == "pasteclone" or name == "pastesubnode":
                     if copiednode[2] is not None:
                         action.setEnabled(True)
                     else:
@@ -1062,8 +1070,8 @@ class TreeView (QGraphicsView):
             super().keyPressEvent(event)
 
 class EditorWindow (QMainWindow):
-    defaultNodeDict = {"type":"talk","text":"","speaker":"def","links":[]}
-    copiedNodeDict = (None, None, None)
+    defaultnodedict = {"type":"talk","text":"","speaker":"def","links":[]}
+    copiednode = (None, None, None)
     actions = dict()
     
     def __init__ (self):
@@ -1134,6 +1142,10 @@ class EditorWindow (QMainWindow):
             None, ["go-down"], "Move node down")
         self.actions["collapse"] = self.createaction("(Un)Colla&pse subtree", self.collapse,
             None, None, "(Un)Collapse subtree")
+        self.actions["addsubnode"] = self.createaction("Add Su&bnode", self.addsubnode,
+            None, ["insert-object"], "Add new subnode")
+        self.actions["pastesubnode"] = self.createaction("Paste Subnode", self.pastesubnode,
+            None, ["edit-paste"], "Paste cloned node as subnode")
     
     def createaction (self, text, slot=None, shortcuts=None, icons=None,
                      tip=None, checkable=False):
@@ -1200,7 +1212,11 @@ class EditorWindow (QMainWindow):
     
     @pyqtSlot()
     def addnode (self):
-        self.activeview().addnode(self.defaultNodeDict)
+        self.activeview().addnode(self.defaultnodedict)
+    
+    @pyqtSlot()
+    def addsubnode (self):
+        self.activeview().addnode(self.defaultnodedict, subnode=True)
     
     @pyqtSlot()
     def copynode (self):
@@ -1210,17 +1226,21 @@ class EditorWindow (QMainWindow):
         nodedict["links"] = []
         nodedict["nodebank"] = -1
         if view.selectednode.issubnode():
-            self.copiedNodeDict = (None, None, nodedict)
+            self.copiednode = (None, None, nodedict)
         else:
-            self.copiedNodeDict = (nodeobj.ID, view, nodedict)
+            self.copiednode = (nodeobj.ID, view, nodedict)
     
     @pyqtSlot()
     def pasteclone (self):
-        self.activeview().addnode(self.copiedNodeDict[2])
+        self.activeview().addnode(self.copiednode[2])
     
     @pyqtSlot()
     def pastelink (self):
-        self.activeview().createlink(self.copiedNodeDict[0])
+        self.activeview().createlink(self.copiednode[0])
+    
+    @pyqtSlot()
+    def pastesubnode (self):
+        self.activeview().addnode(self.copiednode[2], subnode=True)
     
     @pyqtSlot()
     def unlinkinherit (self):

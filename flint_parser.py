@@ -152,7 +152,7 @@ class NodesContainer (object):
 	def getnode (self, ID):
 		return self.nodes[ID]
 	
-	def newnode (self, node_dict, newID=False, refID=False, traverse=True):
+	def newnode (self, node_dict, newID=False, refID=False, bankID=False, traverse=True):
 		if not newID:
 			newID = self.nextID
 			self.nextID = str(int(self.nextID) + 1)
@@ -162,6 +162,8 @@ class NodesContainer (object):
 		self.nodes[newID] = node
 		if refID:
 			self.nodes[refID].addlink(newID)
+		elif bankID:
+			self.nodes[bankID].subnodes.append(newID)
 		return node
 	
 	def newlink (self, fromID, toID, pos=None):
