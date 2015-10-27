@@ -1003,9 +1003,9 @@ class TreeView (QGraphicsView):
             if name in actions:
                 if name == "pasteclone":
                     if copiednode[2] is not None:
-                        action.setEnabled(False)
-                    else:
                         action.setEnabled(True)
+                    else:
+                        action.setEnabled(False)
                 elif name == "pastelink":
                     if copiednode[0] is not None and copiednode[1] is self:
                         action.setEnabled(True)
@@ -1070,6 +1070,8 @@ class EditorWindow (QMainWindow):
         super().__init__()
         
         self.style = FlNodeStyle(QFont())
+        self.initactions()
+        self.inittoolbars()
         
         self.view = TreeView(parent=self)
         
@@ -1097,8 +1099,11 @@ class EditorWindow (QMainWindow):
         splitter.addWidget(rightpanel)
         
         self.setCentralWidget(splitter)
-        
-        viewtoolbar = QToolBar("View control")
+    
+    def activeview (self):
+        return self.tabs.currentWidget()
+    
+    def initactions (self):
         self.actions["zoomin"] = self.createaction("Zoom In", self.zoomin, 
             [QKeySequence.ZoomIn, QKeySequence(Qt.ControlModifier + Qt.KeypadModifier + Qt.Key_Plus)], 
             ["gtk-zoom-in", "zoom-in"], "Zoom in")
@@ -1111,13 +1116,6 @@ class EditorWindow (QMainWindow):
         self.actions["gotoactive"] = self.createaction("Go To Active", self.gotoactive, 
             None, ["go-jump"], "Center on active node")
         
-        viewtoolbar.addAction(self.actions["zoomorig"])
-        viewtoolbar.addAction(self.actions["zoomin"])
-        viewtoolbar.addAction(self.actions["zoomout"])
-        viewtoolbar.addAction(self.actions["gotoactive"])
-        self.addToolBar(viewtoolbar)
-        
-        edittoolbar = QToolBar("Tree editing")
         self.actions["addnode"] = self.createaction("&Add Node", self.addnode,
             None, ["insert-object"], "Add new node")
         self.actions["copynode"] = self.createaction("&Copy Node", self.copynode,
@@ -1136,24 +1134,6 @@ class EditorWindow (QMainWindow):
             None, ["go-down"], "Move node down")
         self.actions["collapse"] = self.createaction("(Un)Colla&pse subtree", self.collapse,
             None, None, "(Un)Collapse subtree")
-        
-        edittoolbar.addAction(self.actions["addnode"])
-        edittoolbar.addAction(self.actions["copynode"])
-        edittoolbar.addAction(self.actions["pasteclone"])
-        edittoolbar.addAction(self.actions["pastelink"])
-        edittoolbar.addAction(self.actions["unlinknode"])
-        edittoolbar.addAction(self.actions["unlinkstree"])
-        edittoolbar.addAction(self.actions["moveup"])
-        edittoolbar.addAction(self.actions["movedown"])
-        self.addToolBar(edittoolbar)
-        
-        searchtoolbar = QToolBar("Search")
-        searchwidget = SearchWidget(self)
-        searchtoolbar.addWidget(searchwidget)
-        self.addToolBar(searchtoolbar)
-    
-    def activeview (self):
-        return self.tabs.currentWidget()
     
     def createaction (self, text, slot=None, shortcuts=None, icons=None,
                      tip=None, checkable=False):
@@ -1176,6 +1156,30 @@ class EditorWindow (QMainWindow):
         if checkable:
             action.setCheckable(True)
         return action
+    
+    def inittoolbars (self):
+        viewtoolbar = QToolBar("View control")
+        viewtoolbar.addAction(self.actions["zoomorig"])
+        viewtoolbar.addAction(self.actions["zoomin"])
+        viewtoolbar.addAction(self.actions["zoomout"])
+        viewtoolbar.addAction(self.actions["gotoactive"])
+        self.addToolBar(viewtoolbar)
+        
+        edittoolbar = QToolBar("Tree editing")
+        edittoolbar.addAction(self.actions["addnode"])
+        edittoolbar.addAction(self.actions["copynode"])
+        edittoolbar.addAction(self.actions["pasteclone"])
+        edittoolbar.addAction(self.actions["pastelink"])
+        edittoolbar.addAction(self.actions["unlinknode"])
+        edittoolbar.addAction(self.actions["unlinkstree"])
+        edittoolbar.addAction(self.actions["moveup"])
+        edittoolbar.addAction(self.actions["movedown"])
+        self.addToolBar(edittoolbar)
+        
+        searchtoolbar = QToolBar("Search")
+        searchwidget = SearchWidget(self)
+        searchtoolbar.addWidget(searchwidget)
+        self.addToolBar(searchtoolbar)
     
     @pyqtSlot()
     def zoomin (self):
