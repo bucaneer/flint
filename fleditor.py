@@ -449,6 +449,7 @@ class BankNodeItem (NodeItem):
             self.subnodes.append(subnode)
             subnode.setX(self.x())
             subnode.updatelayout(force=True)
+        self.updatelayout()
     
     def graphicsetup (self):
         super().graphicsetup()
