@@ -221,6 +221,22 @@ class NodesContainer (object):
 		ind2 = subnodes.index(subID2)
 		subnodes[ind2], subnodes[ind1] = subnodes[ind1], subnodes[ind2]
 	
+	def parentswap (self, grandpaID, parentID, childID):
+		parlinks = list(self.nodes[parentID].linkIDs)
+		childlinks = list(self.nodes[childID].linkIDs)
+		grandpalinks = self.nodes[grandpaID].linkIDs
+		
+		childindex = parlinks.index(childID)
+		parlinks.remove(childID)
+		parlinks.insert(childindex, parentID)
+		
+		parindex = grandpalinks.index(parentID)
+		grandpalinks.remove(parentID)
+		grandpalinks.insert(parindex, childID)
+		
+		self.nodes[parentID].linkIDs = childlinks
+		self.nodes[childID].linkIDs = parlinks
+	
 	def todict (self):
 		return {"name":self.name, "nextID":self.nextID, "nodes":self.nodes}
 

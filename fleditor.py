@@ -439,6 +439,7 @@ class TextNodeItem (NodeItem):
             menu.addAction(window.actions["addnode"])
             menu.addAction(window.actions["moveup"])
             menu.addAction(window.actions["movedown"])
+            menu.addAction(window.actions["parentswap"])
             menu.addAction(window.actions["unlinknode"])
             menu.addAction(window.actions["unlinkstree"])
         if not menu.isEmpty():
@@ -542,6 +543,7 @@ class BankNodeItem (NodeItem):
             menu.addAction(window.actions["addnode"])
             menu.addAction(window.actions["moveup"])
             menu.addAction(window.actions["movedown"])
+            menu.addAction(window.actions["parentswap"])
             menu.addAction(window.actions["unlinknode"])
             menu.addAction(window.actions["unlinkstree"])
         if not menu.isEmpty():
@@ -972,13 +974,20 @@ class TreeView (QGraphicsView):
         parent = selnode.parent
         if sibling is None or parent is None:
             return
-        selID = selnode.nodeobj.ID
-        sibID = sibling.nodeobj.ID
-        parID = parent.nodeobj.ID
+        selID = selnode.realid()
+        sibID = sibling.realid()
+        parID = parent.realid()
         if selnode.nodebank is parent:
             self.nodecontainer.subnodeswap(parID, selID, sibID)
         else:
             self.nodecontainer.siblingswap(parID, selID, sibID)
+        self.updateview()
+    
+    def parentswap (self):
+        selnode = self.selectednode
+        parent = selnode.parent
+        granparent = parent.parent
+        self.nodecontainer.parentswap(granparent.realid(), parent.realid(), selnode.realid())
         self.updateview()
     
     def collapse (self, collapse=None):
@@ -999,11 +1008,11 @@ class TreeView (QGraphicsView):
             actions = ["copynode", "moveup", "movedown", "unlinknode", 
                 "unlinkstree", "collapse"]
             if not nodeitem.issubnode():
-                actions.extend(["addnode", "pasteclone", "pastelink"])
+                actions.extend(["addnode", "pasteclone", "pastelink", "parentswap"])
         elif isinstance(nodeitem, BankNodeItem):
             actions = ["copynode", "moveup", "movedown", "unlinknode", 
                 "collapse", "addnode", "pasteclone", "pastelink", "unlinkstree",
-                "addsubnode", "pastesubnode"]
+                "addsubnode", "pastesubnode", "parentswap"]
         elif isinstance(nodeitem, RootNodeItem):
             actions = ["addnode", "pasteclone", "pastelink", "collapse"]
         
@@ -1149,6 +1158,8 @@ class EditorWindow (QMainWindow):
             None, ["insert-object"], "Add new subnode")
         self.actions["pastesubnode"] = self.createaction("Paste Subnode", self.pastesubnode,
             None, ["edit-paste"], "Paste cloned node as subnode")
+        self.actions["parentswap"] = self.createaction("Swap with Parent", self.parentswap,
+            None, ["go-left"], "Swap places with parent node")
     
     def createaction (self, text, slot=None, shortcuts=None, icons=None,
                      tip=None, checkable=False):
@@ -1275,6 +1286,10 @@ class EditorWindow (QMainWindow):
     @pyqtSlot()
     def movedown (self):
         self.activeview().movedown()
+    
+    @pyqtSlot()
+    def parentswap (self):
+        self.activeview().parentswap()
     
     @pyqtSlot()
     def collapse (self):
