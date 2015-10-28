@@ -1108,7 +1108,7 @@ class TreeView (QGraphicsView):
             super().keyPressEvent(event)
 
 class EditorWindow (QMainWindow):
-    defaultnodedict = {"type":"talk","text":"","speaker":"def","links":[]}
+    defaultnodedict = {"type":"talk"}
     copiednode = (None, None, None)
     actions = dict()
     

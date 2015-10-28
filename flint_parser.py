@@ -56,8 +56,9 @@ class ChartNode (object):
 		self.ID = str(nodeID)
 		self.linkIDs = []
 		self.realref = None
-		for link in node_dict['links']:
-			self.addlink(str(link['toID']))
+		if "links" in node_dict:
+			for link in node_dict['links']:
+				self.addlink(str(link['toID']))
 		if 'condition' in node_dict:
 			self.condition = ConditionCall(node_dict['condition'])
 		else:
@@ -104,8 +105,8 @@ class ChartNode (object):
 class TextNode (ChartNode):
 	def __init__ (self, container, node_dict, nodeID):
 		super().__init__(container, node_dict, nodeID)
-		self.text = node_dict['text']
-		self.speaker = node_dict['speaker']
+		self.text = node_dict['text'] if 'text' in node_dict else ""
+		self.speaker = node_dict['speaker'] if 'speaker' in node_dict else ""
 	
 	def todict (self):
 		node_dict = super().todict()
@@ -133,8 +134,9 @@ class BankNode (ChartNode):
 	def __init__ (self, container, node_dict, nodeID):
 		super().__init__(container, node_dict, nodeID)
 		self.subnodes = []
-		for subnode in node_dict['subnodes']:
-			self.subnodes.append(subnode)
+		if 'subnodes' in node_dict:
+			for subnode in node_dict['subnodes']:
+				self.subnodes.append(subnode)
 	
 	def todict (self):
 		node_dict = super().todict()
