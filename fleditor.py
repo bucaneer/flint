@@ -364,11 +364,14 @@ class RootNodeItem (NodeItem):
         if self.isselected():
             window = self.view.window()
             menu.addAction(window.actions["collapse"])
-            pastemenu = QMenu("Paste...")
-            pastemenu.addAction(window.actions["pasteclone"])
-            pastemenu.addAction(window.actions["pastelink"])
-            menu.addMenu(pastemenu)
-            menu.addAction(window.actions["addnode"])
+            addmenu = QMenu("Add link...")
+            addmenu.addAction(window.actions["pasteclone"])
+            addmenu.addAction(window.actions["pastelink"])
+            addmenu.addSeparator()
+            addmenu.addAction(window.actions["newtalk"])
+            addmenu.addAction(window.actions["newresponse"])
+            addmenu.addAction(window.actions["newbank"])
+            menu.addMenu(addmenu)
         if not menu.isEmpty():
             menu.exec_(event.screenPos())
 
@@ -442,11 +445,14 @@ class TextNodeItem (NodeItem):
             window = self.view.window()
             menu.addAction(window.actions["collapse"])
             menu.addAction(window.actions["copynode"])
-            pastemenu = QMenu("Paste...")
-            pastemenu.addAction(window.actions["pasteclone"])
-            pastemenu.addAction(window.actions["pastelink"])
-            menu.addMenu(pastemenu)
-            menu.addAction(window.actions["addnode"])
+            addmenu = QMenu("Add link...")
+            addmenu.addAction(window.actions["pasteclone"])
+            addmenu.addAction(window.actions["pastelink"])
+            addmenu.addSeparator()
+            addmenu.addAction(window.actions["newtalk"])
+            addmenu.addAction(window.actions["newresponse"])
+            addmenu.addAction(window.actions["newbank"])
+            menu.addMenu(addmenu)
             menu.addAction(window.actions["moveup"])
             menu.addAction(window.actions["movedown"])
             menu.addAction(window.actions["parentswap"])
@@ -544,13 +550,20 @@ class BankNodeItem (NodeItem):
             window = self.view.window()
             menu.addAction(window.actions["collapse"])
             menu.addAction(window.actions["copynode"])
-            pastemenu = QMenu("Paste...")
-            pastemenu.addAction(window.actions["pastesubnode"])
-            pastemenu.addAction(window.actions["pasteclone"])
-            pastemenu.addAction(window.actions["pastelink"])
-            menu.addMenu(pastemenu)
-            menu.addAction(window.actions["addsubnode"])
-            menu.addAction(window.actions["addnode"])
+            submenu = QMenu("Add subnode...")
+            submenu.addAction(window.actions["pastesubnode"])
+            submenu.addSeparator()
+            submenu.addAction(window.actions["newtalksub"])
+            submenu.addAction(window.actions["newresponsesub"])
+            menu.addMenu(submenu)
+            addmenu = QMenu("Add link...")
+            addmenu.addAction(window.actions["pasteclone"])
+            addmenu.addAction(window.actions["pastelink"])
+            addmenu.addSeparator()
+            addmenu.addAction(window.actions["newtalk"])
+            addmenu.addAction(window.actions["newresponse"])
+            addmenu.addAction(window.actions["newbank"])
+            menu.addMenu(addmenu)
             menu.addAction(window.actions["moveup"])
             menu.addAction(window.actions["movedown"])
             menu.addAction(window.actions["parentswap"])
@@ -1029,18 +1042,22 @@ class TreeView (QGraphicsView):
     @pyqtSlot(str)
     def filteractions (self, nodeID):
         nodeitem = self.nodegraph[nodeID]
-        genericactions = ["zoomin", "zoomout", "zoomorig", "gotoactive"]
+        genericactions = ["zoomin", "zoomout", "zoomorig", "gotoactive",
+            "collapse"]
         if isinstance(nodeitem, TextNodeItem):
             actions = ["copynode", "moveup", "movedown", "unlinknode", 
-                "unlinkstree", "collapse"]
+                "unlinkstree"]
             if not nodeitem.issubnode():
-                actions.extend(["addnode", "pasteclone", "pastelink", "parentswap"])
+                actions.extend(["newtalk", "newresponse", "newbank", 
+                    "pasteclone", "pastelink", "parentswap"])
         elif isinstance(nodeitem, BankNodeItem):
             actions = ["copynode", "moveup", "movedown", "unlinknode", 
-                "collapse", "addnode", "pasteclone", "pastelink", "unlinkstree",
-                "addsubnode", "pastesubnode", "parentswap"]
+                "newtalk", "newresponse", "newbank", "pasteclone", "pastelink",
+                "unlinkstree", "newtalksub", "newresponsesub", "pastesubnode",
+                "parentswap"]
         elif isinstance(nodeitem, RootNodeItem):
-            actions = ["addnode", "pasteclone", "pastelink", "collapse"]
+            actions = ["newtalk", "newresponse", "newbank", "pasteclone",
+                "pastelink"]
         
         actions.extend(genericactions)
         windowactions = self.window().actions
@@ -1162,13 +1179,17 @@ class EditorWindow (QMainWindow):
         self.actions["gotoactive"] = self.createaction("Go To Active", self.gotoactive, 
             None, ["go-jump"], "Center on active node")
         
-        self.actions["addnode"] = self.createaction("&Add Node", self.addnode,
-            None, ["insert-object"], "Add new node")
+        self.actions["newtalk"] = self.createaction("New &Talk Node", self.newtalk,
+            None, ["insert-object"], "Add new Talk node")
+        self.actions["newresponse"] = self.createaction("New &Response Node", self.newresponse,
+            None, ["insert-object"], "Add new Response node")
+        self.actions["newbank"] = self.createaction("New &Bank Node", self.newbank,
+            None, ["insert-object"], "Add new Bank node")
         self.actions["copynode"] = self.createaction("&Copy Node", self.copynode,
             None, ["edit-copy"], "Copy node")
-        self.actions["pasteclone"] = self.createaction("Paste as &Clone", self.pasteclone,
+        self.actions["pasteclone"] = self.createaction("Paste &Clone", self.pasteclone,
             None, ["edit-paste"], "Paste cloned node")
-        self.actions["pastelink"] = self.createaction("Paste as &Link", self.pastelink,
+        self.actions["pastelink"] = self.createaction("Paste &Link", self.pastelink,
             None, ["insert-link"], "Paste link to node")
         self.actions["unlinkstree"] = self.createaction("Unlink &Subtree", self.unlink,
             None, ["edit-clear"], "Unlink subtree from parent")
@@ -1180,11 +1201,13 @@ class EditorWindow (QMainWindow):
             None, ["go-down"], "Move node down")
         self.actions["collapse"] = self.createaction("(Un)Colla&pse subtree", self.collapse,
             None, None, "(Un)Collapse subtree")
-        self.actions["addsubnode"] = self.createaction("Add Su&bnode", self.addsubnode,
-            None, ["insert-object"], "Add new subnode")
-        self.actions["pastesubnode"] = self.createaction("Paste Subnode", self.pastesubnode,
+        self.actions["newtalksub"] = self.createaction("New &Talk Subnode", self.newtalksub,
+            None, ["insert-object"], "Add new Talk subnode")
+        self.actions["newresponsesub"] = self.createaction("New &Response Subnode", self.newresponsesub,
+            None, ["insert-object"], "Add new Response subnode")
+        self.actions["pastesubnode"] = self.createaction("&Paste Subnode", self.pastesubnode,
             None, ["edit-paste"], "Paste cloned node as subnode")
-        self.actions["parentswap"] = self.createaction("Swap with Parent", self.parentswap,
+        self.actions["parentswap"] = self.createaction("S&wap with Parent", self.parentswap,
             None, ["go-left"], "Swap places with parent node")
     
     def createaction (self, text, slot=None, shortcuts=None, icons=None,
@@ -1218,7 +1241,7 @@ class EditorWindow (QMainWindow):
         self.addToolBar(viewtoolbar)
         
         edittoolbar = QToolBar("Tree editing")
-        edittoolbar.addAction(self.actions["addnode"])
+        #edittoolbar.addAction(self.actions["addnode"])
         edittoolbar.addAction(self.actions["copynode"])
         edittoolbar.addAction(self.actions["pasteclone"])
         edittoolbar.addAction(self.actions["pastelink"])
@@ -1251,12 +1274,24 @@ class EditorWindow (QMainWindow):
         view.centerOn(view.activenode)
     
     @pyqtSlot()
-    def addnode (self):
-        self.activeview().addnode(self.defaultnodedict)
+    def newtalk (self):
+        self.activeview().addnode({"type":"talk"})
     
     @pyqtSlot()
-    def addsubnode (self):
-        self.activeview().addnode(self.defaultnodedict, subnode=True)
+    def newresponse (self):
+        self.activeview().addnode({"type":"response"})
+    
+    @pyqtSlot()
+    def newbank (self):
+        self.activeview().addnode({"type":"bank"})
+    
+    @pyqtSlot()
+    def newtalksub (self):
+        self.activeview().addnode({"type":"talk"}, subnode=True)
+    
+    @pyqtSlot()
+    def newresponsesub (self):
+        self.activeview().addnode({"type":"response"}, subnode=True)
     
     @pyqtSlot()
     def copynode (self):
@@ -1272,6 +1307,10 @@ class EditorWindow (QMainWindow):
             self.copiednode = (None, None, nodedict)
         else:
             self.copiednode = (nodeobj.ID, view, nodedict)
+        
+        self.actions["pasteclone"].setText("Paste &Clone (node %s)" % nodeobj.ID)
+        self.actions["pastelink"].setText("Paste &Link (node %s)" % nodeobj.ID)
+        self.actions["pastesubnode"].setText("&Paste Subnode (node %s)" % nodeobj.ID)
     
     @pyqtSlot()
     def pasteclone (self):
