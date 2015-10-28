@@ -1076,6 +1076,11 @@ class TreeView (QGraphicsView):
                         action.setEnabled(False)
                 else:
                     action.setEnabled(True)
+                    if name == "collapse":
+                        if nodeitem.iscollapsed():
+                            action.setText("Uncolla&pse Subtree")
+                        else:
+                            action.setText("Colla&pse Subtree")
             else:
                 action.setEnabled(False)
     
