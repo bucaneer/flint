@@ -104,9 +104,9 @@ class NodeItem(QGraphicsItem):
         self.view = view
         self.treeviewport = view.viewport()
         self.edge = None
-        self.ghost = ghost
         self.yoffset = 0
         self.graphicsetup()
+        self.setghost(ghost)
         
     def id (self):
         if self.isghost():
@@ -149,6 +149,16 @@ class NodeItem(QGraphicsItem):
         else:
             self.selectbox.hide()
     
+    def setghost (self, ghost):
+        self.ghost = ghost
+        
+        if ghost:
+            self.graphgroup.setOpacity(0.7)
+            self.shadowbox.hide()
+        else:
+            self.graphgroup.setOpacity(1)
+            self.shadowbox.show()
+    
     def issubnode (self):
         return self.nodebank is self.parent
     
@@ -165,7 +175,11 @@ class NodeItem(QGraphicsItem):
         return self.view.selectednode is self
     
     def iscollapsed (self):
-        return self.id() in self.view.collapsednodes
+        if self.parent is not None:
+            ids = (self.realid(), self.parent.realid())
+        else:
+            ids = (self.realid(), None)
+        return ids in self.view.collapsednodes
     
     def setY (self, y):
         self.edge.prepareGeometryChange()
@@ -307,10 +321,6 @@ class NodeItem(QGraphicsItem):
         self.nodelabel.setText(self.label % self.realid())
         self.nodelabel.setPos(self.style.itemmargin, self.style.itemmargin)
         self.graphgroup.addToGroup(self.nodelabel)
-        
-        if self.isghost():
-            self.graphgroup.setOpacity(0.7)
-            self.shadowbox.hide()
     
     def mouseDoubleClickEvent (self, event):
         super().mouseDoubleClickEvent(event)
@@ -841,7 +851,10 @@ class TreeView (QGraphicsView):
         while queue:
             curID, ref = queue.pop(0)
             isghost = visited[curID]
-            visited[curID] = True
+            if ref is not None:
+                visited[curID] = visited[curID] or (curID, ref.realid()) not in self.collapsednodes
+            else:
+                visited[curID] = True
             curnodeobj = nodesdict[curID]
             nodeitem = self.newitem(curnodeobj, ref, isghost)
             if not (isghost or nodeitem.iscollapsed()):
@@ -860,9 +873,17 @@ class TreeView (QGraphicsView):
         self.scene().addItem(edgeitem)
         self.scene().addItem(nodeitem)
         if isghost:
-            self.nodegraph["<-".join([nodeobj.ID, refid])] = nodeitem
+            graphid = "<-".join([nodeobj.ID, refid])
+        elif nodeobj.ID in self.nodegraph:
+            oldnode = self.nodegraph[nodeobj.ID]
+            oldnode.setghost(True)
+            self.nodegraph[oldnode.id()] = oldnode
+            nodeitem.referrers = oldnode.referrers
+            oldnode.referrers = []
+            graphid = nodeobj.ID
         else:
-            self.nodegraph[nodeobj.ID] = nodeitem
+            graphid = nodeobj.ID
+        self.nodegraph[graphid] = nodeitem
         
         if refid is not None:
             self.nodegraph[nodeobj.ID].addreferrer(refid)
@@ -991,13 +1012,18 @@ class TreeView (QGraphicsView):
         self.updateview()
     
     def collapse (self, collapse=None):
-        selID = self.selectednode.id()
-        if selID in self.collapsednodes:
+        selID = self.selectednode.realid()
+        if self.selectednode.parent is not None:
+            refID = self.selectednode.parent.realid()
+        else:
+            refID = None
+        ids = (selID, refID)
+        if ids in self.collapsednodes:
             if collapse is None or not collapse:
-                self.collapsednodes.remove(selID)
+                self.collapsednodes.remove(ids)
         else:
             if collapse is None or collapse:
-                self.collapsednodes.append(selID)
+                self.collapsednodes.append(ids)
         self.updateview()
     
     @pyqtSlot(str)
@@ -1270,7 +1296,7 @@ class EditorWindow (QMainWindow):
         if selected.parent is None:
             return
         if len(selected.referrers) == 1:
-            if inherit:
+            if inherit or len(selected.childlist()) == 0:
                 text = "This will remove the only instance of node %s.\n\nContinue?" % selected.id()
             else:
                 text = "This will remove the only instance of node %s and all unique nodes in its subtree.\n\nContinue?" % selected.id()
