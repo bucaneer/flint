@@ -362,14 +362,7 @@ class RootNodeItem (NodeItem):
         if self.isselected():
             window = self.view.window()
             menu.addAction(window.actions["collapse"])
-            addmenu = QMenu("Add link...")
-            addmenu.addAction(window.actions["pasteclone"])
-            addmenu.addAction(window.actions["pastelink"])
-            addmenu.addSeparator()
-            addmenu.addAction(window.actions["newtalk"])
-            addmenu.addAction(window.actions["newresponse"])
-            addmenu.addAction(window.actions["newbank"])
-            menu.addMenu(addmenu)
+            menu.addMenu(window.addmenu)
         if not menu.isEmpty():
             menu.exec_(event.screenPos())
 
@@ -444,14 +437,7 @@ class TextNodeItem (NodeItem):
             window = self.view.window()
             menu.addAction(window.actions["collapse"])
             menu.addAction(window.actions["copynode"])
-            addmenu = QMenu("Add link...")
-            addmenu.addAction(window.actions["pasteclone"])
-            addmenu.addAction(window.actions["pastelink"])
-            addmenu.addSeparator()
-            addmenu.addAction(window.actions["newtalk"])
-            addmenu.addAction(window.actions["newresponse"])
-            addmenu.addAction(window.actions["newbank"])
-            menu.addMenu(addmenu)
+            menu.addMenu(window.addmenu)
             menu.addAction(window.actions["moveup"])
             menu.addAction(window.actions["movedown"])
             menu.addAction(window.actions["parentswap"])
@@ -546,20 +532,8 @@ class BankNodeItem (NodeItem):
             window = self.view.window()
             menu.addAction(window.actions["collapse"])
             menu.addAction(window.actions["copynode"])
-            submenu = QMenu("Add subnode...")
-            submenu.addAction(window.actions["pastesubnode"])
-            submenu.addSeparator()
-            submenu.addAction(window.actions["newtalksub"])
-            submenu.addAction(window.actions["newresponsesub"])
-            menu.addMenu(submenu)
-            addmenu = QMenu("Add link...")
-            addmenu.addAction(window.actions["pasteclone"])
-            addmenu.addAction(window.actions["pastelink"])
-            addmenu.addSeparator()
-            addmenu.addAction(window.actions["newtalk"])
-            addmenu.addAction(window.actions["newresponse"])
-            addmenu.addAction(window.actions["newbank"])
-            menu.addMenu(addmenu)
+            menu.addMenu(window.subnodemenu)
+            menu.addMenu(window.addmenu)
             menu.addAction(window.actions["moveup"])
             menu.addAction(window.actions["movedown"])
             menu.addAction(window.actions["parentswap"])
@@ -1136,6 +1110,7 @@ class EditorWindow (QMainWindow):
         
         self.style = FlNodeStyle(QFont())
         self.initactions()
+        self.initmenus()
         self.inittoolbars()
         
         self.view = TreeView(fp.loadjson("test3.json"), parent=self)
@@ -1247,6 +1222,51 @@ class EditorWindow (QMainWindow):
             action.setCheckable(True)
         return action
     
+    def initmenus (self):
+        menubar = self.menuBar()
+        
+        filemenu = menubar.addMenu("&File")
+        filemenu.addAction(self.actions["openfile"])
+        filemenu.addAction(self.actions["newtree"])
+        filemenu.addSeparator()
+        filemenu.addAction(self.actions["save"])
+        filemenu.addAction(self.actions["saveas"])
+        
+        addmenu = QMenu("Add &link...")
+        addmenu.addAction(self.actions["pasteclone"])
+        addmenu.addAction(self.actions["pastelink"])
+        addmenu.addSeparator()
+        addmenu.addAction(self.actions["newtalk"])
+        addmenu.addAction(self.actions["newresponse"])
+        addmenu.addAction(self.actions["newbank"])
+        #addmenu.setIcon(QIcon.fromTheme("insert-object"))
+        self.addmenu = addmenu
+        
+        subnodemenu = QMenu("Add &subnode...")
+        subnodemenu.addAction(self.actions["pastesubnode"])
+        subnodemenu.addSeparator()
+        subnodemenu.addAction(self.actions["newtalksub"])
+        subnodemenu.addAction(self.actions["newresponsesub"])
+        self.subnodemenu = subnodemenu
+        
+        editmenu = menubar.addMenu("&Edit")
+        editmenu.addMenu(addmenu)
+        editmenu.addMenu(subnodemenu)
+        editmenu.addAction(self.actions["moveup"])
+        editmenu.addAction(self.actions["movedown"])
+        editmenu.addAction(self.actions["parentswap"])
+        editmenu.addSeparator()
+        editmenu.addAction(self.actions["unlinknode"])
+        editmenu.addAction(self.actions["unlinkstree"])
+        self.editmenu = editmenu
+        
+        viewmenu = menubar.addMenu("&View")
+        viewmenu.addAction(self.actions["zoomin"])
+        viewmenu.addAction(self.actions["zoomout"])
+        viewmenu.addAction(self.actions["zoomorig"])
+        viewmenu.addAction(self.actions["gotoactive"])
+        viewmenu.addAction(self.actions["collapse"])
+    
     def inittoolbars (self):
         filetoolbar = QToolBar("File actions")
         filetoolbar.addAction(self.actions["openfile"])
@@ -1263,7 +1283,7 @@ class EditorWindow (QMainWindow):
         self.addToolBar(viewtoolbar)
         
         edittoolbar = QToolBar("Tree editing")
-        #edittoolbar.addAction(self.actions["addnode"])
+        #edittoolbar.addAction(self.addmenu.menuAction())
         edittoolbar.addAction(self.actions["copynode"])
         edittoolbar.addAction(self.actions["pasteclone"])
         edittoolbar.addAction(self.actions["pastelink"])
