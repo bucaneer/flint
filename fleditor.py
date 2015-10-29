@@ -1012,7 +1012,9 @@ class TreeView (QGraphicsView):
         self.updateview()
     
     @pyqtSlot(str)
-    def filteractions (self, nodeID):
+    def filteractions (self, nodeID=""):
+        if nodeID == "":
+            nodeID = self.selectednode.id()
         nodeitem = self.nodegraph[nodeID]
         genericactions = ["zoomin", "zoomout", "zoomorig", "gotoactive",
             "collapse", "openfile", "save", "saveas", "newtree"]
@@ -1402,6 +1404,7 @@ class EditorWindow (QMainWindow):
         self.actions["pasteclone"].setText("Paste &Clone (node %s)" % nodeobj.ID)
         self.actions["pastelink"].setText("Paste &Link (node %s)" % nodeobj.ID)
         self.actions["pastesubnode"].setText("&Paste Subnode (node %s)" % nodeobj.ID)
+        view.filteractions()
     
     @pyqtSlot()
     def pasteclone (self):
