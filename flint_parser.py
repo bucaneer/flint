@@ -147,8 +147,9 @@ class BankNode (ChartNode):
 class NodesContainer (object):
 	__types = { 'talk': TalkNode, 'response': ResponseNode, 'bank': BankNode,
 		'root': ChartNode }
-	def __init__ (self, nodes_dict):
+	def __init__ (self, nodes_dict, filename=""):
 		self.defaultcond = ConditionCall({"type":"cond","operator":"and","calls":[]})
+		self.filename = filename
 		self.name = nodes_dict['name']
 		self.nextID = str(nodes_dict['nextID'])
 		self.nodes = dict()
@@ -244,7 +245,7 @@ class NodesContainer (object):
 
 def loadjson (filename):
 	with open(filename, 'r') as f:
-		return NodesContainer(json.load(f))
+		return NodesContainer(json.load(f), filename)
 
 def writejson (nodecont, filename):
 	with open(filename, 'w') as f:

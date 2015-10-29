@@ -6,6 +6,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtOpenGL import *
 import flint_parser as fp
+import os
 
 class FlPalette (object):
     """Palette of custom colors for quick reference."""
@@ -780,7 +781,7 @@ class TreeView (QGraphicsView):
     __types = {'talk': TalkNodeItem, 'response': ResponseNodeItem, 
         'bank': BankNodeItem, 'root': RootNodeItem}
     
-    def __init__ (self, parent=None):
+    def __init__ (self, nodecontainer, parent=None):
         super().__init__(parent)
         self.zoomscale = 1
         self.activenode = None
@@ -805,7 +806,7 @@ class TreeView (QGraphicsView):
         
         self.selectedChanged.connect(self.filteractions)
         
-        self.nodecontainer = fp.loadjson("test3.json")
+        self.nodecontainer = nodecontainer
         self.nodedocs = dict()
         self.updateview()
         self.setactivenode(self.treeroot())
@@ -1043,7 +1044,7 @@ class TreeView (QGraphicsView):
     def filteractions (self, nodeID):
         nodeitem = self.nodegraph[nodeID]
         genericactions = ["zoomin", "zoomout", "zoomorig", "gotoactive",
-            "collapse"]
+            "collapse", "openfile"]
         if isinstance(nodeitem, TextNodeItem):
             actions = ["copynode", "moveup", "movedown", "unlinknode", 
                 "unlinkstree"]
@@ -1141,7 +1142,7 @@ class EditorWindow (QMainWindow):
         self.initactions()
         self.inittoolbars()
         
-        self.view = TreeView(parent=self)
+        self.view = TreeView(fp.loadjson("test3.json"), parent=self)
         
         tabs = QTabWidget(parent=self)
         tabs.addTab(self.view, "Graph")
@@ -1172,6 +1173,9 @@ class EditorWindow (QMainWindow):
         return self.tabs.currentWidget()
     
     def initactions (self):
+        self.actions["openfile"] = self.createaction("Open", self.openfile,
+            None, ["document-open"], "Open dialogue file")
+        
         self.actions["zoomin"] = self.createaction("Zoom In", self.zoomin, 
             [QKeySequence.ZoomIn, QKeySequence(Qt.ControlModifier + Qt.KeypadModifier + Qt.Key_Plus)], 
             ["gtk-zoom-in", "zoom-in"], "Zoom in")
@@ -1238,6 +1242,10 @@ class EditorWindow (QMainWindow):
         return action
     
     def inittoolbars (self):
+        filetoolbar = QToolBar("File actions")
+        filetoolbar.addAction(self.actions["openfile"])
+        self.addToolBar(filetoolbar)
+        
         viewtoolbar = QToolBar("View control")
         viewtoolbar.addAction(self.actions["zoomorig"])
         viewtoolbar.addAction(self.actions["zoomin"])
@@ -1260,6 +1268,16 @@ class EditorWindow (QMainWindow):
         searchwidget = SearchWidget(self)
         searchtoolbar.addWidget(searchwidget)
         self.addToolBar(searchtoolbar)
+    
+    @pyqtSlot()
+    def openfile (self):
+        filename = QFileDialog.getOpenFileName(self, "Open file", os.getcwd(), "Dialog files (*.json)")[0]
+        if filename == "":
+            return
+        nodecontainer = fp.loadjson(filename)
+        treeview = TreeView(nodecontainer, parent=self)
+        tabindex = self.tabs.addTab(treeview, nodecontainer.name)
+        self.tabs.setCurrentIndex(tabindex)
     
     @pyqtSlot()
     def zoomin (self):
