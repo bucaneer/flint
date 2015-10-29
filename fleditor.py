@@ -1044,7 +1044,7 @@ class TreeView (QGraphicsView):
     def filteractions (self, nodeID):
         nodeitem = self.nodegraph[nodeID]
         genericactions = ["zoomin", "zoomout", "zoomorig", "gotoactive",
-            "collapse", "openfile"]
+            "collapse", "openfile", "save", "saveas"]
         if isinstance(nodeitem, TextNodeItem):
             actions = ["copynode", "moveup", "movedown", "unlinknode", 
                 "unlinkstree"]
@@ -1174,7 +1174,11 @@ class EditorWindow (QMainWindow):
     
     def initactions (self):
         self.actions["openfile"] = self.createaction("Open", self.openfile,
-            None, ["document-open"], "Open dialogue file")
+            [QKeySequence.Open], ["document-open"], "Open dialogue file")
+        self.actions["save"] = self.createaction("Save", self.save,
+            [QKeySequence.Save], ["document-save"], "Save dialogue file")
+        self.actions["saveas"] = self.createaction("Save As", self.saveas,
+            [QKeySequence.SaveAs], ["document-save-as"], "Save dialogue file as")
         
         self.actions["zoomin"] = self.createaction("Zoom In", self.zoomin, 
             [QKeySequence.ZoomIn, QKeySequence(Qt.ControlModifier + Qt.KeypadModifier + Qt.Key_Plus)], 
@@ -1244,6 +1248,8 @@ class EditorWindow (QMainWindow):
     def inittoolbars (self):
         filetoolbar = QToolBar("File actions")
         filetoolbar.addAction(self.actions["openfile"])
+        filetoolbar.addAction(self.actions["save"])
+        filetoolbar.addAction(self.actions["saveas"])
         self.addToolBar(filetoolbar)
         
         viewtoolbar = QToolBar("View control")
@@ -1278,6 +1284,20 @@ class EditorWindow (QMainWindow):
         treeview = TreeView(nodecontainer, parent=self)
         tabindex = self.tabs.addTab(treeview, nodecontainer.name)
         self.tabs.setCurrentIndex(tabindex)
+    
+    @pyqtSlot()
+    def save (self, newfile=False):
+        nodecont = self.activeview().nodecontainer
+        if nodecont.filename == "" or newfile:
+            filename = QFileDialog.getSaveFileName(self, "Save as...", 
+                os.path.join(os.getcwd(), (nodecont.name or "Untitled")+".json"),
+                "Dialog files (*.json)")[0]
+            nodecont.filename = filename
+        nodecont.savetofile()
+    
+    @pyqtSlot()
+    def saveas (self):
+        self.save(newfile=True)
     
     @pyqtSlot()
     def zoomin (self):

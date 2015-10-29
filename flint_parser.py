@@ -240,6 +240,11 @@ class NodesContainer (object):
 		self.nodes[parentID].linkIDs = childlinks
 		self.nodes[childID].linkIDs = parlinks
 	
+	def savetofile (self):
+		if self.filename == "":
+			return
+		writejson(self, self.filename)
+	
 	def todict (self):
 		return {"name":self.name, "nextID":self.nextID, "nodes":self.nodes}
 
