@@ -258,3 +258,7 @@ def writejson (nodecont, filename):
 			separators=(',', ': '), sort_keys=True,
 			default=lambda o: o.todict() )
 
+def newcontainer ():
+	nodes_dict = { "name": "Untitled", "nextID": 1, "nodes": { "0": {"type": "root"} } }
+	return NodesContainer(nodes_dict)
+

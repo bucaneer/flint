@@ -1044,7 +1044,7 @@ class TreeView (QGraphicsView):
     def filteractions (self, nodeID):
         nodeitem = self.nodegraph[nodeID]
         genericactions = ["zoomin", "zoomout", "zoomorig", "gotoactive",
-            "collapse", "openfile", "save", "saveas"]
+            "collapse", "openfile", "save", "saveas", "newtree"]
         if isinstance(nodeitem, TextNodeItem):
             actions = ["copynode", "moveup", "movedown", "unlinknode", 
                 "unlinkstree"]
@@ -1179,6 +1179,8 @@ class EditorWindow (QMainWindow):
             [QKeySequence.Save], ["document-save"], "Save dialogue file")
         self.actions["saveas"] = self.createaction("Save As", self.saveas,
             [QKeySequence.SaveAs], ["document-save-as"], "Save dialogue file as")
+        self.actions["newtree"] = self.createaction("New", self.newtree,
+            [QKeySequence.New], ["document-new"], "New dialogue tree")
         
         self.actions["zoomin"] = self.createaction("Zoom In", self.zoomin, 
             [QKeySequence.ZoomIn, QKeySequence(Qt.ControlModifier + Qt.KeypadModifier + Qt.Key_Plus)], 
@@ -1248,6 +1250,7 @@ class EditorWindow (QMainWindow):
     def inittoolbars (self):
         filetoolbar = QToolBar("File actions")
         filetoolbar.addAction(self.actions["openfile"])
+        filetoolbar.addAction(self.actions["newtree"])
         filetoolbar.addAction(self.actions["save"])
         filetoolbar.addAction(self.actions["saveas"])
         self.addToolBar(filetoolbar)
@@ -1281,6 +1284,13 @@ class EditorWindow (QMainWindow):
         if filename == "":
             return
         nodecontainer = fp.loadjson(filename)
+        treeview = TreeView(nodecontainer, parent=self)
+        tabindex = self.tabs.addTab(treeview, nodecontainer.name)
+        self.tabs.setCurrentIndex(tabindex)
+    
+    @pyqtSlot()
+    def newtree (self):
+        nodecontainer = fp.newcontainer()
         treeview = TreeView(nodecontainer, parent=self)
         tabindex = self.tabs.addTab(treeview, nodecontainer.name)
         self.tabs.setCurrentIndex(tabindex)
