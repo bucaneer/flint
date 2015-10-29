@@ -118,9 +118,6 @@ class NodeItem(QGraphicsItem):
     def realid (self):
         return self.nodeobj.ID
     
-    def nodeitems (self):
-        return self.view.nodegraph
-    
     def addchild (self, nodeitem):
         self.children.append(nodeitem)
     
@@ -336,7 +333,7 @@ class NodeItem(QGraphicsItem):
             event.accept()
     
     def __repr__(self):
-        return "<NodeItem %s>" % self.id()
+        return "<%s %s>" % (type(self).__name__, self.id())
 
 
 class RootNodeItem (NodeItem):
@@ -478,8 +475,8 @@ class BankNodeItem (NodeItem):
     altcolor = FlPalette.bankvar
     label = "%s Bank"
     
-    def __init__ (self, nodeobj, parent=None, view=None, ghost=False, **args):
-        super().__init__(nodeobj, parent, view, ghost, **args)
+    def __init__ (self, nodeobj, parent=None, view=None, ghost=False):
+        super().__init__(nodeobj, parent, view, ghost)
         self.subnodes = []
         self.setZValue(-1)
         for subnodeID in nodeobj.subnodes:
@@ -542,9 +539,6 @@ class BankNodeItem (NodeItem):
         super().setY(y)
         for subnode in self.subnodes:
             subnode.setY(y)
-    
-    def boundingRect (self):
-        return self.rect
     
     def contextMenuEvent (self, event):
         menu = QMenu()
@@ -857,11 +851,11 @@ class TreeView (QGraphicsView):
         else:
             self.setselectednode(self.activenode)
     
-    def constructgraph (self, nodeID="0"):
+    def constructgraph (self):
         queue = []
-        queue.append((nodeID, None))
+        queue.append(("0", None))
         nodesdict = self.nodecontainer.nodes
-        visited = {nodeID: False}
+        visited = {"0": False}
         
         while queue:
             curID, ref = queue.pop(0)
@@ -1134,7 +1128,6 @@ class TreeView (QGraphicsView):
             super().keyPressEvent(event)
 
 class EditorWindow (QMainWindow):
-    defaultnodedict = {"type":"talk"}
     copiednode = (None, None, None)
     actions = dict()
     
