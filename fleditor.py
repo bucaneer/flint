@@ -1150,7 +1150,9 @@ class EditorWindow (QMainWindow):
         tabs = QTabWidget(parent=self)
         tabs.addTab(self.view, "Graph")
         tabs.setTabsClosable(True)
+        tabs.setTabBarAutoHide(True)
         tabs.tabCloseRequested.connect(self.closetab)
+        tabs.tabBarDoubleClicked.connect(self.nametab)
         self.tabs = tabs                        
         
         mapview = MapView(self)
@@ -1320,6 +1322,17 @@ class EditorWindow (QMainWindow):
         self.tabs.removeTab(index)
         view.deleteLater()
         view = None
+    
+    @pyqtSlot(int)
+    def nametab (self, index):
+        if index == -1:
+            return
+        view = self.tabs.widget(index)
+        name = view.nodecontainer.name
+        newname = QInputDialog.getText(self, "Rename", "Conversation title:", text=name)
+        if newname[1] and newname[0] != "":
+            view.nodecontainer.name = newname[0]
+            self.tabs.setTabText(index, newname[0])
     
     @pyqtSlot()
     def zoomin (self):
