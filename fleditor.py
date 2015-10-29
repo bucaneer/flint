@@ -1022,8 +1022,10 @@ class TreeView (QGraphicsView):
     def parentswap (self):
         selnode = self.selectednode
         parent = selnode.parent
-        granparent = parent.parent
-        self.nodecontainer.parentswap(granparent.realid(), parent.realid(), selnode.realid())
+        grandparent = parent.parent
+        if grandparent is None:
+            return
+        self.nodecontainer.parentswap(grandparent.realid(), parent.realid(), selnode.realid())
         self.updateview()
     
     def collapse (self, collapse=None):
