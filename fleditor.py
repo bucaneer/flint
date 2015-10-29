@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtOpenGL import *
 import flint_parser as fp
 import os
+import weakref
 
 class FlPalette (object):
     """Palette of custom colors for quick reference."""
@@ -57,8 +58,8 @@ class FlNodeStyle (object):
         self.rowgap = rowgap
 
 class QGraphicsRectItemCond (QGraphicsRectItem):
-    def __init__(self, parent=0, cond=None, **args):
-        super().__init__(parent, **args)
+    def __init__(self, parent=0, cond=None):
+        super().__init__(parent)
         self.cond = cond
     
     def paint(self, painter, style, widget):
@@ -66,8 +67,8 @@ class QGraphicsRectItemCond (QGraphicsRectItem):
             super().paint(painter, style, widget)
 
 class QGraphicsSimpleTextItemCond (QGraphicsSimpleTextItem):
-    def __init__(self, parent=0, cond=None, **args):
-        super().__init__(parent, **args)
+    def __init__(self, parent=0, cond=None):
+        super().__init__(parent)
         self.cond = cond
     
     def paint(self, painter, style, widget):
@@ -75,8 +76,8 @@ class QGraphicsSimpleTextItemCond (QGraphicsSimpleTextItem):
             super().paint(painter, style, widget)
 
 class QGraphicsTextItemCond (QGraphicsTextItem):
-    def __init__(self, parent=0, cond=None, **args):
-        super().__init__(parent, **args)
+    def __init__(self, parent=0, cond=None):
+        super().__init__(parent)
         self.cond = cond
     
     def paint(self, painter, style, widget):
@@ -92,9 +93,9 @@ class NodeItem(QGraphicsItem):
         self.style = view.window().style
         if parent is None:
             self.parent = None
-            self.nodebank = view
+            self.nodebank = weakref.proxy(view)
         elif nodeobj.nodebank == -1:
-            self.nodebank = view
+            self.nodebank = weakref.proxy(view)
             self.parent = parent
             self.parent.addchild(self)
             self.setX(parent.x()+self.style.rankwidth)
@@ -102,8 +103,7 @@ class NodeItem(QGraphicsItem):
             self.nodebank = parent
             self.parent = parent
         self.setCursor(Qt.ArrowCursor)
-        self.view = view
-        self.treeviewport = view.viewport()
+        self.view = weakref.proxy(view)
         self.edge = None
         self.yoffset = 0
         self.graphicsetup()
@@ -316,7 +316,7 @@ class NodeItem(QGraphicsItem):
         self.graphgroup.addToGroup(self.mainbox)
         
         self.nodelabel = QGraphicsSimpleTextItemCond(self, 
-            lambda s,w: w is self.treeviewport)
+            lambda s,w: w is self.view.viewport())
         self.nodelabel.setBrush(lightbrush)
         self.nodelabel.setFont(self.style.boldfont)
         self.nodelabel.setText(self.label % self.realid())
@@ -388,22 +388,23 @@ class TextNodeItem (NodeItem):
         
         lightbrush = QBrush(FlPalette.light)
         nopen = QPen(0)
+        viewport = self.view.viewport()
         
         self.textbox = QGraphicsRectItemCond(self, 
-            lambda s,w: w is self.treeviewport and not self.iscollapsed())
+            lambda s,w: w is viewport and not self.iscollapsed())
         self.textbox.setBrush(lightbrush)
         self.textbox.setPen(nopen)
         self.graphgroup.addToGroup(self.textbox)
         
-        self.nodespeaker = QGraphicsSimpleTextItemCond(self, 
-            lambda s,w: w is self.treeviewport and not self.iscollapsed())
+        self.nodespeaker = QGraphicsSimpleTextItemCond(self,
+            lambda s,w: w is viewport and not self.iscollapsed())
         self.nodespeaker.setBrush(lightbrush)
         self.nodespeaker.setText(self.nodeobj.speaker)
         self.nodespeaker.setPos(self.style.itemmargin, self.nodelabel.y()+self.nodelabel.boundingRect().height()+self.style.itemmargin*2)
         self.graphgroup.addToGroup(self.nodespeaker)
         
-        self.nodetext = QGraphicsTextItemCond(self, 
-            lambda s,w: w is self.treeviewport and not self.iscollapsed())
+        self.nodetext = QGraphicsTextItemCond(self,
+            lambda s,w: w is viewport and not self.iscollapsed())
         self.nodetext.setTextWidth(self.style.nodetextwidth)
         self.nodetext.setDefaultTextColor(FlPalette.dark)
         self.nodetext.setPos(0, self.nodespeaker.y()+self.nodespeaker.boundingRect().height()+self.style.itemmargin)
@@ -494,7 +495,7 @@ class BankNodeItem (NodeItem):
         nopen = QPen(0)
         
         self.centerbox = QGraphicsRectItemCond(self, 
-            lambda s,w: w is self.treeviewport and not self.iscollapsed())
+            lambda s,w: w is self.view.viewport() and not self.iscollapsed())
         self.centerbox.setRect(QRectF())
         self.centerbox.setBrush(darkbrush)
         self.centerbox.setPen(nopen)
@@ -580,11 +581,11 @@ class EdgeItem(QGraphicsItem):
     bgcolor = FlPalette.dark
     pensize = 2
     
-    def __init__(self, source, view, **args):
-        super().__init__(**args)
+    def __init__(self, source, view):
+        super().__init__()
         self.source = source
         source.setedge(self)
-        self.treeviewport = view.viewport()
+        self.view = weakref.proxy(view)
         self.style = view.window().style
     
     def boundingRect(self):
@@ -602,7 +603,7 @@ class EdgeItem(QGraphicsItem):
     def paint(self, painter, style, widget, color=None, off=0, main=True):
         assert(isinstance(painter, QPainter))
         children = self.source.childlist()
-        treeview = widget is self.treeviewport
+        treeview = widget is self.view.viewport()
         if not children:
             return
         if main and treeview:
@@ -640,7 +641,7 @@ class EdgeItem(QGraphicsItem):
 class FrameItem (QGraphicsItem):
     def __init__ (self, view):
         super().__init__()
-        self.treeview = view
+        self.treeview = weakref.proxy(view)
         self.setZValue(1)
     
     def boundingRect (self):
@@ -798,7 +799,7 @@ class TreeView (QGraphicsView):
         #self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
         #self.setViewportUpdateMode(QGraphicsView.MinimalViewportUpdate)
         
-        scene =  QGraphicsScene()
+        scene = QGraphicsScene(self)
         scene.setBackgroundBrush(FlPalette.bg)
         self.setScene(scene)
         
@@ -818,7 +819,7 @@ class TreeView (QGraphicsView):
             if nodeID in self.nodedocs:
                 newnodedocs[nodeID] = self.nodedocs[nodeID]
             elif isinstance(nodeobj, fp.TextNode):
-                textdoc = QTextDocument()
+                textdoc = QTextDocument(self)
                 textdoc.setDocumentLayout(QPlainTextDocumentLayout(textdoc))
                 textdoc.setPlainText(nodeobj.text)
                 newnodedocs[nodeID] = {"text": textdoc}
@@ -1146,6 +1147,8 @@ class EditorWindow (QMainWindow):
         
         tabs = QTabWidget(parent=self)
         tabs.addTab(self.view, "Graph")
+        tabs.setTabsClosable(True)
+        tabs.tabCloseRequested.connect(self.closetab)
         self.tabs = tabs                        
         
         mapview = MapView(self)
@@ -1308,6 +1311,13 @@ class EditorWindow (QMainWindow):
     @pyqtSlot()
     def saveas (self):
         self.save(newfile=True)
+    
+    @pyqtSlot(int)
+    def closetab (self, index):
+        view = self.tabs.widget(index)
+        self.tabs.removeTab(index)
+        view.deleteLater()
+        view = None
     
     @pyqtSlot()
     def zoomin (self):
