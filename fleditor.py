@@ -626,12 +626,12 @@ class EdgeItem(QGraphicsItem):
             tx = target.x() + target.boundingRect().left()
             ty = target.y()
             painter.setPen(pen)
-            painter.drawLine(vert_x+off, ty+off, tx+off-arrow, ty+off)
-            if treeview:
-                arrowtip = [QPointF(tx+off, ty+off), QPointF(tx-arrow+off, ty-(arrow/2)+off), QPointF(tx-arrow+off, ty+(arrow/2)+off)]
-                nopen = QPen(0)
-                painter.setPen(nopen)
-                painter.drawPolygon(*arrowtip)
+            corr = self.pensize/2
+            painter.drawLine(vert_x+off-corr, ty+off, tx+off-arrow, ty+off)
+            arrowtip = [QPointF(tx+off, ty+off), QPointF(tx-arrow+off, ty-(arrow/2)+off), QPointF(tx-arrow+off, ty+(arrow/2)+off)]
+            nopen = QPen(0)
+            painter.setPen(nopen)
+            painter.drawPolygon(*arrowtip)
         if len(children) > 1:
             vert_top = children[0].y()
             vert_bottom = children[-1].y()
