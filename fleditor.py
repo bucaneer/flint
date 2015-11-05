@@ -517,6 +517,7 @@ class BankNodeItem (NodeItem):
         newypos = self.centerbox.mapToScene(self.centerbox.pos()).y()
         for subnode in self.subnodes:
             subnode.yoffset += newypos - oldypos
+            subnode.setY(self.y())
         self.prepareGeometryChange()
         self.rect = self.graphgroup.mapRectToParent(self.activebox.boundingRect())
         self.nodebank.updatelayout()
