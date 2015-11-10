@@ -165,7 +165,7 @@ class NodeItem(QGraphicsItem):
         return self.ghost
     
     def realnode (self):
-        return self.view.nodegraph[self.nodeobj.ID]
+        return self.view.nodedict[self.nodeobj.ID]
     
     def isactive (self):
         return self.view.activenode is self
@@ -806,25 +806,25 @@ class TreeView (QGraphicsView):
         self.constructed = False
         self.updatedocs()
         self.scene().clear()
-        self.nodegraph = dict()
+        self.nodedict = dict()
         self.viewframe = FrameItem(view=self)
         self.scene().addItem(self.viewframe)
         self.constructed = self.constructgraph()
         self.updatelayout()
         
-        if activeID and activeID in self.nodegraph:
-            self.setactivenode(self.nodegraph[activeID], signal=False)
+        if activeID and activeID in self.nodedict:
+            self.setactivenode(self.nodedict[activeID], signal=False)
         else:
             self.setactivenode(self.treeroot())
         
         baseID = ""
         while selectedID:
             swappedID = "<-".join([baseID, selectedID])
-            if baseID and swappedID in self.nodegraph:
-                self.setselectednode(self.nodegraph[swappedID], signal=False)
+            if baseID and swappedID in self.nodedict:
+                self.setselectednode(self.nodedict[swappedID], signal=False)
                 break
-            elif selectedID in self.nodegraph:
-                self.setselectednode(self.nodegraph[selectedID])
+            elif selectedID in self.nodedict:
+                self.setselectednode(self.nodedict[selectedID])
                 break
             split = selectedID.split("<-", 1)
             selectedID = split[1]
@@ -864,25 +864,25 @@ class TreeView (QGraphicsView):
         defaultid = "<-".join([nodeobj.ID, refid])
         if isghost:
             graphid = defaultid
-        elif nodeobj.ID in self.nodegraph:
-            oldnode = self.nodegraph[nodeobj.ID]
+        elif nodeobj.ID in self.nodedict:
+            oldnode = self.nodedict[nodeobj.ID]
             oldnode.setghost(True)
-            self.nodegraph[oldnode.id()] = oldnode
+            self.nodedict[oldnode.id()] = oldnode
             nodeitem.referrers = oldnode.referrers
             oldnode.referrers = []
             graphid = nodeobj.ID
         else:
             graphid = nodeobj.ID
-        self.nodegraph[graphid] = nodeitem
-        self.nodegraph[defaultid] = nodeitem
+        self.nodedict[graphid] = nodeitem
+        self.nodedict[defaultid] = nodeitem
         
         if refid:
-            self.nodegraph[nodeobj.ID].addreferrer(refid)
+            self.nodedict[nodeobj.ID].addreferrer(refid)
         
         return nodeitem
     
     def treeroot (self):
-        return self.nodegraph["0"]
+        return self.nodedict["0"]
     
     def updatelayout (self):
         if not self.constructed:
@@ -953,7 +953,7 @@ class TreeView (QGraphicsView):
             newobj = self.nodecontainer.newnode(nodedict, refID=selectedid)
         newid = newobj.ID
         self.updateview()
-        self.shownode(self.nodegraph[newid])
+        self.shownode(self.nodedict[newid])
     
     def unlink (self, inherit=False):
         selID = self.selectednode.realid()
@@ -1022,7 +1022,7 @@ class TreeView (QGraphicsView):
     def filteractions (self, nodeID=""):
         if nodeID == "":
             nodeID = self.selectednode.id()
-        nodeitem = self.nodegraph[nodeID]
+        nodeitem = self.nodedict[nodeID]
         genericactions = ["zoomin", "zoomout", "zoomorig", "gotoactive",
             "collapse", "openfile", "save", "saveas", "newtree"]
         if isinstance(nodeitem, TextNodeItem):
