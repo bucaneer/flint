@@ -1173,35 +1173,35 @@ class EditorWindow (QMainWindow):
             None, ["go-jump"], "Center on active node")
         
         self.actions["newtalk"] = self.createaction("New &Talk Node", self.newtalk,
-            None, ["insert-object"], "Add new Talk node")
+            [QKeySequence(Qt.ControlModifier+Qt.Key_T)], ["insert-object"], "Add new Talk node")
         self.actions["newresponse"] = self.createaction("New &Response Node", self.newresponse,
-            None, ["insert-object"], "Add new Response node")
+            [QKeySequence(Qt.ControlModifier+Qt.Key_R)], ["insert-object"], "Add new Response node")
         self.actions["newbank"] = self.createaction("New &Bank Node", self.newbank,
-            None, ["insert-object"], "Add new Bank node")
+            [QKeySequence(Qt.ControlModifier+Qt.Key_B)], ["insert-object"], "Add new Bank node")
         self.actions["copynode"] = self.createaction("&Copy Node", self.copynode,
-            None, ["edit-copy"], "Copy node")
+            [QKeySequence.Copy], ["edit-copy"], "Copy node")
         self.actions["pasteclone"] = self.createaction("Paste &Clone", self.pasteclone,
-            None, ["edit-paste"], "Paste cloned node")
+            [QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_V)], ["edit-paste"], "Paste cloned node")
         self.actions["pastelink"] = self.createaction("Paste &Link", self.pastelink,
-            None, ["insert-link"], "Paste link to node")
+            [QKeySequence.Paste], ["insert-link"], "Paste link to node")
         self.actions["unlinkstree"] = self.createaction("Unlink &Subtree", self.unlink,
-            None, ["edit-clear"], "Unlink subtree from parent")
+            [QKeySequence.Delete], ["edit-clear"], "Unlink subtree from parent")
         self.actions["unlinknode"] = self.createaction("Unlink &Node", self.unlinkinherit,
-            None, ["edit-delete"], "Unlink node and let parent inherit its child nodes")
+            [QKeySequence(Qt.ControlModifier+Qt.Key_Delete)], ["edit-delete"], "Unlink node and let parent inherit its child nodes")
         self.actions["moveup"] = self.createaction("Move &Up", self.moveup,
-            None, ["go-up"], "Move node up")
+            [QKeySequence(Qt.ShiftModifier+Qt.Key_Up)], ["go-up"], "Move node up")
         self.actions["movedown"] = self.createaction("Move &Down", self.movedown,
-            None, ["go-down"], "Move node down")
+            [QKeySequence(Qt.ShiftModifier+Qt.Key_Down)], ["go-down"], "Move node down")
         self.actions["collapse"] = self.createaction("(Un)Colla&pse subtree", self.collapse,
-            None, None, "(Un)Collapse subtree")
+            [QKeySequence(Qt.Key_Space)], None, "(Un)Collapse subtree")
         self.actions["newtalksub"] = self.createaction("New &Talk Subnode", self.newtalksub,
-            None, ["insert-object"], "Add new Talk subnode")
+            [QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_T)], ["insert-object"], "Add new Talk subnode")
         self.actions["newresponsesub"] = self.createaction("New &Response Subnode", self.newresponsesub,
-            None, ["insert-object"], "Add new Response subnode")
+            [QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_R)], ["insert-object"], "Add new Response subnode")
         self.actions["pastesubnode"] = self.createaction("&Paste Subnode", self.pastesubnode,
-            None, ["edit-paste"], "Paste cloned node as subnode")
+            [QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_B)], ["edit-paste"], "Paste cloned node as subnode")
         self.actions["parentswap"] = self.createaction("S&wap with Parent", self.parentswap,
-            None, ["go-left"], "Swap places with parent node")
+            [QKeySequence(Qt.ShiftModifier+Qt.Key_Left)], ["go-left"], "Swap places with parent node")
     
     def createaction (self, text, slot=None, shortcuts=None, icons=None,
                      tip=None, checkable=False):
@@ -1255,6 +1255,7 @@ class EditorWindow (QMainWindow):
         editmenu = menubar.addMenu("&Edit")
         editmenu.addMenu(addmenu)
         editmenu.addMenu(subnodemenu)
+        editmenu.addAction(self.actions["copynode"])
         editmenu.addAction(self.actions["moveup"])
         editmenu.addAction(self.actions["movedown"])
         editmenu.addAction(self.actions["parentswap"])
