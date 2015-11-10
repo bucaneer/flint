@@ -185,10 +185,10 @@ class NodeItem(QGraphicsItem):
         y += self.yoffset
         super().setY(y)    
     
-    def y_up (self):
+    def y_top (self):
         return self.y() - self.boundingRect().height()//2
     
-    def y_low (self):
+    def y_bottom (self):
         return self.y() + self.boundingRect().height()//2
     
     def bulkshift (self, diff):
@@ -207,7 +207,7 @@ class NodeItem(QGraphicsItem):
         if children:
             top, bottom, depth = self.subtreesize(1)
             self.setY((top+bottom)//2)
-        localranks[rank] = [self.y_up, self.y_low]
+        localranks[rank] = [self.y_top, self.y_bottom]
         streeshift = None
         for r in localranks:
             if r in ranks:
@@ -265,12 +265,12 @@ class NodeItem(QGraphicsItem):
             """Doing this as a single list comprehension causes slowdowns with big trees."""
             for child in children:
                 stree = child.subtreesize(nextdepth)
-                ymin = min(ymin, child.y_up(), stree[0]) if ymin is not None else stree[0]
-                ymax = max(ymax, child.y_low(), stree[1]) if ymax is not None else stree[1]
+                ymin = min(ymin, child.y_top(), stree[0]) if ymin is not None else stree[0]
+                ymax = max(ymax, child.y_bottom(), stree[1]) if ymax is not None else stree[1]
                 maxdepth = max(maxdepth, stree[2])
         else:
-            ymin = self.y_up()
-            ymax = self.y_low()
+            ymin = self.y_top()
+            ymax = self.y_bottom()
         return ymin, ymax, maxdepth
         
     def boundingRect(self):
@@ -499,7 +499,7 @@ class BankNodeItem (NodeItem):
                 nodeheight = noderect.height()
                 nodewidth = noderect.width()
                 subnode.show()
-                subnode.yoffset = self.mapToScene(0,verticalpos + nodeheight/2+self.style.activemargin).y()-self.y_low()
+                subnode.yoffset = self.mapToScene(0,verticalpos + nodeheight/2+self.style.activemargin).y()-self.y_bottom()
                 verticalpos += nodeheight
                 maxwidth = max(maxwidth, nodewidth)
             centerrect = self.centerbox.rect()
