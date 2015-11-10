@@ -110,10 +110,11 @@ class NodeItem(QGraphicsItem):
         self.setghost(ghost)
         
     def id (self):
-        if self.isghost():
-            return "<-".join([self.nodeobj.ID, self.parent.id()])
+        if self.parent is not None:
+            refid = self.parent.id()
         else:
-            return self.nodeobj.ID
+            refid = ""
+        return "<-".join([self.nodeobj.ID, refid])
     
     def realid (self):
         return self.nodeobj.ID
@@ -797,12 +798,9 @@ class TreeView (QGraphicsView):
     def updateview (self):
         selectedID = activeID = selparentID = None
         if self.activenode is not None:
-            activeID = self.activenode.id()
+            activeID = self.activenode.realid()
         if self.selectednode is not None:
             selectedID = self.selectednode.id()
-            selparent = self.selectednode.parent
-            if selparent is not None:
-                selparentID = selparent.id()
         self.activenode = self.selectednode = None
         
         self.constructed = False
@@ -819,12 +817,19 @@ class TreeView (QGraphicsView):
         else:
             self.setactivenode(self.treeroot())
         
-        if selectedID and selectedID in self.nodegraph:
-            self.setselectednode(self.nodegraph[selectedID], signal=False)
-        elif selparentID and selparentID in self.nodegraph:
-            self.setselectednode(self.nodegraph[selparentID])
-        else:
-            self.setselectednode(self.activenode)
+        baseID = ""
+        while selectedID:
+            swappedID = "<-".join([baseID, selectedID])
+            if baseID and swappedID in self.nodegraph:
+                self.setselectednode(self.nodegraph[swappedID], signal=False)
+                break
+            elif selectedID in self.nodegraph:
+                self.setselectednode(self.nodegraph[selectedID])
+                break
+            split = selectedID.split("<-", 1)
+            selectedID = split[1]
+            if not baseID:
+                baseID = split[0]
     
     def constructgraph (self):
         queue = []
@@ -849,15 +854,16 @@ class TreeView (QGraphicsView):
     
     def newitem (self, nodeobj, parent, isghost=False):
         if parent is None:
-            refid = None
+            refid = ""
         else:
             refid = parent.id()
         nodeitem = self.__types[nodeobj.typename](nodeobj, parent=parent, view=self, ghost=isghost)
         edgeitem = EdgeItem(nodeitem, view=self)
         self.scene().addItem(edgeitem)
         self.scene().addItem(nodeitem)
+        defaultid = "<-".join([nodeobj.ID, refid])
         if isghost:
-            graphid = "<-".join([nodeobj.ID, refid])
+            graphid = defaultid
         elif nodeobj.ID in self.nodegraph:
             oldnode = self.nodegraph[nodeobj.ID]
             oldnode.setghost(True)
@@ -868,8 +874,9 @@ class TreeView (QGraphicsView):
         else:
             graphid = nodeobj.ID
         self.nodegraph[graphid] = nodeitem
+        self.nodegraph[defaultid] = nodeitem
         
-        if refid is not None:
+        if refid:
             self.nodegraph[nodeobj.ID].addreferrer(refid)
         
         return nodeitem
@@ -937,8 +944,7 @@ class TreeView (QGraphicsView):
         self.updateview()
     
     def addnode (self, nodedict, subnode=False):
-        selected = self.selectednode.realnode()
-        selectedid = selected.id()
+        selectedid = self.selectednode.realid()
         if subnode:
             nodedictmod = nodedict.copy()
             nodedictmod["nodebank"] = selectedid
@@ -951,7 +957,7 @@ class TreeView (QGraphicsView):
     
     def unlink (self, inherit=False):
         selID = self.selectednode.realid()
-        refID = self.selectednode.parent.id()
+        refID = self.selectednode.parent.realid()
         if self.selectednode.issubnode():
             self.nodecontainer.removesubnode(refID, selID)
         else:
@@ -1134,7 +1140,7 @@ class EditorWindow (QMainWindow):
         
         editwidget = NodeEditWidget(self)
         editwidget.setMinimumWidth(300)
-        editwidget.loadnode(self.view.activenode.id())
+        editwidget.loadnode(self.view.activenode.realid())
         self.view.activeChanged.connect(editwidget.loadnode)
         
         rightpanel = QSplitter(Qt.Vertical, self)
@@ -1427,14 +1433,14 @@ class EditorWindow (QMainWindow):
     @pyqtSlot()
     def unlink (self, inherit=False):
         view = self.activeview()
-        selected = view.selectednode
+        selected = view.selectednode.realnode()
         if selected.parent is None:
             return
         if len(selected.referrers) == 1:
             if inherit or len(selected.childlist()) == 0:
-                text = "This will remove the only instance of node %s.\n\nContinue?" % selected.id()
+                text = "This will remove the only instance of node %s.\n\nContinue?" % selected.realid()
             else:
-                text = "This will remove the only instance of node %s and all unique nodes in its subtree.\n\nContinue?" % selected.id()
+                text = "This will remove the only instance of node %s and all unique nodes in its subtree.\n\nContinue?" % selected.realid()
             answer = QMessageBox.question(self, "Node removal", text)
             if answer == QMessageBox.No:
                 return
