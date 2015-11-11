@@ -730,6 +730,7 @@ class ScriptParamWidget (QWidget):
     def __init__ (self, parent, name, annot, default):
         super().__init__(parent)
         layout = QHBoxLayout(self)
+        layout.setContentsMargins(*[0]*4)
         label = QLabel(name)
         if annot is bool:
             editor = QCheckBox("True", self)
@@ -763,6 +764,7 @@ class ScriptCallWidget (QGroupBox):
         super().__init__(name, parent)
         params = defaultparams[::-1]
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(*[0]*4)
         paramswidget = QWidget(self)
         paramslayout = QVBoxLayout(paramswidget)
         for param in signature.parameters.values():
@@ -796,6 +798,7 @@ class ScriptEditWidget (QWidget):
         addbutton = QPushButton("Add", newwidget)
         addbutton.clicked.connect(self.newscriptcall)
         newlayout = QHBoxLayout(newwidget)
+        newlayout.setContentsMargins(*[0]*4)
         newlayout.addWidget(combobox)
         newlayout.addWidget(addbutton)
         
