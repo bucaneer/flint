@@ -63,7 +63,11 @@ class ChartNode (object):
 			self.condition = ConditionCall(node_dict['condition'])
 		else:
 			self.condition = self.container.defaultcond
-		self.script = 'script' in node_dict and ScriptCall(node_dict['script'])
+		if 'scripts' in node_dict:
+			self.scripts = [ScriptCall(s) for s in node_dict['scripts']]
+		else:
+			self.scripts = []
+		#self.scripts = 'scripts' in node_dict and ScriptCall(node_dict['scripts'])
 		self.optvars = node_dict['vars'] if 'vars' in node_dict else dict()
 		self.comment = 'comment' in node_dict and node_dict['comment']
 		if 'nodebank' in node_dict:
@@ -92,8 +96,8 @@ class ChartNode (object):
 			"links": [{'toID':i} for i in self.linkIDs] }
 		if self.condition is not self.container.defaultcond:
 			node_dict['condition'] = self.condition.todict()
-		if self.script:
-			node_dict['script']    = self.script.todict()
+		if self.scripts:
+			node_dict['scripts']    = [s.todict() for s in self.scripts]
 		if self.optvars:
 			node_dict['vars']      = self.optvars
 		if self.comment:

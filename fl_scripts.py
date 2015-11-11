@@ -3,16 +3,19 @@
 from time import sleep
 
 class ScriptCalls (object):
-	def sc_print (self, *params):
-		print(" ".join(params))
+	def sc_print (self, words):
+		print(" ".join(words))
 		return True
 	
-	def sc_wait (self, *params):
-		sleep(5)
+	def sc_wait (self, seconds: int):
+		sleep(seconds)
 		return True
 	
-	def sc_quick (self, *params):
+	def sc_quick (self):
 		return True
 	
-	def sc_false (self, *params):
+	def sc_false (self):
 		return False
+	
+	def sc_bool (self, var: bool):
+		return var

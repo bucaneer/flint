@@ -8,6 +8,8 @@ from PyQt5.QtOpenGL import *
 import flint_parser as fp
 import os
 import weakref
+import inspect as insp
+from collections import OrderedDict
 
 class FlPalette (object):
     """Palette of custom colors for quick reference."""
@@ -724,6 +726,122 @@ class NodeEditWidget (QWidget):
     def setnodetext (self):
         self.nodeobj.text = self.nodetext.toPlainText()
 
+class ScriptParamWidget (QWidget):
+    def __init__ (self, parent, name, annot, default):
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        label = QLabel(name)
+        if annot is bool:
+            editor = QCheckBox("True", self)
+            signal = editor.stateChanged
+            value = lambda: bool(editor.checkState())
+            editor.setCheckState(bool(default))
+        elif annot is int:
+            editor = QSpinBox(self)
+            signal = editor.valueChanged
+            value = editor.value()
+            if default == "":
+                default = 0
+            editor.setValue(int(default))
+        else: #elif annot is str:
+            editor = QLineEdit(self)
+            signal = editor.textEdited
+            value = editor.text()
+            editor.setText(default)
+        
+        layout.addWidget(label)
+        layout.addWidget(editor)
+        
+        self.editor = editor
+        self.signal = signal
+        self.value = value
+
+class ScriptCallWidget (QGroupBox):
+    scriptChanged = pyqtSignal()
+    
+    def __init__ (self, parent, name, signature, defaultparams):
+        super().__init__(name, parent)
+        params = defaultparams[::-1]
+        layout = QVBoxLayout(self)
+        paramswidget = QWidget(self)
+        paramslayout = QVBoxLayout(paramswidget)
+        for param in signature.parameters.values():
+            pname = param.name
+            annot = param.annotation if param.annotation is not insp._empty else ""
+            default = params.pop()
+            parwidget = ScriptParamWidget(paramswidget, pname, annot, default)
+            paramslayout.addWidget(parwidget)
+            parwidget.signal.connect(self.paramchanged)
+        layout.addWidget(paramswidget)
+        
+        self.setCheckable(True)
+        self.toggled.connect(paramswidget.setVisible)
+    
+    @pyqtSlot()
+    def paramchanged (self):
+        self.scriptChanged.emit()
+
+class ScriptEditWidget (QWidget):
+    def __init__ (self, parent):
+        super().__init__(parent)
+        scriptcalls = OrderedDict([sc for sc in insp.getmembers(fp.ScriptCall, insp.isfunction) if sc[0][:3] == "sc_"])
+        self.scriptcalls = scriptcalls
+        scriptnames = scriptcalls.keys()
+        
+        newwidget = QWidget(self)
+        combobox = QComboBox(newwidget)
+        print(scriptnames)
+        combobox.insertItems(len(scriptnames), scriptnames)
+        self.combobox = combobox
+        addbutton = QPushButton("Add", newwidget)
+        addbutton.clicked.connect(self.newscriptcall)
+        newlayout = QHBoxLayout(newwidget)
+        newlayout.addWidget(combobox)
+        newlayout.addWidget(addbutton)
+        
+        callsarea = QScrollArea(self)
+        callsarea.setWidgetResizable(True)
+        self.callsarea = callsarea
+        self.callswidgetsetup()
+        
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignTop)
+        layout.addWidget(newwidget)
+        layout.addWidget(callsarea)
+    
+    def callswidgetsetup (self):
+        oldwidget = self.callsarea.takeWidget()
+        if oldwidget:
+            oldwidget.deleteLater()
+        callswidget = QWidget(self.callsarea)
+        layout = QVBoxLayout(callswidget)
+        layout.setAlignment(Qt.AlignTop)
+        self.callsarea.setWidget(callswidget)
+    
+    @pyqtSlot(str)
+    def loadnode (self, nodeID):
+        view = self.window().activeview()
+        nodeobj = view.nodecontainer.nodes[nodeID]
+        self.callswidgetsetup()
+        self.nodeobj = nodeobj
+        for sc in nodeobj.scripts:
+            self.addscriptcall(sc.funcname, insp.signature(self.scriptcalls[sc.funcname]), sc.funcparams)
+    
+    @pyqtSlot()
+    def newscriptcall (self):
+        name = self.combobox.currentText()
+        signature = insp.signature(self.scriptcalls[name])
+        params = [''] * len(signature.parameters)
+        self.nodeobj.scripts.append(fp.ScriptCall({"type":"script", "command":name, "params":params}))
+        #self.addscriptcall(name, signature, params)
+        self.loadnode(self.nodeobj.ID)
+    
+    def addscriptcall (self, name, signature, params):
+        callswidget = self.callsarea.widget()
+        scwidget = ScriptCallWidget(callswidget, name, signature, params)
+        callswidget.layout().addWidget(scwidget)
+        scwidget.show()
+
 class SearchWidget (QWidget):
     def __init__ (self, parent):
         super().__init__(parent)
@@ -1138,7 +1256,12 @@ class EditorWindow (QMainWindow):
         maptimer.timeout.connect(mapview.update)
         maptimer.start(100) # OPTION: mapview frame rate
         
-        editwidget = NodeEditWidget(self)
+        """editwidget = NodeEditWidget(self)
+        editwidget.setMinimumWidth(300)
+        editwidget.loadnode(self.view.activenode.realid())
+        self.view.activeChanged.connect(editwidget.loadnode)"""
+        
+        editwidget = ScriptEditWidget(self)
         editwidget.setMinimumWidth(300)
         editwidget.loadnode(self.view.activenode.realid())
         self.view.activeChanged.connect(editwidget.loadnode)

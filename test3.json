@@ -29,6 +29,36 @@
          "text": "Hello, stranger!",
          "type": "response"
       },
+      "10": {
+         "links": [],
+         "subnodes": [
+            "11",
+            "12",
+            "13"
+         ],
+         "type": "bank"
+      },
+      "11": {
+         "links": [],
+         "nodebank": "10",
+         "speaker": "def",
+         "text": "AAA",
+         "type": "talk"
+      },
+      "12": {
+         "links": [],
+         "nodebank": "10",
+         "speaker": "def",
+         "text": "BBB",
+         "type": "talk"
+      },
+      "13": {
+         "links": [],
+         "nodebank": "10",
+         "speaker": "def",
+         "text": "CCC",
+         "type": "talk"
+      },
       "2": {
          "links": [
             {
@@ -81,6 +111,15 @@
       },
       "6": {
          "links": [],
+         "scripts": [
+            {
+               "command": "sc_quick",
+               "params": [
+                  ""
+               ],
+               "type": "script"
+            }
+         ],
          "speaker": "def",
          "text": "World",
          "type": "talk"
@@ -120,32 +159,6 @@
          "speaker": "def",
          "text": "Indeed",
          "type": "talk"
-      },
-      "10": {
-        "links": [],
-        "type": "bank",
-        "subnodes": ["11", "12", "13"]
-      },
-      "11": {
-         "links": [],
-         "speaker": "def",
-         "text": "AAA",
-         "type": "talk",
-         "nodebank": "10"
-      },
-      "12": {
-         "links": [],
-         "speaker": "def",
-         "text": "BBB",
-         "type": "talk",
-         "nodebank": "10"
-      },
-      "13": {
-         "links": [],
-         "speaker": "def",
-         "text": "CCC",
-         "type": "talk",
-         "nodebank": "10"
       }
    }
 }
