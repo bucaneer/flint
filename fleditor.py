@@ -1433,17 +1433,19 @@ class EditorWindow (QMainWindow):
     @pyqtSlot()
     def unlink (self, inherit=False):
         view = self.activeview()
-        selected = view.selectednode.realnode()
+        selected = view.selectednode
         if selected.parent is None:
             return
-        if len(selected.referrers) == 1:
+        if len(selected.realnode().referrers) == 1:
             if inherit or len(selected.childlist()) == 0:
                 text = "This will remove the only instance of node %s.\n\nContinue?" % selected.realid()
             else:
                 text = "This will remove the only instance of node %s and all unique nodes in its subtree.\n\nContinue?" % selected.realid()
-            answer = QMessageBox.question(self, "Node removal", text)
-            if answer == QMessageBox.No:
-                return
+        else:
+            text = "Unlink node %s from node %s?" % (selected.realid(), selected.parent.realid())
+        answer = QMessageBox.question(self, "Node removal", text)
+        if answer == QMessageBox.No:
+            return
         self.activeview().unlink(inherit)
     
     @pyqtSlot()
