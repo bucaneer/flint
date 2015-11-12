@@ -776,6 +776,7 @@ class ScriptCallWidget (QGroupBox):
             parwidget.signal.connect(self.paramchanged)
         layout.addWidget(paramswidget)
         
+        self.setStyleSheet("QGroupBox::indicator:unchecked { image: url(images/plus.png) } QGroupBox::indicator:!unchecked { image: url(images/minus.png) }")
         self.setCheckable(True)
         self.toggled.connect(paramswidget.setVisible)
     
@@ -792,7 +793,6 @@ class ScriptEditWidget (QWidget):
         
         newwidget = QWidget(self)
         combobox = QComboBox(newwidget)
-        print(scriptnames)
         combobox.insertItems(len(scriptnames), scriptnames)
         self.combobox = combobox
         addbutton = QPushButton("Add", newwidget)
