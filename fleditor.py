@@ -736,18 +736,22 @@ class ScriptParamWidget (QWidget):
             editor = QCheckBox("True", self)
             signal = editor.stateChanged
             value = lambda: bool(editor.checkState())
-            editor.setCheckState(bool(default))
+            if default:
+                state = Qt.Checked
+            else:
+                state = Qt.Unchecked
+            editor.setCheckState(state)
         elif annot is int:
             editor = QSpinBox(self)
             signal = editor.valueChanged
-            value = editor.value()
+            value = editor.value
             if default == "":
                 default = 0
             editor.setValue(int(default))
         else: #elif annot is str:
             editor = QLineEdit(self)
             signal = editor.textEdited
-            value = editor.text()
+            value = editor.text
             editor.setText(default)
         
         layout.addWidget(label)
@@ -758,23 +762,27 @@ class ScriptParamWidget (QWidget):
         self.value = value
 
 class ScriptCallWidget (QGroupBox):
-    scriptChanged = pyqtSignal()
-    
-    def __init__ (self, parent, name, signature, defaultparams):
+    def __init__ (self, parent, callobj, signature):
+        name = callobj.funcname
         super().__init__(name, parent)
-        params = defaultparams[::-1]
+        self.callobj = callobj
+        params = callobj.funcparams[::-1]
         layout = QVBoxLayout(self)
         layout.setContentsMargins(*[0]*4)
         paramswidget = QWidget(self)
         paramslayout = QVBoxLayout(paramswidget)
+        paramslist = []
         for param in signature.parameters.values():
             pname = param.name
             annot = param.annotation if param.annotation is not insp._empty else ""
             default = params.pop()
             parwidget = ScriptParamWidget(paramswidget, pname, annot, default)
             paramslayout.addWidget(parwidget)
+            paramslist.append(parwidget)
             parwidget.signal.connect(self.paramchanged)
         layout.addWidget(paramswidget)
+        
+        self.paramslist = paramslist
         
         self.setStyleSheet("QGroupBox::indicator:unchecked { image: url(images/plus.png) } QGroupBox::indicator:!unchecked { image: url(images/minus.png) }")
         self.setCheckable(True)
@@ -782,7 +790,10 @@ class ScriptCallWidget (QGroupBox):
     
     @pyqtSlot()
     def paramchanged (self):
-        self.scriptChanged.emit()
+        newparams = []
+        for param in self.paramslist:
+            newparams.append(param.value())
+        self.callobj.funcparams = newparams
 
 class ScriptEditWidget (QWidget):
     def __init__ (self, parent):
@@ -828,20 +839,27 @@ class ScriptEditWidget (QWidget):
         self.callswidgetsetup()
         self.nodeobj = nodeobj
         for sc in nodeobj.scripts:
-            self.addscriptcall(sc.funcname, insp.signature(self.scriptcalls[sc.funcname]), sc.funcparams)
+            self.addscriptcall(sc)
     
     @pyqtSlot()
     def newscriptcall (self):
         name = self.combobox.currentText()
         signature = insp.signature(self.scriptcalls[name])
-        params = [''] * len(signature.parameters)
-        self.nodeobj.scripts.append(fp.ScriptCall({"type":"script", "command":name, "params":params}))
-        #self.addscriptcall(name, signature, params)
-        self.loadnode(self.nodeobj.ID)
+        defaults = {int: 0, bool: False}
+        params = []
+        for param in signature.parameters.values():
+            if param.annotation in defaults:
+                params.append(defaults[param.annotation])
+            else:
+                params.append("")
+        callobj = fp.ScriptCall({"type":"script", "command":name, "params":params})
+        self.nodeobj.scripts.append(callobj)
+        self.addscriptcall(callobj)
     
-    def addscriptcall (self, name, signature, params):
+    def addscriptcall (self, callobj):
         callswidget = self.callsarea.widget()
-        scwidget = ScriptCallWidget(callswidget, name, signature, params)
+        signature = insp.signature(self.scriptcalls[callobj.funcname])
+        scwidget = ScriptCallWidget(callswidget, callobj, signature)
         callswidget.layout().addWidget(scwidget)
         scwidget.show()
 
