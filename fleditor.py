@@ -815,6 +815,8 @@ class ScriptEditWidget (QWidget):
         
         callsarea = QScrollArea(self)
         callsarea.setWidgetResizable(True)
+        callsarea.setContextMenuPolicy(Qt.CustomContextMenu)
+        callsarea.customContextMenuRequested.connect(self.contextmenu)
         self.callsarea = callsarea
         self.callswidgetsetup()
         
@@ -861,7 +863,31 @@ class ScriptEditWidget (QWidget):
         signature = insp.signature(self.scriptcalls[callobj.funcname])
         scwidget = ScriptCallWidget(callswidget, callobj, signature)
         callswidget.layout().addWidget(scwidget)
-        scwidget.show()
+    
+    def removescriptcall (self, scwidget):
+        callswidget = self.callsarea.widget()
+        callobj = scwidget.callobj
+        self.nodeobj.scripts.remove(callobj)
+        callswidget.layout().removeWidget(scwidget)
+        scwidget.deleteLater()
+    
+    @pyqtSlot(QPoint)
+    def contextmenu (self, pos):
+        scwidget = self.callsarea.childAt(pos)
+        while scwidget:
+            if isinstance(scwidget, ScriptCallWidget):
+                break
+            scwidget = scwidget.parent()
+        
+        if scwidget is None:
+            return
+        
+        remove = QAction("Remove", self)
+        remove.triggered.connect(lambda: self.removescriptcall(scwidget))
+        
+        menu = QMenu(self)
+        menu.addAction(remove)
+        menu.exec_(self.callsarea.mapToGlobal(pos))
 
 class SearchWidget (QWidget):
     def __init__ (self, parent):

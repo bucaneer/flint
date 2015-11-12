@@ -85,24 +85,6 @@
                "toID": "5"
             }
          ],
-         "scripts": [
-            {
-               "command": "sc_bool",
-               "params": [
-                  "",
-                  false
-               ],
-               "type": "script"
-            },
-            {
-               "command": "sc_wait",
-               "params": [
-                  "",
-                  0
-               ],
-               "type": "script"
-            }
-         ],
          "speaker": "def",
          "text": "Yup. asd asd asd asd as das das das dasd asd asd asd ad as das as asd asd sd as asd asd as da",
          "type": "talk"
@@ -129,23 +111,6 @@
       },
       "6": {
          "links": [],
-         "scripts": [
-            {
-               "command": "sc_quick",
-               "params": [
-                  ""
-               ],
-               "type": "script"
-            },
-            {
-               "command": "sc_print",
-               "params": [
-                  "",
-                  "blarg"
-               ],
-               "type": "script"
-            }
-         ],
          "speaker": "def",
          "text": "World",
          "type": "talk"
