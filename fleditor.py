@@ -872,7 +872,7 @@ class CallCreateWidget (QWidget):
         combobox = QComboBox(self)
         combobox.insertItems(len(scriptcalls), scriptcalls)
         self.combobox = combobox
-        addbutton = QPushButton("&Add", self)
+        addbutton = QPushButton("Add", self)
         addbutton.clicked.connect(self.newscriptcall)
         
         layout = QHBoxLayout(self)
@@ -1563,7 +1563,7 @@ class EditorWindow (QMainWindow):
         self.actions["movedown"] = self.createaction("Move &Down", self.movedown,
             [QKeySequence(Qt.ShiftModifier+Qt.Key_Down)], ["go-down"], "Move node down")
         self.actions["collapse"] = self.createaction("(Un)Colla&pse subtree", self.collapse,
-            [QKeySequence(Qt.Key_Space)], None, "(Un)Collapse subtree")
+            [QKeySequence(Qt.ControlModifier+Qt.Key_Space)], None, "(Un)Collapse subtree")
         self.actions["newtalksub"] = self.createaction("New &Talk Subnode", self.newtalksub,
             [QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_T)], ["insert-object"], "Add new Talk subnode")
         self.actions["newresponsesub"] = self.createaction("New &Response Subnode", self.newresponsesub,
