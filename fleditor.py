@@ -1460,8 +1460,6 @@ class EditorWindow (QMainWindow):
         self.addDockWidget(Qt.RightDockWidgetArea, textdock)
         self.tabifyDockWidget(textdock, conddock)
         self.tabifyDockWidget(conddock, scriptdock)
-        
-        self.openfile("test3.json")
     
     def activeview (self):
         return self.tabs.currentWidget()
