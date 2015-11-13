@@ -655,6 +655,8 @@ class MapView (QGraphicsView):
         change = False
         window = self.window()
         activeview = window.activeview()
+        if activeview is None:
+            return
         if activeview is not self.treeview:
             self.treeview = activeview
             self.setScene(activeview.scene())
@@ -685,7 +687,7 @@ class ParagraphEdit (QPlainTextEdit):
         else:
             super().keyPressEvent(event)
 
-class NodeEditWidget (QWidget):
+class TextEditWidget (QWidget):
     def __init__ (self, parent):
         super().__init__(parent)
         layout = QVBoxLayout(self)
@@ -761,17 +763,37 @@ class ScriptParamWidget (QWidget):
         self.signal = signal
         self.value = value
 
-class ScriptCallWidget (QGroupBox):
-    def __init__ (self, parent, callobj, signature):
-        name = callobj.funcname
-        super().__init__(name, parent)
+class CallWidget (QGroupBox):
+    removed = pyqtSignal()
+    
+    def __init__ (self, parent, callobj, name):
+        super().__init__ (name, parent)
         self.callobj = callobj
+        self.setStyleSheet("QGroupBox::indicator:unchecked { image: url(images/plus.png) } QGroupBox::indicator:!unchecked { image: url(images/minus.png) }")
+        self.setCheckable(True)
+        
+        actremove = QAction("&Remove", self)
+        actremove.triggered.connect(lambda: self.removed.emit(self.callobj))
+        self.actremove = actremove
+    
+    def contextMenuEvent (self, event):
+        menu = QMenu(self)
+        menu.addAction(self.actremove)
+        menu.exec_(event.globalPos())
+
+class ScriptCallWidget (CallWidget):
+    removed = pyqtSignal(fp.ScriptCall)
+    
+    def __init__ (self, parent, callobj):
+        name = callobj.funcname
+        super().__init__(parent, callobj, name)
         params = callobj.funcparams[::-1]
         layout = QVBoxLayout(self)
         layout.setContentsMargins(*[0]*4)
         paramswidget = QWidget(self)
         paramslayout = QVBoxLayout(paramswidget)
         paramslist = []
+        signature = insp.signature(callobj.funccall)
         for param in signature.parameters.values():
             pname = param.name
             annot = param.annotation if param.annotation is not insp._empty else ""
@@ -784,8 +806,6 @@ class ScriptCallWidget (QGroupBox):
         
         self.paramslist = paramslist
         
-        self.setStyleSheet("QGroupBox::indicator:unchecked { image: url(images/plus.png) } QGroupBox::indicator:!unchecked { image: url(images/minus.png) }")
-        self.setCheckable(True)
         self.toggled.connect(paramswidget.setVisible)
     
     @pyqtSlot()
@@ -795,35 +815,158 @@ class ScriptCallWidget (QGroupBox):
             newparams.append(param.value())
         self.callobj.funcparams = newparams
 
-class ScriptEditWidget (QWidget):
+class CallCreateWidget (QWidget):
+    newCallObj = pyqtSignal(fp.MetaCall)
+    
+    def __init__ (self, parent, cond=False):
+        super().__init__(parent)
+        scriptcalls = [sc for sc in dir(fp.ScriptCall) if sc[:3] == "sc_"]
+        if cond:
+            scriptcalls.insert(0, "(Condition)")
+        self.scriptcalls = scriptcalls
+        
+        combobox = QComboBox(self)
+        combobox.insertItems(len(scriptcalls), scriptcalls)
+        self.combobox = combobox
+        addbutton = QPushButton("&Add", self)
+        addbutton.clicked.connect(self.newscriptcall)
+        
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(*[0]*4)
+        layout.addWidget(combobox)
+        layout.addWidget(addbutton)
+    
+    @pyqtSlot()
+    def newscriptcall (self):
+        name = self.combobox.currentText()
+        if name == "(Condition)":
+            callobj = fp.MetaCall({"type":"cond","operator":"and","calls":[]})
+        else:
+            signature = insp.signature(getattr(fp.ScriptCall, name))
+            defaults = {int: 0, bool: False}
+            params = []
+            for param in signature.parameters.values():
+                if param.name == "self":
+                    continue
+                if param.annotation in defaults:
+                    params.append(defaults[param.annotation])
+                else:
+                    params.append("")
+            callobj = fp.MetaCall({"type":"script", "command":name, "params":params})
+        self.newCallObj.emit(callobj)
+
+class ConditionCallWidget (CallWidget):
+    removed = pyqtSignal(fp.ConditionCall)
+    
+    def __init__ (self, parent, callobj):
+        name = self.fullname(callobj)
+        super().__init__ (parent, callobj, self.elidestring(name, 30))
+        operatorwidget = QWidget(self)
+        operatorlabel = QLabel("Operator", operatorwidget)
+        operatorcombo = QComboBox(operatorwidget)
+        operatorcombo.insertItems(2, ["and", "or"])
+        operatorcombo.currentTextChanged.connect(self.setoperator)
+        operatorlayout = QHBoxLayout(operatorwidget)
+        operatorlayout.addWidget(operatorlabel)
+        operatorlayout.addWidget(operatorcombo)
+        
+        self.widgets = dict()
+        callswidget = QWidget(self)
+        self.callswidget = callswidget
+        callslayout = QVBoxLayout(callswidget)
+        self.types = {"cond": ConditionCallWidget, "script": ScriptCallWidget}
+        for call in callobj.calls:
+            self.addcallwidget(call)
+        
+        newwidget = CallCreateWidget(self, cond=True)
+        newwidget.newCallObj.connect(self.addcall)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(*[0]*4)
+        layout.addWidget(operatorwidget)
+        layout.addWidget(callswidget)
+        layout.addWidget(newwidget)
+        
+        self.toggled.connect(callswidget.setVisible)
+        self.toggled.connect(operatorwidget.setVisible)
+        self.toggled.connect(newwidget.setVisible)
+    
+    @pyqtSlot(fp.MetaCall)
+    def addcall (self, metacall):
+        callobj = metacall.callobj
+        self.callobj.calls.append(callobj)
+        self.addcallwidget(callobj)
+    
+    def addcallwidget (self, callobj):
+        widget = self.types[callobj.typename](self, callobj)
+        widget.removed.connect(self.removecall)
+        self.widgets[callobj] = widget
+        self.callswidget.layout().addWidget(widget)
+    
+    def fullname (self, callobj):
+        fullname = ""
+        for call in callobj.calls:
+            if callobj.calls.index(call):
+                fullname += " %s " % callobj.operatorname
+            if call.typename == "cond":
+                fullname += "("
+                fullname += self.fullname(call)
+                fullname += ")"
+            elif call.typename == "script":
+                if call._not:
+                    fullname += "!"
+                fullname += call.funcname
+        
+        if not fullname:
+            return "Condition"
+        else:
+            return fullname
+    
+    def elidestring (self, string, length):
+        if len(string) <= length:
+            return string
+        else:
+            return string[:length-2]+"…)"
+    
+    @pyqtSlot(str)
+    def setoperator (self, operatorname):
+        self.callobj.setoperator(operatorname)
+        self.setTitle(self.elidestring(self.fullname(self.callobj), 30))
+    
+    @pyqtSlot(fp.ScriptCall)
+    @pyqtSlot(fp.ConditionCall)
+    def removecall (self, callobj):
+        widget = self.widgets.pop(callobj)
+        self.callswidget.layout().removeWidget(widget)
+        widget.deleteLater()
+        self.callobj.calls.remove(callobj)
+
+class CallEditWidget (QWidget):
     def __init__ (self, parent):
         super().__init__(parent)
-        scriptcalls = OrderedDict([sc for sc in insp.getmembers(fp.ScriptCall, insp.isfunction) if sc[0][:3] == "sc_"])
-        self.scriptcalls = scriptcalls
-        scriptnames = scriptcalls.keys()
-        
-        newwidget = QWidget(self)
-        combobox = QComboBox(newwidget)
-        combobox.insertItems(len(scriptnames), scriptnames)
-        self.combobox = combobox
-        addbutton = QPushButton("Add", newwidget)
-        addbutton.clicked.connect(self.newscriptcall)
-        newlayout = QHBoxLayout(newwidget)
-        newlayout.setContentsMargins(*[0]*4)
-        newlayout.addWidget(combobox)
-        newlayout.addWidget(addbutton)
-        
         callsarea = QScrollArea(self)
         callsarea.setWidgetResizable(True)
-        callsarea.setContextMenuPolicy(Qt.CustomContextMenu)
-        callsarea.customContextMenuRequested.connect(self.contextmenu)
         self.callsarea = callsarea
         self.callswidgetsetup()
         
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(*[0]*4)
         layout.setAlignment(Qt.AlignTop)
-        layout.addWidget(newwidget)
-        layout.addWidget(callsarea)
+    
+    def callswidgetsetup (self):
+        oldwidget = self.callsarea.takeWidget()
+        if oldwidget:
+            oldwidget.deleteLater()
+        callswidget = QWidget(self.callsarea)
+        layout = QVBoxLayout(callswidget)
+        layout.setAlignment(Qt.AlignTop)
+        self.callsarea.setWidget(callswidget)
+
+class ConditionEditWidget (CallEditWidget):
+    def __init__ (self, parent):
+        super().__init__(parent)
+        
+        self.layout().addWidget(self.callsarea)
     
     def callswidgetsetup (self):
         oldwidget = self.callsarea.takeWidget()
@@ -840,54 +983,83 @@ class ScriptEditWidget (QWidget):
         nodeobj = view.nodecontainer.nodes[nodeID]
         self.callswidgetsetup()
         self.nodeobj = nodeobj
-        for sc in nodeobj.scripts:
-            self.addscriptcall(sc)
-    
-    @pyqtSlot()
-    def newscriptcall (self):
-        name = self.combobox.currentText()
-        signature = insp.signature(self.scriptcalls[name])
-        defaults = {int: 0, bool: False}
-        params = []
-        for param in signature.parameters.values():
-            if param.annotation in defaults:
-                params.append(defaults[param.annotation])
-            else:
-                params.append("")
-        callobj = fp.ScriptCall({"type":"script", "command":name, "params":params})
-        self.nodeobj.scripts.append(callobj)
-        self.addscriptcall(callobj)
-    
-    def addscriptcall (self, callobj):
+        callobj = nodeobj.condition
         callswidget = self.callsarea.widget()
-        signature = insp.signature(self.scriptcalls[callobj.funcname])
-        scwidget = ScriptCallWidget(callswidget, callobj, signature)
+        scwidget = ConditionCallWidget(callswidget, callobj)
+        scwidget.actremove.setEnabled(False)
+        callswidget.layout().addWidget(scwidget)
+
+class ScriptEditWidget (CallEditWidget):
+    def __init__ (self, parent):
+        super().__init__(parent)
+        
+        newwidget = CallCreateWidget(self)
+        newwidget.newCallObj.connect(self.addscriptcall)
+        
+        self.widgets = dict()
+        
+        layout = self.layout()
+        layout.addWidget(newwidget)
+        layout.addWidget(self.callsarea)
+    
+    @pyqtSlot(str)
+    def loadnode (self, nodeID):
+        view = self.window().activeview()
+        nodeobj = view.nodecontainer.nodes[nodeID]
+        self.callswidgetsetup()
+        self.nodeobj = nodeobj
+        for callobj in nodeobj.scripts:
+            self.addscriptcallwidget(callobj)
+    
+    @pyqtSlot(fp.MetaCall)
+    def addscriptcall (self, metacall):
+        callobj = metacall.callobj
+        self.nodeobj.scripts.append(callobj)
+        self.addscriptcallwidget(callobj)
+    
+    def addscriptcallwidget (self, callobj):
+        callswidget = self.callsarea.widget()
+        scwidget = ScriptCallWidget(callswidget, callobj)
+        scwidget.removed.connect(self.removescriptcall)
+        self.widgets[callobj] = scwidget
         callswidget.layout().addWidget(scwidget)
     
-    def removescriptcall (self, scwidget):
+    @pyqtSlot(fp.ScriptCall)
+    def removescriptcall (self, callobj):
         callswidget = self.callsarea.widget()
-        callobj = scwidget.callobj
-        self.nodeobj.scripts.remove(callobj)
+        scwidget = self.widgets.pop(callobj)
         callswidget.layout().removeWidget(scwidget)
         scwidget.deleteLater()
+        self.nodeobj.scripts.remove(callobj)
+
+class NodeEditWidget (QTabWidget):
+    def __init__ (self, parent):
+        super().__init__(parent)
+        self.scripteditor = ScriptEditWidget(self)
+        self.condeditor = ConditionEditWidget(self)
+        self.texteditor = TextEditWidget(self)
+        
+        self.addTab(self.scripteditor, "Scripts")
+        self.addTab(self.condeditor, "Condition")
+        self.addTab(self.texteditor, "Text")
+        
+        for i in range(self.count()):
+            self.setTabEnabled(i, False)
     
-    @pyqtSlot(QPoint)
-    def contextmenu (self, pos):
-        scwidget = self.callsarea.childAt(pos)
-        while scwidget:
-            if isinstance(scwidget, ScriptCallWidget):
-                break
-            scwidget = scwidget.parent()
+    @pyqtSlot(str)
+    def loadnode (self, nodeID):
+        view = self.window().activeview()
+        nodeobj = view.nodecontainer.nodes[nodeID]
+        if nodeobj.typename in ["talk", "response"]:
+            self.setTabEnabled(self.indexOf(self.texteditor), True)
+            self.texteditor.loadnode(nodeID)
+        else:
+            self.setTabEnabled(self.indexOf(self.texteditor), False)
         
-        if scwidget is None:
-            return
-        
-        remove = QAction("Remove", self)
-        remove.triggered.connect(lambda: self.removescriptcall(scwidget))
-        
-        menu = QMenu(self)
-        menu.addAction(remove)
-        menu.exec_(self.callsarea.mapToGlobal(pos))
+        self.setTabEnabled(self.indexOf(self.scripteditor), True)
+        self.scripteditor.loadnode(nodeID)
+        self.setTabEnabled(self.indexOf(self.condeditor), True)
+        self.condeditor.loadnode(nodeID)
 
 class SearchWidget (QWidget):
     def __init__ (self, parent):
@@ -904,11 +1076,13 @@ class SearchWidget (QWidget):
         
         layout.addWidget(self.inputline)
         layout.addWidget(searchbutton)
+        
+        self.setEnabled(False)
     
     def search (self):
         query = self.inputline.text().casefold()
         view = self.window().activeview()
-        view.search(query)   
+        view.search(query)
 
 class TreeView (QGraphicsView):
     
@@ -1287,10 +1461,7 @@ class EditorWindow (QMainWindow):
         self.initmenus()
         self.inittoolbars()
         
-        self.view = TreeView(fp.loadjson("test3.json"), parent=self)
-        
         tabs = QTabWidget(parent=self)
-        tabs.addTab(self.view, "Graph")
         tabs.setTabsClosable(True)
         tabs.setTabBarAutoHide(True)
         tabs.tabCloseRequested.connect(self.closetab)
@@ -1298,36 +1469,38 @@ class EditorWindow (QMainWindow):
         self.tabs = tabs                        
         
         mapview = MapView(self)
-        mapview.setMinimumSize(200, 200)               
+        mapview.setMinimumSize(200, 200)
         maptimer = QTimer(self)
         maptimer.timeout.connect(mapview.update)
         maptimer.start(100) # OPTION: mapview frame rate
         
-        """editwidget = NodeEditWidget(self)
+        editwidget = NodeEditWidget(self)
         editwidget.setMinimumWidth(300)
-        editwidget.loadnode(self.view.activenode.realid())
-        self.view.activeChanged.connect(editwidget.loadnode)"""
-        
-        editwidget = ScriptEditWidget(self)
-        editwidget.setMinimumWidth(300)
-        editwidget.loadnode(self.view.activenode.realid())
-        self.view.activeChanged.connect(editwidget.loadnode)
+        self.editwidget = editwidget
         
         rightpanel = QSplitter(Qt.Vertical, self)
         rightpanel.addWidget(mapview)
-        rightpanel.addWidget(editwidget)        
+        rightpanel.addWidget(editwidget)
+        rightpanel.setVisible(False)
+        self.rightpanel = rightpanel
         
         splitter = QSplitter(self)
         splitter.addWidget(tabs)
+        splitter.setStretchFactor(0, 10)
         splitter.addWidget(rightpanel)
+        splitter.setStretchFactor(1, 15)
+        splitter.setOpaqueResize(False)
+        self.splitter = splitter
         
         self.setCentralWidget(splitter)
+        
+        self.openfile("test3.json")
     
     def activeview (self):
         return self.tabs.currentWidget()
     
     def initactions (self):
-        self.actions["openfile"] = self.createaction("Open", self.openfile,
+        self.actions["openfile"] = self.createaction("Open", self.selectopenfile,
             [QKeySequence.Open], ["document-open"], "Open dialogue file")
         self.actions["save"] = self.createaction("Save", self.save,
             [QKeySequence.Save], ["document-save"], "Save dialogue file")
@@ -1479,21 +1652,31 @@ class EditorWindow (QMainWindow):
         self.addToolBar(searchtoolbar)
     
     @pyqtSlot()
-    def openfile (self):
+    def selectopenfile (self):
         filename = QFileDialog.getOpenFileName(self, "Open file", os.getcwd(), "Dialog files (*.json)")[0]
         if filename == "":
             return
+        self.openfile(filename)
+    
+    def openfile (self, filename):
         nodecontainer = fp.loadjson(filename)
         treeview = TreeView(nodecontainer, parent=self)
-        tabindex = self.tabs.addTab(treeview, nodecontainer.name)
-        self.tabs.setCurrentIndex(tabindex)
+        self.newtab(treeview)
     
     @pyqtSlot()
     def newtree (self):
         nodecontainer = fp.newcontainer()
         treeview = TreeView(nodecontainer, parent=self)
-        tabindex = self.tabs.addTab(treeview, nodecontainer.name)
+        self.newtab(treeview)
+    
+    def newtab (self, treeview):
+        name = treeview.nodecontainer.name
+        treeview.activeChanged.connect(self.editwidget.loadnode)
+        tabindex = self.tabs.addTab(treeview, name)
         self.tabs.setCurrentIndex(tabindex)
+        if self.tabs.count() == 1:
+            self.rightpanel.setVisible(True)
+            self.splitter.refresh()
     
     @pyqtSlot()
     def save (self, newfile=False):

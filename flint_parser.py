@@ -45,9 +45,19 @@ class ConditionCall (object):
 				return not self.operator
 		return self.operator
 	
+	def setoperator (self, operatorname):
+		self.operatorname = operatorname
+		self.operator = self.operators[operatorname]
+	
 	def todict (self):
 		return {"type": self.typename, "operator": self.operatorname, 
 			"calls": [call.todict() for call in self.calls] }
+
+class MetaCall (object):
+	def __init__ (self, call_dict):
+		types = {"script":ScriptCall, "cond":ConditionCall}
+		typename = call_dict["type"]
+		self.callobj = types[typename](call_dict)
 
 class ChartNode (object):
 	def __init__ (self, container, node_dict, nodeID):
@@ -62,7 +72,8 @@ class ChartNode (object):
 		if 'condition' in node_dict:
 			self.condition = ConditionCall(node_dict['condition'])
 		else:
-			self.condition = self.container.defaultcond
+			#self.condition = self.container.defaultcond
+			self.condition = ConditionCall(self.container.defaultcond)
 		if 'scripts' in node_dict:
 			self.scripts = [ScriptCall(s) for s in node_dict['scripts']]
 		else:
@@ -94,10 +105,10 @@ class ChartNode (object):
 	def todict (self):
 		node_dict = { "type": self.typename, 
 			"links": [{'toID':i} for i in self.linkIDs] }
-		if self.condition is not self.container.defaultcond:
+		if self.condition.todict() != ConditionCall(self.container.defaultcond).todict():
 			node_dict['condition'] = self.condition.todict()
 		if self.scripts:
-			node_dict['scripts']    = [s.todict() for s in self.scripts]
+			node_dict['scripts']   = [s.todict() for s in self.scripts]
 		if self.optvars:
 			node_dict['vars']      = self.optvars
 		if self.comment:
@@ -152,7 +163,8 @@ class NodesContainer (object):
 	__types = { 'talk': TalkNode, 'response': ResponseNode, 'bank': BankNode,
 		'root': ChartNode }
 	def __init__ (self, nodes_dict, filename=""):
-		self.defaultcond = ConditionCall({"type":"cond","operator":"and","calls":[]})
+		#self.defaultcond = ConditionCall({"type":"cond","operator":"and","calls":[]})
+		self.defaultcond = {"type":"cond","operator":"and","calls":[]}
 		self.filename = filename
 		self.name = nodes_dict['name']
 		self.nextID = str(nodes_dict['nextID'])

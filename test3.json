@@ -14,6 +14,39 @@
          "type": "root"
       },
       "1": {
+         "condition": {
+            "calls": [
+               {
+                  "command": "sc_bool",
+                  "params": [
+                     false
+                  ],
+                  "type": "script"
+               },
+               {
+                  "calls": [
+                     {
+                        "command": "sc_print",
+                        "params": [
+                           "qwerty"
+                        ],
+                        "type": "script"
+                     },
+                     {
+                        "command": "sc_wait",
+                        "params": [
+                           4
+                        ],
+                        "type": "script"
+                     }
+                  ],
+                  "operator": "or",
+                  "type": "cond"
+               }
+            ],
+            "operator": "and",
+            "type": "cond"
+         },
          "links": [
             {
                "toID": "2"
@@ -74,7 +107,30 @@
             "calls": [
                {
                   "command": "sc_wait",
+                  "params": [
+                     2
+                  ],
                   "type": "script"
+               },
+               {
+                  "calls": [
+                     {
+                        "command": "sc_wait",
+                        "params": [
+                           1
+                        ],
+                        "type": "script"
+                     },
+                     {
+                        "command": "sc_wait",
+                        "params": [
+                           2
+                        ],
+                        "type": "script"
+                     }
+                  ],
+                  "operator": "and",
+                  "type": "cond"
                }
             ],
             "operator": "and",
@@ -111,6 +167,15 @@
       },
       "6": {
          "links": [],
+         "scripts": [
+            {
+               "command": "sc_bool",
+               "params": [
+                  true
+               ],
+               "type": "script"
+            }
+         ],
          "speaker": "def",
          "text": "World",
          "type": "talk"
@@ -132,6 +197,12 @@
          "links": [
             {
                "toID": "9"
+            }
+         ],
+         "scripts": [
+            {
+               "command": "sc_quick",
+               "type": "script"
             }
          ],
          "speaker": "def",
