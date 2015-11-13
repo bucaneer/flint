@@ -950,41 +950,25 @@ class CallEditWidget (QWidget):
         callsarea = QScrollArea(self)
         callsarea.setWidgetResizable(True)
         self.callsarea = callsarea
-        self.callswidgetsetup()
+        
+        callswidget = QWidget(self.callsarea)
+        callslayout = QVBoxLayout(callswidget)
+        callslayout.setAlignment(Qt.AlignTop)
+        self.callsarea.setWidget(callswidget)
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(*[0]*4)
         layout.setAlignment(Qt.AlignTop)
-    
-    def callswidgetsetup (self):
-        oldwidget = self.callsarea.takeWidget()
-        if oldwidget:
-            oldwidget.deleteLater()
-        callswidget = QWidget(self.callsarea)
-        layout = QVBoxLayout(callswidget)
-        layout.setAlignment(Qt.AlignTop)
-        self.callsarea.setWidget(callswidget)
 
 class ConditionEditWidget (CallEditWidget):
     def __init__ (self, parent):
         super().__init__(parent)
-        
         self.layout().addWidget(self.callsarea)
-    
-    def callswidgetsetup (self):
-        oldwidget = self.callsarea.takeWidget()
-        if oldwidget:
-            oldwidget.deleteLater()
-        callswidget = QWidget(self.callsarea)
-        layout = QVBoxLayout(callswidget)
-        layout.setAlignment(Qt.AlignTop)
-        self.callsarea.setWidget(callswidget)
     
     @pyqtSlot(str)
     def loadnode (self, nodeID):
         view = FlGlob.mainwindow.activeview()
         nodeobj = view.nodecontainer.nodes[nodeID]
-        self.callswidgetsetup()
         self.nodeobj = nodeobj
         callobj = nodeobj.condition
         callswidget = self.callsarea.widget()
@@ -1009,7 +993,6 @@ class ScriptEditWidget (CallEditWidget):
     def loadnode (self, nodeID):
         view = FlGlob.mainwindow.activeview()
         nodeobj = view.nodecontainer.nodes[nodeID]
-        self.callswidgetsetup()
         self.nodeobj = nodeobj
         for callobj in nodeobj.scripts:
             self.addscriptcallwidget(callobj)
