@@ -1337,7 +1337,7 @@ class TreeView (QGraphicsView):
             nodeID = self.selectednode.id()
         nodeitem = self.nodedict[nodeID]
         genericactions = ["zoomin", "zoomout", "zoomorig", "gotoactive",
-            "collapse", "openfile", "save", "saveas", "newtree"]
+            "collapse", "openfile", "save", "saveas", "newtree", "close"]
         if isinstance(nodeitem, TextNodeItem):
             actions = ["copynode", "moveup", "movedown", "unlinknode", 
                 "unlinkstree"]
@@ -1454,16 +1454,19 @@ class EditorWindow (QMainWindow):
         mapdock.setWidget(mapview)
         
         textdock = QDockWidget("Text", self)
+        textdock.newWidget = lambda: TextEditWidget(self)
         textdock.setWidget(TextEditWidget(self))
         textdock.setEnabled(False)
         self.textdock = textdock
         
         conddock = QDockWidget("Condition", self)
+        conddock.newWidget = lambda: ConditionEditWidget(self)
         conddock.setWidget(ConditionEditWidget(self))
         conddock.setEnabled(False)
         self.conddock = conddock
         
         scriptdock = QDockWidget("Scripts", self)
+        scriptdock.newWidget = lambda: ScriptEditWidget(self)
         scriptdock.setWidget(ScriptEditWidget(self))
         scriptdock.setEnabled(False)
         self.scriptdock = scriptdock
@@ -1489,6 +1492,8 @@ class EditorWindow (QMainWindow):
             [QKeySequence.SaveAs], ["document-save-as"], "Save dialogue file as")
         self.actions["newtree"] = self.createaction("New", self.newtree,
             [QKeySequence.New], ["document-new"], "New dialogue tree")
+        self.actions["close"] = self.createaction("Close", self.closefile,
+            None, ["window-close"], "Close file")
         
         self.actions["zoomin"] = self.createaction("Zoom In", self.zoomin, 
             [QKeySequence.ZoomIn, QKeySequence(Qt.ControlModifier + Qt.KeypadModifier + Qt.Key_Plus)], 
@@ -1564,6 +1569,8 @@ class EditorWindow (QMainWindow):
         filemenu.addSeparator()
         filemenu.addAction(self.actions["save"])
         filemenu.addAction(self.actions["saveas"])
+        filemenu.addSeparator()
+        filemenu.addAction(self.actions["close"])
         
         addmenu = QMenu("Add &link...")
         addmenu.addAction(self.actions["pasteclone"])
@@ -1632,8 +1639,16 @@ class EditorWindow (QMainWindow):
         searchtoolbar.addWidget(searchwidget)
         self.addToolBar(searchtoolbar)
     
+    def resetdocks (self):
+        for dock in [self.textdock, self.scriptdock, self.conddock]:
+            dock.setEnabled(False)
+            olddock = dock.widget()
+            dock.setWidget(dock.newWidget())
+            olddock.deleteLater()
+    
     @pyqtSlot(str)
     def loadnode (self, nodeID):
+        self.resetdocks()
         view = self.activeview()
         nodeobj = view.nodecontainer.nodes[nodeID]
         if nodeobj.typename in ["talk", "response"]:
@@ -1685,8 +1700,15 @@ class EditorWindow (QMainWindow):
     def saveas (self):
         self.save(newfile=True)
     
+    @pyqtSlot()
+    def closefile (self):
+        view = self.activeview()
+        index = self.tabs.indexOf(view)
+        self.closetab(index)
+    
     @pyqtSlot(int)
     def closetab (self, index):
+        self.resetdocks()
         view = self.tabs.widget(index)
         self.tabs.removeTab(index)
         view.deleteLater()
