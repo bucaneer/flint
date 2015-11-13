@@ -11,7 +11,7 @@ class ScriptCall (fl_scripts.ScriptCalls):
 			raise RuntimeError("Attempted to bind non-custom function")
 		self.funccall = getattr(self, self.funcname)
 		self.funcparams = sc_dict['params'] if 'params' in sc_dict else []
-		self._not = int(sc_dict['not']) if 'not' in sc_dict else False
+		self._not = bool(sc_dict['not']) if 'not' in sc_dict else False
 	
 	def run (self):
 		if self._not:

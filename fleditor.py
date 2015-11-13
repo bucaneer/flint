@@ -768,16 +768,40 @@ class ScriptParamWidget (QWidget):
 
 class CallWidget (QGroupBox):
     removed = pyqtSignal()
+    changed = pyqtSignal()
     
     def __init__ (self, parent, callobj, name):
         super().__init__ (name, parent)
         self.callobj = callobj
-        self.setStyleSheet("QGroupBox::indicator:unchecked { image: url(images/plus.png) } QGroupBox::indicator:!unchecked { image: url(images/minus.png) }")
+        self.setStyleSheet("""
+            QGroupBox::indicator:unchecked {
+                image: url(images/plus.png);
+            }
+            QGroupBox::indicator:!unchecked {
+                image: url(images/minus.png);
+            }
+            QGroupBox {
+                font-weight: bold;
+                border: solid gray;
+                border-width: 0px 0px 0px 2px;
+                margin-top: 1ex;
+                margin-left: 0.5ex;
+                padding-top: 1ex;
+            }
+            QGroupBox::title {
+                subcontrol-origin:margin;
+            }
+            """)
         self.setCheckable(True)
         
         actremove = QAction("&Remove", self)
-        actremove.triggered.connect(lambda: self.removed.emit(self.callobj))
+        actremove.triggered.connect(self.remove)
         self.actremove = actremove
+    
+    @pyqtSlot()
+    def remove (self):
+        self.removed.emit(self.callobj)
+        self.changed.emit()
     
     def contextMenuEvent (self, event):
         menu = QMenu(self)
@@ -787,14 +811,26 @@ class CallWidget (QGroupBox):
 class ScriptCallWidget (CallWidget):
     removed = pyqtSignal(fp.ScriptCall)
     
-    def __init__ (self, parent, callobj):
+    def __init__ (self, parent, callobj, cond=False):
         name = callobj.funcname
         super().__init__(parent, callobj, name)
         params = callobj.funcparams[::-1]
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(*[0]*4)
+        layout.setContentsMargins(*[9, 4]*2)
+        
+        if cond:
+            notcheck = QCheckBox("Not", self)
+            if callobj._not:
+                notcheck.setCheckState(Qt.Checked)
+            else:
+                notcheck.setCheckState(Qt.Unchecked)
+            notcheck.stateChanged.connect(self.notchanged)
+            layout.addWidget(notcheck)
+            self.toggled.connect(notcheck.setVisible)
+        
         paramswidget = QWidget(self)
         paramslayout = QVBoxLayout(paramswidget)
+        paramslayout.setContentsMargins(*[0]*4)
         paramslist = []
         signature = insp.signature(callobj.funccall)
         for param in signature.parameters.values():
@@ -811,6 +847,11 @@ class ScriptCallWidget (CallWidget):
         
         self.toggled.connect(paramswidget.setVisible)
     
+    @pyqtSlot(int)
+    def notchanged (self, newnot):
+        self.callobj._not = bool(newnot)
+        self.changed.emit()
+    
     @pyqtSlot()
     def paramchanged (self):
         newparams = []
@@ -825,7 +866,7 @@ class CallCreateWidget (QWidget):
         super().__init__(parent)
         scriptcalls = [sc for sc in dir(fp.ScriptCall) if sc[:3] == "sc_"]
         if cond:
-            scriptcalls.insert(0, "(Condition)")
+            scriptcalls.insert(0, "( )")
         self.scriptcalls = scriptcalls
         
         combobox = QComboBox(self)
@@ -835,14 +876,14 @@ class CallCreateWidget (QWidget):
         addbutton.clicked.connect(self.newscriptcall)
         
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(*[0]*4)
+        #layout.setContentsMargins(*[0]*4)
         layout.addWidget(combobox)
         layout.addWidget(addbutton)
     
     @pyqtSlot()
     def newscriptcall (self):
         name = self.combobox.currentText()
-        if name == "(Condition)":
+        if name == "( )":
             callobj = fp.MetaCall({"type":"cond","operator":"and","calls":[]})
         else:
             signature = insp.signature(getattr(fp.ScriptCall, name))
@@ -861,15 +902,17 @@ class CallCreateWidget (QWidget):
 class ConditionCallWidget (CallWidget):
     removed = pyqtSignal(fp.ConditionCall)
     
-    def __init__ (self, parent, callobj):
-        name = self.fullname(callobj)
-        super().__init__ (parent, callobj, self.elidestring(name, 30))
+    def __init__ (self, parent, callobj, cond=True):
+        name = "( )"
+        super().__init__ (parent, callobj, name)
         operatorwidget = QWidget(self)
         operatorlabel = QLabel("Operator", operatorwidget)
         operatorcombo = QComboBox(operatorwidget)
         operatorcombo.insertItems(2, ["and", "or"])
+        operatorcombo.setCurrentText(callobj.operatorname)
         operatorcombo.currentTextChanged.connect(self.setoperator)
         operatorlayout = QHBoxLayout(operatorwidget)
+        #operatorlayout.setContentsMargins(*[0]*4)
         operatorlayout.addWidget(operatorlabel)
         operatorlayout.addWidget(operatorcombo)
         
@@ -877,6 +920,7 @@ class ConditionCallWidget (CallWidget):
         callswidget = QWidget(self)
         self.callswidget = callswidget
         callslayout = QVBoxLayout(callswidget)
+        callslayout.setContentsMargins(*[0]*4)
         self.types = {"cond": ConditionCallWidget, "script": ScriptCallWidget}
         for call in callobj.calls:
             self.addcallwidget(call)
@@ -885,7 +929,7 @@ class ConditionCallWidget (CallWidget):
         newwidget.newCallObj.connect(self.addcall)
         
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(*[0]*4)
+        layout.setContentsMargins(*[4]*4)
         layout.addWidget(operatorwidget)
         layout.addWidget(callswidget)
         layout.addWidget(newwidget)
@@ -901,10 +945,12 @@ class ConditionCallWidget (CallWidget):
         self.addcallwidget(callobj)
     
     def addcallwidget (self, callobj):
-        widget = self.types[callobj.typename](self, callobj)
+        widget = self.types[callobj.typename](self, callobj, cond=True)
         widget.removed.connect(self.removecall)
+        widget.changed.connect(self.newtitle)
         self.widgets[callobj] = widget
         self.callswidget.layout().addWidget(widget)
+        self.newtitle()
     
     def fullname (self, callobj):
         fullname = ""
@@ -912,18 +958,18 @@ class ConditionCallWidget (CallWidget):
             if callobj.calls.index(call):
                 fullname += " %s " % callobj.operatorname
             if call.typename == "cond":
-                fullname += "("
+                #fullname += "("
                 fullname += self.fullname(call)
-                fullname += ")"
+                #fullname += ")"
             elif call.typename == "script":
                 if call._not:
                     fullname += "!"
                 fullname += call.funcname
         
         if not fullname:
-            return "Condition"
+            return "()"
         else:
-            return fullname
+            return "(%s)" % fullname
     
     def elidestring (self, string, length):
         if len(string) <= length:
@@ -931,10 +977,18 @@ class ConditionCallWidget (CallWidget):
         else:
             return string[:length-2]+"…)"
     
+    @pyqtSlot()
+    def newtitle (self):
+        fullname = self.fullname(self.callobj)
+        #self.setTitle(fullname)
+        self.setTitle("( )")
+        self.setToolTip(fullname)
+        self.changed.emit()
+    
     @pyqtSlot(str)
     def setoperator (self, operatorname):
         self.callobj.setoperator(operatorname)
-        self.setTitle(self.elidestring(self.fullname(self.callobj), 30))
+        self.newtitle()
     
     @pyqtSlot(fp.ScriptCall)
     @pyqtSlot(fp.ConditionCall)
@@ -957,7 +1011,7 @@ class CallEditWidget (QWidget):
         self.callsarea.setWidget(callswidget)
         
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(*[0]*4)
+        #layout.setContentsMargins(*[0]*4)
         layout.setAlignment(Qt.AlignTop)
 
 class ConditionEditWidget (CallEditWidget):
