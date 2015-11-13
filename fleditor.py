@@ -11,6 +11,9 @@ import weakref
 import inspect as insp
 from collections import OrderedDict
 
+class FlGlob:
+    mainwindow = None
+
 class FlPalette (object):
     """Palette of custom colors for quick reference."""
     dark    = QColor( 38,  39,  41)
@@ -92,7 +95,7 @@ class NodeItem(QGraphicsItem):
         self.nodeobj = nodeobj
         self.children = []
         self.referrers = []
-        self.style = view.window().style
+        self.style = FlGlob.mainwindow.style
         if parent is None:
             self.parent = None
             self.nodebank = weakref.proxy(view)
@@ -363,7 +366,7 @@ class RootNodeItem (NodeItem):
     def contextMenuEvent (self, event):
         menu = QMenu()
         if self.isselected():
-            window = self.view.window()
+            window = FlGlob.mainwindow
             menu.addAction(window.actions["collapse"])
             menu.addMenu(window.addmenu)
         if not menu.isEmpty():
@@ -437,7 +440,7 @@ class TextNodeItem (NodeItem):
     def contextMenuEvent (self, event):
         menu = QMenu()
         if self.isselected():
-            window = self.view.window()
+            window = FlGlob.mainwindow
             menu.addAction(window.actions["collapse"])
             menu.addAction(window.actions["copynode"])
             menu.addMenu(window.addmenu)
@@ -533,7 +536,7 @@ class BankNodeItem (NodeItem):
     def contextMenuEvent (self, event):
         menu = QMenu()
         if self.isselected():
-            window = self.view.window()
+            window = FlGlob.mainwindow
             menu.addAction(window.actions["collapse"])
             menu.addAction(window.actions["copynode"])
             menu.addMenu(window.subnodemenu)
@@ -558,7 +561,7 @@ class EdgeItem(QGraphicsItem):
         self.source = source
         source.setedge(self)
         self.view = weakref.proxy(view)
-        self.style = view.window().style
+        self.style = FlGlob.mainwindow.style
     
     def boundingRect(self):
         xmin = self.source.x()
@@ -653,7 +656,7 @@ class MapView (QGraphicsView):
     @pyqtSlot()
     def update (self):
         change = False
-        window = self.window()
+        window = FlGlob.mainwindow
         activeview = window.activeview()
         if activeview is None:
             return
@@ -683,7 +686,7 @@ class ParagraphEdit (QPlainTextEdit):
         key = event.key()
         mod = event.modifiers()
         if not (mod & Qt.ShiftModifier) and (key == Qt.Key_Enter or key == Qt.Key_Return):
-            self.window().activeview().setFocus()
+            FlGlob.mainwindow.activeview().setFocus()
         else:
             super().keyPressEvent(event)
 
@@ -710,7 +713,7 @@ class TextEditWidget (QWidget):
         
     @pyqtSlot(str)
     def loadnode (self, nodeID):
-        view = self.window().activeview()
+        view = FlGlob.mainwindow.activeview()
         self.nodeobj = view.nodecontainer.nodes[nodeID]
         if not isinstance(self.nodeobj, fp.TextNode):
             return
@@ -979,7 +982,7 @@ class ConditionEditWidget (CallEditWidget):
     
     @pyqtSlot(str)
     def loadnode (self, nodeID):
-        view = self.window().activeview()
+        view = FlGlob.mainwindow.activeview()
         nodeobj = view.nodecontainer.nodes[nodeID]
         self.callswidgetsetup()
         self.nodeobj = nodeobj
@@ -1004,7 +1007,7 @@ class ScriptEditWidget (CallEditWidget):
     
     @pyqtSlot(str)
     def loadnode (self, nodeID):
-        view = self.window().activeview()
+        view = FlGlob.mainwindow.activeview()
         nodeobj = view.nodecontainer.nodes[nodeID]
         self.callswidgetsetup()
         self.nodeobj = nodeobj
@@ -1032,35 +1035,6 @@ class ScriptEditWidget (CallEditWidget):
         scwidget.deleteLater()
         self.nodeobj.scripts.remove(callobj)
 
-class NodeEditWidget (QTabWidget):
-    def __init__ (self, parent):
-        super().__init__(parent)
-        self.scripteditor = ScriptEditWidget(self)
-        self.condeditor = ConditionEditWidget(self)
-        self.texteditor = TextEditWidget(self)
-        
-        self.addTab(self.scripteditor, "Scripts")
-        self.addTab(self.condeditor, "Condition")
-        self.addTab(self.texteditor, "Text")
-        
-        for i in range(self.count()):
-            self.setTabEnabled(i, False)
-    
-    @pyqtSlot(str)
-    def loadnode (self, nodeID):
-        view = self.window().activeview()
-        nodeobj = view.nodecontainer.nodes[nodeID]
-        if nodeobj.typename in ["talk", "response"]:
-            self.setTabEnabled(self.indexOf(self.texteditor), True)
-            self.texteditor.loadnode(nodeID)
-        else:
-            self.setTabEnabled(self.indexOf(self.texteditor), False)
-        
-        self.setTabEnabled(self.indexOf(self.scripteditor), True)
-        self.scripteditor.loadnode(nodeID)
-        self.setTabEnabled(self.indexOf(self.condeditor), True)
-        self.condeditor.loadnode(nodeID)
-
 class SearchWidget (QWidget):
     def __init__ (self, parent):
         super().__init__(parent)
@@ -1081,7 +1055,7 @@ class SearchWidget (QWidget):
     
     def search (self):
         query = self.inputline.text().casefold()
-        view = self.window().activeview()
+        view = FlGlob.mainwindow.activeview()
         view.search(query)
 
 class TreeView (QGraphicsView):
@@ -1112,7 +1086,7 @@ class TreeView (QGraphicsView):
         scene.setBackgroundBrush(FlPalette.bg)
         self.setScene(scene)
         
-        self.style = self.window().style
+        self.style = FlGlob.mainwindow.style
         
         self.selectedChanged.connect(self.filteractions)
         
@@ -1380,8 +1354,8 @@ class TreeView (QGraphicsView):
                 "pastelink"]
         
         actions.extend(genericactions)
-        windowactions = self.window().actions
-        copiednode = self.window().copiednode
+        windowactions = FlGlob.mainwindow.actions
+        copiednode = FlGlob.mainwindow.copiednode
         for name, action in windowactions.items():
             if name in actions:
                 if name == "pasteclone" or name == "pastesubnode":
@@ -1456,6 +1430,8 @@ class EditorWindow (QMainWindow):
     def __init__ (self):
         super().__init__()
         
+        FlGlob.mainwindow = self
+        
         self.style = FlNodeStyle(QFont())
         self.initactions()
         self.initmenus()
@@ -1474,25 +1450,30 @@ class EditorWindow (QMainWindow):
         maptimer.timeout.connect(mapview.update)
         maptimer.start(100) # OPTION: mapview frame rate
         
-        editwidget = NodeEditWidget(self)
-        editwidget.setMinimumWidth(300)
-        self.editwidget = editwidget
+        mapdock = QDockWidget("Map view", self)
+        mapdock.setWidget(mapview)
         
-        rightpanel = QSplitter(Qt.Vertical, self)
-        rightpanel.addWidget(mapview)
-        rightpanel.addWidget(editwidget)
-        rightpanel.setVisible(False)
-        self.rightpanel = rightpanel
+        textdock = QDockWidget("Text", self)
+        textdock.setWidget(TextEditWidget(self))
+        textdock.setEnabled(False)
+        self.textdock = textdock
         
-        splitter = QSplitter(self)
-        splitter.addWidget(tabs)
-        splitter.setStretchFactor(0, 10)
-        splitter.addWidget(rightpanel)
-        splitter.setStretchFactor(1, 15)
-        splitter.setOpaqueResize(False)
-        self.splitter = splitter
+        conddock = QDockWidget("Condition", self)
+        conddock.setWidget(ConditionEditWidget(self))
+        conddock.setEnabled(False)
+        self.conddock = conddock
         
-        self.setCentralWidget(splitter)
+        scriptdock = QDockWidget("Scripts", self)
+        scriptdock.setWidget(ScriptEditWidget(self))
+        scriptdock.setEnabled(False)
+        self.scriptdock = scriptdock
+        
+        self.setCentralWidget(tabs)
+        self.setTabPosition(Qt.AllDockWidgetAreas, QTabWidget.North)
+        self.addDockWidget(Qt.RightDockWidgetArea, mapdock)
+        self.addDockWidget(Qt.RightDockWidgetArea, textdock)
+        self.tabifyDockWidget(textdock, conddock)
+        self.tabifyDockWidget(conddock, scriptdock)
         
         self.openfile("test3.json")
     
@@ -1651,6 +1632,21 @@ class EditorWindow (QMainWindow):
         searchtoolbar.addWidget(searchwidget)
         self.addToolBar(searchtoolbar)
     
+    @pyqtSlot(str)
+    def loadnode (self, nodeID):
+        view = self.activeview()
+        nodeobj = view.nodecontainer.nodes[nodeID]
+        if nodeobj.typename in ["talk", "response"]:
+            self.textdock.setEnabled(True)
+            self.textdock.widget().loadnode(nodeID)
+        else:
+            self.textdock.setEnabled(False)
+        
+        self.scriptdock.setEnabled(True)
+        self.scriptdock.widget().loadnode(nodeID)
+        self.conddock.setEnabled(True)
+        self.conddock.widget().loadnode(nodeID)
+    
     @pyqtSlot()
     def selectopenfile (self):
         filename = QFileDialog.getOpenFileName(self, "Open file", os.getcwd(), "Dialog files (*.json)")[0]
@@ -1671,12 +1667,9 @@ class EditorWindow (QMainWindow):
     
     def newtab (self, treeview):
         name = treeview.nodecontainer.name
-        treeview.activeChanged.connect(self.editwidget.loadnode)
+        treeview.activeChanged.connect(self.loadnode)
         tabindex = self.tabs.addTab(treeview, name)
         self.tabs.setCurrentIndex(tabindex)
-        if self.tabs.count() == 1:
-            self.rightpanel.setVisible(True)
-            self.splitter.refresh()
     
     @pyqtSlot()
     def save (self, newfile=False):
