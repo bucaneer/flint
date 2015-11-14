@@ -552,9 +552,6 @@ class BankNodeItem (NodeItem):
 
 class EdgeItem(QGraphicsItem):
     arrowsize = 10
-    fgcolor = FlPalette.light
-    bgcolor = FlPalette.dark
-    pensize = 2
     
     def __init__(self, source, view):
         super().__init__()
@@ -562,58 +559,78 @@ class EdgeItem(QGraphicsItem):
         source.setedge(self)
         self.view = weakref.proxy(view)
         self.style = FlGlob.mainwindow.style
+        
+        pen = QPen(FlPalette.light, 2, cap = Qt.FlatCap, join=Qt.MiterJoin)
+        pen.setCosmetic(True)
+        brush = QBrush(FlPalette.light)
+        
+        pen2 = QPen(pen)
+        pen2.setColor(FlPalette.dark)
+        brush2 = QBrush(FlPalette.dark)
+        
+        visuals = dict()
+        visuals[True] = (pen, brush)
+        visuals[False] = (pen2, brush2)
+        self.visuals = visuals
+        
+        self.nopen = QPen(0)
     
     def boundingRect(self):
         xmin = self.source.x()
         xmax = xmin + self.style.rankwidth
         children = self.source.childlist()
+        halfarrow = self.arrowsize/2
         if children:
-            ymin = children[0].y()-self.arrowsize/2
-            ymax = children[-1].y()+self.arrowsize/2
+            ymin = children[0].y() - halfarrow
+            ymax = children[-1].y() + halfarrow
         else:
-            ymin = self.source.y()-self.arrowsize/2
-            ymax = self.source.y()+self.arrowsize/2
+            y = self.source.y()
+            ymin = y - halfarrow
+            ymax = y + halfarrow
         return QRectF(xmin, ymin, abs(xmax-xmin), abs(ymax-ymin))
     
-    def paint(self, painter, style, widget, color=None, off=0, main=True):
-        assert(isinstance(painter, QPainter))
+    def paint(self, painter, style, widget, off=0, main=True):
         children = self.source.childlist()
-        treeview = widget is self.view.viewport()
         if not children:
             return
+        treeview = widget is self.view.viewport()
+        
         if main and treeview:
-            self.paint(painter, style, widget, color=self.bgcolor, off=self.style.shadowoffset, main=False)
-        arrow = self.arrowsize
-        if color is None:
-            color = self.fgcolor
-        pen = QPen(color, self.pensize, cap = Qt.FlatCap, join=Qt.MiterJoin)
-        pen.setCosmetic(True)
-        if not treeview or self.view.zoomscale <= 0.8:
+            self.paint(painter, style, widget, off=self.style.shadowoffset, main=False)
+        
+        pen, brush = self.visuals[main]
+        if not treeview:
             pen.setWidth(1)
-        elif self.view.zoomscale > 1:
+            pen.setCosmetic(True)
+        elif self.view.zoomscale >= 1:
+            pen.setWidth(2)
             pen.setCosmetic(False)
-        brush = QBrush(color)
+        
         painter.setPen(pen)
         painter.setBrush(brush)
-        x0 = self.source.x() + self.source.boundingRect().right()
-        y0 = self.source.y()
-        vert_x = self.source.x() + self.style.rankwidth/2
-        painter.drawLine(x0+off, y0+off, vert_x+off, y0+off)
+        
+        x0 = self.source.x() + self.source.boundingRect().right() + off
+        y0 = self.source.y() + off
+        vert_x = self.source.x() + self.style.rankwidth/2 + off
+        painter.drawLine(x0, y0, vert_x, y0)
+        
+        arrow = self.arrowsize
+        corr = pen.width()/2
         for target in children:
-            tx = target.x() + target.boundingRect().left()
-            ty = target.y()
-            painter.setPen(pen)
-            corr = self.pensize/2
-            painter.drawLine(vert_x+off-corr, ty+off, tx+off-arrow, ty+off)
-            arrowtip = [QPointF(tx+off, ty+off), QPointF(tx-arrow+off, ty-(arrow/2)+off), QPointF(tx-arrow+off, ty+(arrow/2)+off)]
-            nopen = QPen(0)
-            painter.setPen(nopen)
+            tx = target.x() + target.boundingRect().left() + off
+            ty = target.y() + off
+            painter.drawLine(vert_x-corr, ty, tx-arrow, ty)
+            arrowtip = [QPointF(tx, ty),
+                        QPointF(tx-arrow, ty-(arrow/2)),
+                        QPointF(tx-arrow, ty+(arrow/2))]
+            painter.setPen(self.nopen)
             painter.drawPolygon(*arrowtip)
-        if len(children) > 1:
-            vert_top = children[0].y()
-            vert_bottom = children[-1].y()
             painter.setPen(pen)
-            painter.drawLine(vert_x+off, vert_top+off, vert_x+off, vert_bottom+off)
+        
+        if len(children) > 1:
+            vert_top = children[0].y() + off
+            vert_bottom = children[-1].y() + off
+            painter.drawLine(vert_x, vert_top, vert_x, vert_bottom)
 
 class FrameItem (QGraphicsItem):
     def __init__ (self, view):
