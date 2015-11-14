@@ -587,9 +587,11 @@ class EdgeItem(QGraphicsItem):
         if color is None:
             color = self.fgcolor
         pen = QPen(color, self.pensize, cap = Qt.FlatCap, join=Qt.MiterJoin)
-        if not treeview:
-            pen.setWidth(0)
-            pen.setCosmetic(True)
+        pen.setCosmetic(True)
+        if not treeview or self.view.zoomscale <= 0.8:
+            pen.setWidth(1)
+        elif self.view.zoomscale > 1:
+            pen.setCosmetic(False)
         brush = QBrush(color)
         painter.setPen(pen)
         painter.setBrush(brush)
