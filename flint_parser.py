@@ -103,8 +103,9 @@ class ChartNode (object):
 				self.linkIDs.insert(pos, nodeID)
 	
 	def todict (self):
-		node_dict = { "type": self.typename, 
-			"links": [{'toID':i} for i in self.linkIDs] }
+		node_dict = { "type": self.typename }
+		if self.linkIDs:
+			node_dict["links"]     = [{'toID':i} for i in self.linkIDs]
 		if self.condition.todict() != ConditionCall(self.container.defaultcond).todict():
 			node_dict['condition'] = self.condition.todict()
 		if self.scripts:
