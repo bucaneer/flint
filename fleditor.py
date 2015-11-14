@@ -903,7 +903,7 @@ class ConditionCallWidget (CallWidget):
     removed = pyqtSignal(fp.ConditionCall)
     
     def __init__ (self, parent, callobj, cond=True):
-        name = "( )"
+        name = "()"
         super().__init__ (parent, callobj, name)
         operatorwidget = QWidget(self)
         operatorlabel = QLabel("Operator", operatorwidget)
@@ -952,15 +952,18 @@ class ConditionCallWidget (CallWidget):
         self.callswidget.layout().addWidget(widget)
         self.newtitle()
     
-    def fullname (self, callobj):
+    def fullname (self, callobj, recursive=False):
         fullname = ""
         for call in callobj.calls:
             if callobj.calls.index(call):
                 fullname += " %s " % callobj.operatorname
             if call.typename == "cond":
-                #fullname += "("
-                fullname += self.fullname(call)
-                #fullname += ")"
+                if recursive:
+                    fullname += self.fullname(call)
+                elif not call.calls:
+                    fullname += "()"
+                else:
+                    fullname += "(…)"
             elif call.typename == "script":
                 if call._not:
                     fullname += "!"
@@ -975,13 +978,13 @@ class ConditionCallWidget (CallWidget):
         if len(string) <= length:
             return string
         else:
-            return string[:length-2]+"…)"
+            return string[:length-1]+"…"
     
     @pyqtSlot()
     def newtitle (self):
-        fullname = self.fullname(self.callobj)
-        #self.setTitle(fullname)
-        self.setTitle("( )")
+        fullname = self.fullname(self.callobj, recursive=True)
+        shortname = self.fullname(self.callobj)
+        self.setTitle(self.elidestring(shortname,30))
         self.setToolTip(fullname)
         self.changed.emit()
     
