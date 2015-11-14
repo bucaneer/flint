@@ -677,7 +677,6 @@ class MapView (QGraphicsView):
             change = True
         if change:
             self.fitInView(scenerect, Qt.KeepAspectRatio)
-            self.viewport().update()
 
 class ParagraphEdit (QPlainTextEdit):
     def __init__ (self, parent):
@@ -1245,7 +1244,6 @@ class TreeView (QGraphicsView):
         root = self.treeroot()
         root.treeposition()
         self.updatescenerect(root)
-        self.scene().update()
     
     def updatescenerect (self, root):
         top, bottom, depth = root.subtreesize(-1)
@@ -1281,7 +1279,6 @@ class TreeView (QGraphicsView):
             self.shownode(self.selectednode)
             if signal:
                 self.selectedChanged.emit(self.selectednode.realid())
-            self.scene().update()
     
     def setactivenode (self, nodeitem, signal=True):
         if nodeitem is not None:
@@ -1291,7 +1288,6 @@ class TreeView (QGraphicsView):
             self.activenode.setactive(True)
             if signal:
                 self.activeChanged.emit(self.activenode.realid())
-            self.scene().update()
     
     def createlink (self, toID):
         fromID = self.selectednode.realid()
@@ -1429,7 +1425,6 @@ class TreeView (QGraphicsView):
                 if query in nodeobj.text.casefold():
                     hits.append(nodeobj)
             self.hits = hits
-        self.scene().update()
     
     def wheelEvent (self, event):
         mod = event.modifiers()
