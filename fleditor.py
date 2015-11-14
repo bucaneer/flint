@@ -634,49 +634,6 @@ class FrameItem (QGraphicsItem):
             painter.setPen(pen)
             painter.setBrush(QBrush())
             painter.drawRect(self.boundingRect())
-    
-class MapView (QGraphicsView):
-    def __init__ (self, parent):
-        super().__init__(parent)
-        self.setOptimizationFlags(QGraphicsView.DontAdjustForAntialiasing | QGraphicsView.DontSavePainterState)
-        self.setRenderHints(QPainter.SmoothPixmapTransform | QPainter.Antialiasing)
-        self.treeview = None
-        self.scenerect = self.viewrect = QRectF()
-    
-    def mousePressEvent (self, event):
-        pos = event.pos()
-        adjpos = self.mapToScene(pos)
-        self.treeview.centerOn(adjpos)
-    
-    def mouseMoveEvent (self, event):
-        if event.buttons():
-            self.mousePressEvent(event)
-    
-    def mouseDoubleClickEvent (self, event):
-        pass
-    
-    @pyqtSlot()
-    def update (self):
-        change = False
-        window = FlGlob.mainwindow
-        activeview = window.activeview()
-        if activeview is None:
-            return
-        if activeview is not self.treeview:
-            self.treeview = activeview
-            self.setScene(activeview.scene())
-            change = True
-        scenerect = activeview.sceneRect()
-        if scenerect != self.scenerect:
-            self.scenerect = scenerect
-            self.setSceneRect(scenerect)
-            change = True
-        viewrect = activeview.viewframe.boundingRect()
-        if viewrect != self.viewrect:
-            self.viewrect = viewrect
-            change = True
-        if change:
-            self.fitInView(scenerect, Qt.KeepAspectRatio)
 
 class ParagraphEdit (QPlainTextEdit):
     def __init__ (self, parent):
@@ -1098,6 +1055,49 @@ class SearchWidget (QWidget):
         query = self.inputline.text().casefold()
         view = FlGlob.mainwindow.activeview()
         view.search(query)
+
+class MapView (QGraphicsView):
+    def __init__ (self, parent):
+        super().__init__(parent)
+        self.setOptimizationFlags(QGraphicsView.DontAdjustForAntialiasing | QGraphicsView.DontSavePainterState)
+        self.setRenderHints(QPainter.SmoothPixmapTransform | QPainter.Antialiasing)
+        self.treeview = None
+        self.scenerect = self.viewrect = QRectF()
+    
+    def mousePressEvent (self, event):
+        pos = event.pos()
+        adjpos = self.mapToScene(pos)
+        self.treeview.centerOn(adjpos)
+    
+    def mouseMoveEvent (self, event):
+        if event.buttons():
+            self.mousePressEvent(event)
+    
+    def mouseDoubleClickEvent (self, event):
+        pass
+    
+    @pyqtSlot()
+    def update (self):
+        change = False
+        window = FlGlob.mainwindow
+        activeview = window.activeview()
+        if activeview is None:
+            return
+        if activeview is not self.treeview:
+            self.treeview = activeview
+            self.setScene(activeview.scene())
+            change = True
+        scenerect = activeview.sceneRect()
+        if scenerect != self.scenerect:
+            self.scenerect = scenerect
+            self.setSceneRect(scenerect)
+            change = True
+        viewrect = activeview.viewframe.boundingRect()
+        if viewrect != self.viewrect:
+            self.viewrect = viewrect
+            change = True
+        if change:
+            self.fitInView(scenerect, Qt.KeepAspectRatio)
 
 class TreeView (QGraphicsView):
     
