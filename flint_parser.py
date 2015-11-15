@@ -271,8 +271,8 @@ def loadjson (filename):
 
 def writejson (nodecont, filename):
 	with open(filename, 'w') as f:
-		json.dump(nodecont, f, indent=3, 
-			separators=(',', ': '), sort_keys=True,
+		json.dump(nodecont, f, indent=3, separators=(',', ': '),
+			sort_keys=True, ensure_ascii=False,
 			default=lambda o: o.todict() )
 
 def newcontainer ():
