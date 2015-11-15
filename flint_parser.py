@@ -66,25 +66,29 @@ class ChartNode (object):
 		self.ID = str(nodeID)
 		self.linkIDs = []
 		self.realref = None
+		
 		if "links" in node_dict:
 			for link in node_dict['links']:
 				self.addlink(str(link['toID']))
+		
 		if 'condition' in node_dict:
 			self.condition = ConditionCall(node_dict['condition'])
 		else:
-			#self.condition = self.container.defaultcond
 			self.condition = ConditionCall(self.container.defaultcond)
+		
 		if 'scripts' in node_dict:
 			self.scripts = [ScriptCall(s) for s in node_dict['scripts']]
 		else:
 			self.scripts = []
-		#self.scripts = 'scripts' in node_dict and ScriptCall(node_dict['scripts'])
-		self.optvars = node_dict['vars'] if 'vars' in node_dict else dict()
-		self.comment = 'comment' in node_dict and node_dict['comment']
+			
 		if 'nodebank' in node_dict:
 			self.nodebank = node_dict['nodebank']
 		else:
 			self.nodebank = -1
+		
+		self.optvars = node_dict['vars'] if 'vars' in node_dict else dict()
+		self.comment = 'comment' in node_dict and node_dict['comment']
+		self.memory = 'memory' in node_dict and node_dict['memory']
 	
 	def checkcond (self):
 		return self.condition.run()
@@ -116,6 +120,8 @@ class ChartNode (object):
 			node_dict['comment']   = self.comment
 		if self.nodebank != -1:
 			node_dict['nodebank']  = self.nodebank
+		if self.memory:
+			node_dict['memory']    = self.memory
 		return node_dict
 
 class TextNode (ChartNode):
@@ -164,7 +170,6 @@ class NodesContainer (object):
 	__types = { 'talk': TalkNode, 'response': ResponseNode, 'bank': BankNode,
 		'root': ChartNode }
 	def __init__ (self, nodes_dict, filename=""):
-		#self.defaultcond = ConditionCall({"type":"cond","operator":"and","calls":[]})
 		self.defaultcond = {"type":"cond","operator":"and","calls":[]}
 		self.filename = filename
 		self.name = nodes_dict['name']

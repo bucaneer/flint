@@ -1050,6 +1050,32 @@ class ScriptEditWidget (CallEditWidget):
         scwidget.deleteLater()
         self.nodeobj.scripts.remove(callobj)
 
+class PropertiesEditWidget (QWidget):
+    def __init__ (self, parent):
+        super().__init__(parent)
+        layout = QFormLayout(self)
+        
+        l_memory = QLabel("Memory", self)
+        memory = QComboBox(self)
+        memoryvals = ["", "Mark", "OnceEver", "OncePerConv"]
+        memory.insertItems(len(memoryvals), memoryvals)
+        memory.currentTextChanged.connect(self.propertychanged)
+        self.memory = memory
+        
+        layout.addRow(l_memory, memory)
+    
+    @pyqtSlot(str)
+    def loadnode (self, nodeID):
+        view = FlGlob.mainwindow.activeview()
+        nodeobj = view.nodecontainer.nodes[nodeID]
+        self.nodeobj = nodeobj
+        self.memory.setCurrentText(str(nodeobj.memory))
+    
+    @pyqtSlot()
+    def propertychanged (self):
+        memory = self.memory.currentText()
+        self.nodeobj.memory = memory
+
 class SearchWidget (QWidget):
     def __init__ (self, parent):
         super().__init__(parent)
@@ -1525,12 +1551,19 @@ class EditorWindow (QMainWindow):
         scriptdock.setEnabled(False)
         self.scriptdock = scriptdock
         
+        propdock = QDockWidget("Properties", self)
+        propdock.newWidget = lambda: PropertiesEditWidget(self)
+        propdock.setWidget(PropertiesEditWidget(self))
+        propdock.setEnabled(False)
+        self.propdock = propdock
+        
         self.setCentralWidget(tabs)
         self.setTabPosition(Qt.AllDockWidgetAreas, QTabWidget.North)
         self.addDockWidget(Qt.RightDockWidgetArea, mapdock)
         self.addDockWidget(Qt.RightDockWidgetArea, textdock)
         self.tabifyDockWidget(textdock, conddock)
         self.tabifyDockWidget(conddock, scriptdock)
+        self.tabifyDockWidget(scriptdock, propdock)
     
     def activeview (self):
         return self.tabs.currentWidget()
@@ -1692,7 +1725,7 @@ class EditorWindow (QMainWindow):
         self.addToolBar(searchtoolbar)
     
     def resetdocks (self):
-        for dock in [self.textdock, self.scriptdock, self.conddock]:
+        for dock in [self.textdock, self.scriptdock, self.conddock, self.propdock]:
             dock.setEnabled(False)
             olddock = dock.widget()
             dock.setWidget(dock.newWidget())
@@ -1713,6 +1746,8 @@ class EditorWindow (QMainWindow):
         self.scriptdock.widget().loadnode(nodeID)
         self.conddock.setEnabled(True)
         self.conddock.widget().loadnode(nodeID)
+        self.propdock.setEnabled(True)
+        self.propdock.widget().loadnode(nodeID)
     
     @pyqtSlot()
     def selectopenfile (self):
