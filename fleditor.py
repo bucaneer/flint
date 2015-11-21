@@ -1177,7 +1177,6 @@ class TreeView (QGraphicsView):
         self.nodecontainer = nodecontainer
         self.nodedocs = dict()
         self.updateview()
-        self.setactivenode(self.treeroot())
         self.setselectednode(self.treeroot())
     
     def updatedocs (self):
@@ -1212,7 +1211,7 @@ class TreeView (QGraphicsView):
         if activeID and activeID in self.nodedict:
             self.setactivenode(self.nodedict[activeID], signal=False)
         else:
-            self.setactivenode(self.treeroot())
+            self.setactivenode(None)
         
         baseID = ""
         while selectedID:
@@ -1331,6 +1330,11 @@ class TreeView (QGraphicsView):
             self.activenode.setactive(True)
             if signal:
                 self.activeChanged.emit(self.activenode.realid())
+        else:
+            if self.activenode is not None:
+                self.activenode = None
+            if signal:
+                self.activeChanged.emit("-1")
     
     def createlink (self, toID):
         fromID = self.selectednode.realid()
@@ -1734,6 +1738,8 @@ class EditorWindow (QMainWindow):
     @pyqtSlot(str)
     def loadnode (self, nodeID):
         self.resetdocks()
+        if nodeID == "-1":
+            return
         view = self.activeview()
         nodeobj = view.nodecontainer.nodes[nodeID]
         if nodeobj.typename in ["talk", "response"]:
