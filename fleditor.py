@@ -1009,8 +1009,12 @@ class ConditionEditWidget (CallEditWidget):
         callswidget.layout().addWidget(scwidget)
 
 class ScriptEditWidget (CallEditWidget):
-    def __init__ (self, parent):
+    def __init__ (self, parent, slot="enter"):
         super().__init__(parent)
+        if slot in ("enter", "exit"):
+            self.slot = slot
+        else:
+            return
         
         newwidget = CallCreateWidget(self)
         newwidget.newCallObj.connect(self.addscriptcall)
@@ -1025,14 +1029,17 @@ class ScriptEditWidget (CallEditWidget):
     def loadnode (self, nodeID):
         view = FlGlob.mainwindow.activeview()
         nodeobj = view.nodecontainer.nodes[nodeID]
-        self.nodeobj = nodeobj
-        for callobj in nodeobj.scripts:
+        if self.slot == "enter":
+            self.scripts = nodeobj.enterscripts
+        elif self.slot == "exit":
+            self.scripts = nodeobj.exitscripts
+        for callobj in self.scripts:
             self.addscriptcallwidget(callobj)
     
     @pyqtSlot(fp.MetaCall)
     def addscriptcall (self, metacall):
         callobj = metacall.callobj
-        self.nodeobj.scripts.append(callobj)
+        self.scripts.append(callobj)
         self.addscriptcallwidget(callobj)
     
     def addscriptcallwidget (self, callobj):
@@ -1048,7 +1055,7 @@ class ScriptEditWidget (CallEditWidget):
         scwidget = self.widgets.pop(callobj)
         callswidget.layout().removeWidget(scwidget)
         scwidget.deleteLater()
-        self.nodeobj.scripts.remove(callobj)
+        self.scripts.remove(callobj)
 
 class PropertiesEditWidget (QWidget):
     def __init__ (self, parent):
@@ -1549,11 +1556,17 @@ class EditorWindow (QMainWindow):
         conddock.setEnabled(False)
         self.conddock = conddock
         
-        scriptdock = QDockWidget("Scripts", self)
-        scriptdock.newWidget = lambda: ScriptEditWidget(self)
-        scriptdock.setWidget(ScriptEditWidget(self))
-        scriptdock.setEnabled(False)
-        self.scriptdock = scriptdock
+        onenterdock = QDockWidget("On Enter", self)
+        onenterdock.newWidget = lambda: ScriptEditWidget(self, slot="enter")
+        onenterdock.setWidget(ScriptEditWidget(self, slot="enter"))
+        onenterdock.setEnabled(False)
+        self.onenterdock = onenterdock
+        
+        onexitdock = QDockWidget("On Exit", self)
+        onexitdock.newWidget = lambda: ScriptEditWidget(self, slot="exit")
+        onexitdock.setWidget(ScriptEditWidget(self, slot="exit"))
+        onexitdock.setEnabled(False)
+        self.onexitdock = onexitdock
         
         propdock = QDockWidget("Properties", self)
         propdock.newWidget = lambda: PropertiesEditWidget(self)
@@ -1566,8 +1579,9 @@ class EditorWindow (QMainWindow):
         self.addDockWidget(Qt.RightDockWidgetArea, mapdock)
         self.addDockWidget(Qt.RightDockWidgetArea, textdock)
         self.tabifyDockWidget(textdock, conddock)
-        self.tabifyDockWidget(conddock, scriptdock)
-        self.tabifyDockWidget(scriptdock, propdock)
+        self.tabifyDockWidget(conddock, onenterdock)
+        self.tabifyDockWidget(onenterdock, onexitdock)
+        self.tabifyDockWidget(onexitdock, propdock)
     
     def activeview (self):
         return self.tabs.currentWidget()
@@ -1729,7 +1743,7 @@ class EditorWindow (QMainWindow):
         self.addToolBar(searchtoolbar)
     
     def resetdocks (self):
-        for dock in [self.textdock, self.scriptdock, self.conddock, self.propdock]:
+        for dock in (self.textdock, self.onenterdock, self.onexitdock, self.conddock, self.propdock):
             dock.setEnabled(False)
             olddock = dock.widget()
             dock.setWidget(dock.newWidget())
@@ -1748,8 +1762,10 @@ class EditorWindow (QMainWindow):
         else:
             self.textdock.setEnabled(False)
         
-        self.scriptdock.setEnabled(True)
-        self.scriptdock.widget().loadnode(nodeID)
+        self.onenterdock.setEnabled(True)
+        self.onenterdock.widget().loadnode(nodeID)
+        self.onexitdock.setEnabled(True)
+        self.onexitdock.widget().loadnode(nodeID)
         self.conddock.setEnabled(True)
         self.conddock.widget().loadnode(nodeID)
         self.propdock.setEnabled(True)
