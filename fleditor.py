@@ -378,7 +378,10 @@ class RootNodeItem (NodeItem):
         self.updatelayout()
     
     def updatelayout (self):
-        labelrect = self.nodelabel.mapRectToParent(self.nodelabel.boundingRect().united(self.condicon.mapRectToParent(self.condicon.boundingRect())))
+        if self.iscollapsed():
+            labelrect = self.nodelabel.mapRectToParent(self.nodelabel.boundingRect())
+        else:
+            labelrect = self.nodelabel.mapRectToParent(self.nodelabel.boundingRect().united(self.condicon.mapRectToParent(self.condicon.boundingRect())))
         mainrect = labelrect.marginsAdded(QMarginsF(*[self.style.nodemargin]*4))
         self.mainbox.setRect(mainrect)
         self.shadowbox.setRect(mainrect)
