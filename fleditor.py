@@ -191,11 +191,7 @@ class NodeItem(QGraphicsItem):
         return self.view.selectednode is self
     
     def iscollapsed (self):
-        if self.parent is not None:
-            ids = (self.realid(), self.parent.realid())
-        else:
-            ids = (self.realid(), None)
-        return ids in self.view.collapsednodes
+        return self.id() in self.view.collapsednodes
     
     def setY (self, y):
         self.edge.prepareGeometryChange()
@@ -1274,12 +1270,9 @@ class TreeView (QGraphicsView):
         while queue:
             curID, ref = queue.pop(0)
             isghost = visited[curID]
-            if ref is not None:
-                visited[curID] = visited[curID] or (curID, ref.realid()) not in self.collapsednodes
-            else:
-                visited[curID] = True
             curnodeobj = nodesdict[curID]
             nodeitem = self.newitem(curnodeobj, ref, isghost)
+            visited[curID] = visited[curID] or nodeitem.id() not in self.collapsednodes
             if not (isghost or nodeitem.iscollapsed()):
                 for nextID in curnodeobj.linkIDs:
                     queue.append((nextID, nodeitem))
@@ -1440,18 +1433,13 @@ class TreeView (QGraphicsView):
         self.updateview()
     
     def collapse (self, collapse=None):
-        selID = self.selectednode.realid()
-        if self.selectednode.parent is not None:
-            refID = self.selectednode.parent.realid()
-        else:
-            refID = None
-        ids = (selID, refID)
-        if ids in self.collapsednodes:
+        selID = self.selectednode.id()
+        if selID in self.collapsednodes:
             if collapse is None or not collapse:
-                self.collapsednodes.remove(ids)
+                self.collapsednodes.remove(selID)
         else:
             if collapse is None or collapse:
-                self.collapsednodes.append(ids)
+                self.collapsednodes.append(selID)
         self.updateview()
     
     @pyqtSlot(str)
