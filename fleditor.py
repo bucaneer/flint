@@ -40,6 +40,9 @@ class FlNodeStyle (object):
         baseem = basemetrics.height()
         baseen = baseem // 2
         
+        boldmetrics = QFontMetrics(boldfont)
+        self.boldheight = boldmetrics.height()
+        
         nodemargin = baseen*3//5
         itemmargin = baseen//2
         activemargin = baseen*3//4
@@ -83,6 +86,15 @@ class QGraphicsSimpleTextItemCond (QGraphicsSimpleTextItem):
 class QGraphicsTextItemCond (QGraphicsTextItem):
     def __init__(self, parent=0, cond=None):
         super().__init__(parent)
+        self.cond = cond
+    
+    def paint(self, painter, style, widget):
+        if self.cond(self, widget):
+            super().paint(painter, style, widget)
+
+class QGraphicsPixmapItemCond (QGraphicsPixmapItem):
+    def __init__ (self, pixmap, parent, cond=None):
+        super().__init__(pixmap, parent)
         self.cond = cond
     
     def paint(self, painter, style, widget):
@@ -325,6 +337,24 @@ class NodeItem(QGraphicsItem):
         self.nodelabel.setText(self.label % self.realid())
         self.nodelabel.setPos(self.style.itemmargin, self.style.itemmargin)
         self.graphgroup.addToGroup(self.nodelabel)
+        
+        condpix = QPixmap("images/key.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
+        self.condicon = QGraphicsPixmapItemCond(condpix, self,
+            lambda s,w: w is self.view.viewport() and self.nodeobj.hascond() and not self.iscollapsed())
+        self.condicon.setPos(self.style.nodetextwidth-condpix.width(), self.style.itemmargin)
+        self.graphgroup.addToGroup(self.condicon)
+        
+        exitpix = QPixmap("images/script-exit.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
+        self.exiticon = QGraphicsPixmapItemCond(exitpix, self,
+            lambda s,w: w is self.view.viewport() and self.nodeobj.hasexitscripts() and not self.iscollapsed())
+        self.exiticon.setPos(self.condicon.x()-self.style.itemmargin-exitpix.width(), self.style.itemmargin)
+        self.graphgroup.addToGroup(self.exiticon)
+        
+        enterpix = QPixmap("images/script-enter.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
+        self.entericon = QGraphicsPixmapItemCond(enterpix, self,
+            lambda s,w: w is self.view.viewport() and self.nodeobj.hasenterscripts() and not self.iscollapsed())
+        self.entericon.setPos(self.exiticon.x()-self.style.itemmargin-enterpix.width(), self.style.itemmargin)
+        self.graphgroup.addToGroup(self.entericon)
     
     def mouseDoubleClickEvent (self, event):
         super().mouseDoubleClickEvent(event)
@@ -352,7 +382,8 @@ class RootNodeItem (NodeItem):
         self.updatelayout()
     
     def updatelayout (self):
-        mainrect = self.nodelabel.mapRectToParent(self.nodelabel.boundingRect()).marginsAdded(QMarginsF(*[self.style.nodemargin]*4))
+        labelrect = self.nodelabel.mapRectToParent(self.nodelabel.boundingRect().united(self.condicon.mapRectToParent(self.condicon.boundingRect())))
+        mainrect = labelrect.marginsAdded(QMarginsF(*[self.style.nodemargin]*4))
         self.mainbox.setRect(mainrect)
         self.shadowbox.setRect(mainrect)
         self.selectbox.setRect(mainrect.marginsAdded(QMarginsF(*[self.style.selectmargin]*4)))

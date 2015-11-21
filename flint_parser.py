@@ -111,11 +111,20 @@ class ChartNode (object):
 			else:
 				self.linkIDs.insert(pos, nodeID)
 	
+	def hascond (self):
+		return self.condition.todict() != self.container.defaultcondcall.todict()
+	
+	def hasenterscripts (self):
+		return len(self.enterscripts) > 0
+	
+	def hasexitscripts (self):
+		return len(self.exitscripts) > 0
+	
 	def todict (self):
 		node_dict = { "type": self.typename }
 		if self.linkIDs:
 			node_dict["links"]     = [{'toID':i} for i in self.linkIDs]
-		if self.condition.todict() != ConditionCall(self.container.defaultcond).todict():
+		if self.hascond():
 			node_dict['condition'] = self.condition.todict()
 		if self.enterscripts:
 			node_dict['enterscripts'] = [s.todict() for s in self.enterscripts]
@@ -178,6 +187,7 @@ class NodesContainer (object):
 		'root': ChartNode }
 	def __init__ (self, nodes_dict, filename=""):
 		self.defaultcond = {"type":"cond","operator":"and","calls":[]}
+		self.defaultcondcall = ConditionCall(self.defaultcond)
 		self.filename = filename
 		self.name = nodes_dict['name']
 		self.nextID = str(nodes_dict['nextID'])
