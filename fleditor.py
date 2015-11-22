@@ -948,6 +948,7 @@ class ConditionCallWidget (CallWidget):
         callobj = metacall.callobj
         self.callobj.calls.append(callobj)
         self.addcallwidget(callobj)
+        FlGlob.mainwindow.activeview().viewport().update()
     
     def addcallwidget (self, callobj):
         widget = self.types[callobj.typename](self, callobj, cond=True)
@@ -1005,6 +1006,7 @@ class ConditionCallWidget (CallWidget):
         self.callswidget.layout().removeWidget(widget)
         widget.deleteLater()
         self.callobj.calls.remove(callobj)
+        FlGlob.mainwindow.activeview().viewport().update()
 
 class CallEditWidget (QWidget):
     def __init__ (self, parent):
@@ -1071,6 +1073,7 @@ class ScriptEditWidget (CallEditWidget):
         callobj = metacall.callobj
         self.scripts.append(callobj)
         self.addscriptcallwidget(callobj)
+        FlGlob.mainwindow.activeview().viewport().update()
     
     def addscriptcallwidget (self, callobj):
         callswidget = self.callsarea.widget()
@@ -1086,6 +1089,7 @@ class ScriptEditWidget (CallEditWidget):
         callswidget.layout().removeWidget(scwidget)
         scwidget.deleteLater()
         self.scripts.remove(callobj)
+        FlGlob.mainwindow.activeview().viewport().update()
 
 class PropertiesEditWidget (QWidget):
     def __init__ (self, parent):
