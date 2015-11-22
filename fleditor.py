@@ -1122,13 +1122,13 @@ class PropertiesEditWidget (QWidget):
         super().__init__(parent)
         layout = QFormLayout(self)
         
-        l_memory = QLabel("Memory", self)
-        memory = QComboBox(self)
-        memoryvals = ["", "Mark", "OnceEver", "OncePerConv"]
-        memory.insertItems(len(memoryvals), memoryvals)
-        memory.currentTextChanged.connect(self.propertychanged)
-        l_memory.setBuddy(memory)
-        self.memory = memory
+        l_persistence = QLabel("Persistence", self)
+        persistence = QComboBox(self)
+        persvals = ["", "Mark", "OnceEver", "OncePerConv"]
+        persistence.insertItems(len(persvals), persvals)
+        persistence.currentTextChanged.connect(self.propertychanged)
+        l_persistence.setBuddy(persistence)
+        self.persistence = persistence
         
         l_comment = QLabel("Comment", self)
         comment = ParagraphEdit(self)
@@ -1136,7 +1136,7 @@ class PropertiesEditWidget (QWidget):
         self.comment = comment
         l_comment.setBuddy(comment)
         
-        layout.addRow(l_memory, memory)
+        layout.addRow(l_persistence, persistence)
         layout.addRow(l_comment, comment)
     
     @pyqtSlot(str)
@@ -1144,7 +1144,7 @@ class PropertiesEditWidget (QWidget):
         view = FlGlob.mainwindow.activeview()
         nodeobj = view.nodecontainer.nodes[nodeID]
         self.nodeobj = nodeobj
-        self.memory.setCurrentText(str(nodeobj.memory))
+        self.persistence.setCurrentText(str(nodeobj.persistence))
         
         commentdoc = view.nodedocs[nodeID]["comment"]
         self.comment.setDocument(commentdoc)
@@ -1152,10 +1152,10 @@ class PropertiesEditWidget (QWidget):
     
     @pyqtSlot()
     def propertychanged (self):
-        memory = self.memory.currentText()
+        persistence = self.persistence.currentText()
         comment = self.comment.toPlainText()
         
-        self.nodeobj.memory = memory
+        self.nodeobj.persistence = persistence
         self.nodeobj.comment = comment
 
 class SearchWidget (QWidget):

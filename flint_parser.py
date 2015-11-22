@@ -93,7 +93,7 @@ class ChartNode (object):
 		
 		self.optvars = node_dict['vars'] if 'vars' in node_dict else dict()
 		self.comment = node_dict['comment'] if 'comment' in node_dict else ""
-		self.memory = 'memory' in node_dict and node_dict['memory']
+		self.persistence = node_dict['persistence'] if 'persistence' in node_dict else ""
 	
 	def checkcond (self):
 		return self.condition.run()
@@ -136,8 +136,8 @@ class ChartNode (object):
 			node_dict['comment']   = self.comment
 		if self.nodebank != -1:
 			node_dict['nodebank']  = self.nodebank
-		if self.memory:
-			node_dict['memory']    = self.memory
+		if self.persistence:
+			node_dict['persistence']    = self.persistence
 		return node_dict
 
 class TextNode (ChartNode):
