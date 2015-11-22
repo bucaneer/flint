@@ -1101,9 +1101,17 @@ class PropertiesEditWidget (QWidget):
         memoryvals = ["", "Mark", "OnceEver", "OncePerConv"]
         memory.insertItems(len(memoryvals), memoryvals)
         memory.currentTextChanged.connect(self.propertychanged)
+        l_memory.setBuddy(memory)
         self.memory = memory
         
+        l_comment = QLabel("Comment", self)
+        comment = ParagraphEdit(self)
+        comment.textChanged.connect(self.propertychanged)
+        self.comment = comment
+        l_comment.setBuddy(comment)
+        
         layout.addRow(l_memory, memory)
+        layout.addRow(l_comment, comment)
     
     @pyqtSlot(str)
     def loadnode (self, nodeID):
@@ -1111,11 +1119,18 @@ class PropertiesEditWidget (QWidget):
         nodeobj = view.nodecontainer.nodes[nodeID]
         self.nodeobj = nodeobj
         self.memory.setCurrentText(str(nodeobj.memory))
+        
+        commentdoc = view.nodedocs[nodeID]["comment"]
+        self.comment.setDocument(commentdoc)
+        self.comment.moveCursor(QTextCursor.End)
     
     @pyqtSlot()
     def propertychanged (self):
         memory = self.memory.currentText()
+        comment = self.comment.toPlainText()
+        
         self.nodeobj.memory = memory
+        self.nodeobj.comment = comment
 
 class SearchWidget (QWidget):
     def __init__ (self, parent):
@@ -1225,11 +1240,17 @@ class TreeView (QGraphicsView):
         for nodeID, nodeobj in self.nodecontainer.nodes.items():
             if nodeID in self.nodedocs:
                 newnodedocs[nodeID] = self.nodedocs[nodeID]
-            elif isinstance(nodeobj, fp.TextNode):
-                textdoc = QTextDocument(self)
-                textdoc.setDocumentLayout(QPlainTextDocumentLayout(textdoc))
-                textdoc.setPlainText(nodeobj.text)
-                newnodedocs[nodeID] = {"text": textdoc}
+            else:
+                newnodedocs[nodeID] = dict()
+                if isinstance(nodeobj, fp.TextNode):
+                    textdoc = QTextDocument(self)
+                    textdoc.setDocumentLayout(QPlainTextDocumentLayout(textdoc))
+                    textdoc.setPlainText(nodeobj.text)
+                    newnodedocs[nodeID]["text"] = textdoc
+                commentdoc = QTextDocument(self)
+                commentdoc.setDocumentLayout(QPlainTextDocumentLayout(commentdoc))
+                commentdoc.setPlainText(nodeobj.comment)
+                newnodedocs[nodeID]["comment"] = commentdoc
         self.nodedocs = newnodedocs
         
     def updateview (self):
