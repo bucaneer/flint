@@ -353,6 +353,12 @@ class NodeItem(QGraphicsItem):
         self.entericon.setPos(self.exiticon.x()-self.style.itemmargin-enterpix.width(), self.style.itemmargin)
         self.fggroup.addToGroup(self.entericon)
         
+        blankpix = QPixmap("images/blank.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
+        self.persisticon = QGraphicsPixmapItemCond(blankpix, self,
+            lambda s,w: w is self.view.viewport() and not self.iscollapsed())
+        self.persisticon.setPos(self.entericon.x()-self.style.itemmargin-blankpix.width(), self.style.itemmargin)
+        self.fggroup.addToGroup(self.persisticon)
+        
         self.comment = QGraphicsTextItemCond(self,
             lambda s,w: w is self.view.viewport() and not self.iscollapsed())
         self.comment.setTextWidth(self.style.nodetextwidth)
@@ -363,8 +369,14 @@ class NodeItem(QGraphicsItem):
         self.graphgroup.addToGroup(self.fggroup)
         
         self.view.nodedocs[self.realid()]["comment"].contentsChanged.connect(self.updatecomment)
-        
+        self.updatepersistence()
         # Never call updatelayout() from here!
+    
+    @pyqtSlot()
+    def updatepersistence (self):
+        icons = {"Mark": "mark", "OncePerConv": "once", "OnceEver": "onceever", "": "blank"}
+        pixmap = QPixmap("images/%s.png" % icons[self.nodeobj.persistence]).scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
+        self.persisticon.setPixmap(pixmap)
     
     @pyqtSlot()
     def updatecomment (self):
@@ -1157,6 +1169,10 @@ class PropertiesEditWidget (QWidget):
         
         self.nodeobj.persistence = persistence
         self.nodeobj.comment = comment
+        
+        #HACK
+        if FlGlob.mainwindow.activeview().activenode is not None:
+            FlGlob.mainwindow.activeview().activenode.updatepersistence()
 
 class SearchWidget (QWidget):
     def __init__ (self, parent):
