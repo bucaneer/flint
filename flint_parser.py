@@ -69,7 +69,7 @@ class ChartNode (object):
 		
 		if "links" in node_dict:
 			for link in node_dict['links']:
-				self.addlink(str(link['toID']))
+				self.addlink(str(link))
 		
 		if 'condition' in node_dict:
 			self.condition = ConditionCall(node_dict['condition'])
@@ -123,7 +123,7 @@ class ChartNode (object):
 	def todict (self):
 		node_dict = { "type": self.typename }
 		if self.linkIDs:
-			node_dict["links"]     = [{'toID':i} for i in self.linkIDs]
+			node_dict["links"]     = self.linkIDs
 		if self.hascond():
 			node_dict['condition'] = self.condition.todict()
 		if self.enterscripts:
