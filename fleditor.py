@@ -302,6 +302,7 @@ class NodeItem(QGraphicsItem):
         nopen = QPen(0)
         
         self.graphgroup = QGraphicsItemGroup(self)
+        self.fggroup = QGraphicsItemGroup(self)
         
         self.shadowbox = QGraphicsRectItem(self)
         self.shadowbox.setBrush(FlPalette.dark)
@@ -332,25 +333,66 @@ class NodeItem(QGraphicsItem):
         self.nodelabel.setFont(self.style.boldfont)
         self.nodelabel.setText(self.label % self.realid())
         self.nodelabel.setPos(self.style.itemmargin, self.style.itemmargin)
-        self.graphgroup.addToGroup(self.nodelabel)
+        self.fggroup.addToGroup(self.nodelabel)
         
         condpix = QPixmap("images/key.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
         self.condicon = QGraphicsPixmapItemCond(condpix, self,
             lambda s,w: w is self.view.viewport() and self.nodeobj.hascond() and not self.iscollapsed())
         self.condicon.setPos(self.style.nodetextwidth-condpix.width(), self.style.itemmargin)
-        self.graphgroup.addToGroup(self.condicon)
+        self.fggroup.addToGroup(self.condicon)
         
         exitpix = QPixmap("images/script-exit.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
         self.exiticon = QGraphicsPixmapItemCond(exitpix, self,
             lambda s,w: w is self.view.viewport() and self.nodeobj.hasexitscripts() and not self.iscollapsed())
         self.exiticon.setPos(self.condicon.x()-self.style.itemmargin-exitpix.width(), self.style.itemmargin)
-        self.graphgroup.addToGroup(self.exiticon)
+        self.fggroup.addToGroup(self.exiticon)
         
         enterpix = QPixmap("images/script-enter.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
         self.entericon = QGraphicsPixmapItemCond(enterpix, self,
             lambda s,w: w is self.view.viewport() and self.nodeobj.hasenterscripts() and not self.iscollapsed())
         self.entericon.setPos(self.exiticon.x()-self.style.itemmargin-enterpix.width(), self.style.itemmargin)
-        self.graphgroup.addToGroup(self.entericon)
+        self.fggroup.addToGroup(self.entericon)
+        
+        self.comment = QGraphicsTextItemCond(self,
+            lambda s,w: w is self.view.viewport() and not self.iscollapsed())
+        self.comment.setTextWidth(self.style.nodetextwidth)
+        self.comment.setDefaultTextColor(FlPalette.light)
+        self.comment.setPos(0, self.nodelabel.y()+self.nodelabel.boundingRect().height()+self.style.itemmargin)
+        self.fggroup.addToGroup(self.comment)
+        
+        self.graphgroup.addToGroup(self.fggroup)
+        
+        self.view.nodedocs[self.realid()]["comment"].contentsChanged.connect(self.updatecomment)
+        
+        # Never call updatelayout() from here!
+    
+    @pyqtSlot()
+    def updatecomment (self):
+        self.fggroup.removeFromGroup(self.comment)
+        contents = self.view.nodedocs[self.realid()]["comment"].toPlainText()
+        if not contents:
+            self.comment.hide()
+        else:
+            self.comment.show()
+            self.comment.setPlainText(contents)
+            self.fggroup.addToGroup(self.comment)
+        self.updatelayout()
+    
+    def updatelayout (self):
+        if self.iscollapsed():
+            rect = self.nodelabel.mapRectToParent(self.nodelabel.boundingRect())
+        else:
+            rect = self.fggroup.boundingRect()
+        mainrect = rect.marginsAdded(QMarginsF(*[self.style.nodemargin]*4))
+        self.mainbox.setRect(mainrect)
+        self.shadowbox.setRect(mainrect)
+        self.selectbox.setRect(mainrect.marginsAdded(QMarginsF(*[self.style.selectmargin]*4)))
+        activerect = mainrect.marginsAdded(QMarginsF(*[self.style.activemargin]*4))
+        self.activebox.setRect(activerect)
+        self.graphgroup.setPos(-activerect.width()//2-activerect.x(), -activerect.height()//2-activerect.y())
+        self.prepareGeometryChange()
+        self.rect = self.graphgroup.mapRectToParent(self.activebox.boundingRect())
+        self.nodebank.updatelayout()
     
     def mouseDoubleClickEvent (self, event):
         super().mouseDoubleClickEvent(event)
@@ -375,23 +417,7 @@ class RootNodeItem (NodeItem):
     
     def graphicsetup (self):
         super().graphicsetup()
-        self.updatelayout()
-    
-    def updatelayout (self):
-        if self.iscollapsed():
-            labelrect = self.nodelabel.mapRectToParent(self.nodelabel.boundingRect())
-        else:
-            labelrect = self.nodelabel.mapRectToParent(self.nodelabel.boundingRect().united(self.condicon.mapRectToParent(self.condicon.boundingRect())))
-        mainrect = labelrect.marginsAdded(QMarginsF(*[self.style.nodemargin]*4))
-        self.mainbox.setRect(mainrect)
-        self.shadowbox.setRect(mainrect)
-        self.selectbox.setRect(mainrect.marginsAdded(QMarginsF(*[self.style.selectmargin]*4)))
-        activerect = mainrect.marginsAdded(QMarginsF(*[self.style.activemargin]*4))
-        self.activebox.setRect(activerect)
-        self.graphgroup.setPos(-activerect.width()//2-activerect.x(), -activerect.height()//2-activerect.y())
-        self.prepareGeometryChange()
-        self.rect = self.graphgroup.mapRectToParent(self.activebox.boundingRect())
-        self.nodebank.updatelayout()
+        self.updatecomment()
     
     def contextMenuEvent (self, event):
         menu = QMenu()
@@ -420,52 +446,43 @@ class TextNodeItem (NodeItem):
             lambda s,w: w is viewport and not self.iscollapsed())
         self.textbox.setBrush(lightbrush)
         self.textbox.setPen(nopen)
-        self.graphgroup.addToGroup(self.textbox)
+        self.fggroup.addToGroup(self.textbox)
         
         self.nodespeaker = QGraphicsSimpleTextItemCond(self,
             lambda s,w: w is viewport and not self.iscollapsed())
         self.nodespeaker.setBrush(lightbrush)
         self.nodespeaker.setText(self.nodeobj.speaker)
         self.nodespeaker.setPos(self.style.itemmargin, self.nodelabel.y()+self.nodelabel.boundingRect().height()+self.style.itemmargin*2)
-        self.graphgroup.addToGroup(self.nodespeaker)
+        self.fggroup.addToGroup(self.nodespeaker)
         
         self.nodetext = QGraphicsTextItemCond(self,
             lambda s,w: w is viewport and not self.iscollapsed())
         self.nodetext.setTextWidth(self.style.nodetextwidth)
         self.nodetext.setDefaultTextColor(FlPalette.dark)
         self.nodetext.setPos(0, self.nodespeaker.y()+self.nodespeaker.boundingRect().height()+self.style.itemmargin)
-        self.graphgroup.addToGroup(self.nodetext)
+        self.fggroup.addToGroup(self.nodetext)
         
-        self.view.nodedocs[self.realid()]["text"].contentsChanged.connect(self.updatelayout)
-        self.updatelayout()
+        self.view.nodedocs[self.realid()]["text"].contentsChanged.connect(self.updatetext)
+        self.updatecomment()
+        self.updatetext()
     
     @pyqtSlot()
-    def updatelayout (self, force=False):
-        if self.iscollapsed():
-            if self.collapselayout and not force:
-                return
-            else:
-                textrect = QRectF()
-                self.collapselayout = True
-        else:
-            ndtxt = self.nodetext
-            ndtxt.setPlainText(self.view.nodedocs[self.realid()]["text"].toPlainText())
-            textrect = ndtxt.mapRectToParent(ndtxt.boundingRect())
-            textheight = textrect.height()
-            if textheight == self.textheight and not force:
-                return
-            self.textheight = textheight
-            self.textbox.setRect(textrect)
-        mainrect = textrect.united(self.nodelabel.mapRectToParent(self.nodelabel.boundingRect())).marginsAdded(QMarginsF(*[self.style.nodemargin]*4))
-        self.mainbox.setRect(mainrect)
-        self.shadowbox.setRect(mainrect)
-        self.selectbox.setRect(mainrect.marginsAdded(QMarginsF(*[self.style.selectmargin]*4)))
-        activerect = mainrect.marginsAdded(QMarginsF(*[self.style.activemargin]*4))
-        self.activebox.setRect(activerect)
-        self.graphgroup.setPos(-activerect.width()//2-activerect.x(), -activerect.height()//2-activerect.y())
-        self.prepareGeometryChange()
-        self.rect = self.graphgroup.mapRectToParent(self.activebox.boundingRect())
-        self.nodebank.updatelayout()
+    def updatetext (self):
+        ndtxt = self.nodetext
+        ndtxt.setPlainText(self.view.nodedocs[self.realid()]["text"].toPlainText())
+        textrect = ndtxt.mapRectToParent(ndtxt.boundingRect())
+        self.textbox.setRect(textrect)
+        self.comment.setY(textrect.bottom()+self.style.itemmargin)
+        self.fggroup.removeFromGroup(self.textbox)
+        self.fggroup.addToGroup(self.textbox)
+        self.fggroup.removeFromGroup(ndtxt)
+        self.fggroup.addToGroup(ndtxt)
+        
+        textheight = textrect.height()
+        if textheight == self.textheight:
+            return
+        self.textheight = textheight
+        self.updatelayout()
     
     def contextMenuEvent (self, event):
         menu = QMenu()
@@ -505,8 +522,8 @@ class BankNodeItem (NodeItem):
             subnode = view.newitem(view.nodecontainer.nodes[subnodeID], self, ghost)
             self.subnodes.append(subnode)
             subnode.setX(self.x())
-            subnode.updatelayout(force=True)
-        self.updatelayout()
+        self.updatecomment()
+        self.updatecenterbox()
     
     def graphicsetup (self):
         super().graphicsetup()
@@ -519,30 +536,39 @@ class BankNodeItem (NodeItem):
         self.centerbox.setBrush(darkbrush)
         self.centerbox.setPen(nopen)
         self.centerbox.setPos(0, self.nodelabel.y()+self.nodelabel.boundingRect().height()+self.style.itemmargin*2)
-        self.graphgroup.addToGroup(self.centerbox)
+        self.fggroup.addToGroup(self.centerbox)
+    
+    def updatecenterbox (self):
+        verticalpos = self.centerbox.y()
+        maxwidth = 0
+        for subnode in self.subnodes:
+            noderect = subnode.boundingRect()
+            nodeheight = noderect.height()
+            nodewidth = noderect.width()
+            subnode.show()
+            subnode.yoffset = self.mapToScene(0,verticalpos + nodeheight/2+self.style.activemargin).y()-self.y_bottom()
+            verticalpos += nodeheight
+            maxwidth = max(maxwidth, nodewidth)
+        centerrect = self.centerbox.rect()
+        centerrect.setWidth(maxwidth)
+        centerrect.setHeight(verticalpos-self.centerbox.y())
+        self.centerbox.setRect(centerrect)
+        centerrect = self.centerbox.mapRectToParent(centerrect)
+        
+        self.comment.setY(centerrect.bottom()+self.style.itemmargin)
+        
+        self.fggroup.removeFromGroup(self.centerbox)
+        self.fggroup.addToGroup(self.centerbox)
     
     def updatelayout (self):
         if self.iscollapsed():
             for subnode in self.subnodes:
                 subnode.hide()
-            centerrect = QRectF()
+            rect = self.nodelabel.mapRectToParent(self.nodelabel.boundingRect())
         else:
-            verticalpos = self.centerbox.y()
-            maxwidth = 0
-            for subnode in self.subnodes:
-                noderect = subnode.boundingRect()
-                nodeheight = noderect.height()
-                nodewidth = noderect.width()
-                subnode.show()
-                subnode.yoffset = self.mapToScene(0,verticalpos + nodeheight/2+self.style.activemargin).y()-self.y_bottom()
-                verticalpos += nodeheight
-                maxwidth = max(maxwidth, nodewidth)
-            centerrect = self.centerbox.rect()
-            centerrect.setWidth(maxwidth)
-            centerrect.setHeight(verticalpos-self.centerbox.y())
-            self.centerbox.setRect(centerrect)
-            centerrect = self.centerbox.mapRectToParent(centerrect)
-        mainrect = centerrect.united(self.nodelabel.mapRectToParent(self.nodelabel.boundingRect())).marginsAdded(QMarginsF(*[self.style.nodemargin]*4))
+            self.updatecenterbox()
+            rect = self.fggroup.boundingRect()
+        mainrect = rect.marginsAdded(QMarginsF(*[self.style.nodemargin]*4))
         self.mainbox.setRect(mainrect)
         self.shadowbox.setRect(mainrect)
         self.selectbox.setRect(mainrect.marginsAdded(QMarginsF(*[self.style.selectmargin]*4)))
