@@ -1622,6 +1622,7 @@ class EditorWindow (QMainWindow):
         tabs.setTabBarAutoHide(True)
         tabs.tabCloseRequested.connect(self.closetab)
         tabs.tabBarDoubleClicked.connect(self.nametab)
+        tabs.currentChanged.connect(self.filteractions)
         self.tabs = tabs                        
         
         mapview = MapView(self)
@@ -1671,6 +1672,8 @@ class EditorWindow (QMainWindow):
         self.tabifyDockWidget(conddock, onenterdock)
         self.tabifyDockWidget(onenterdock, onexitdock)
         self.tabifyDockWidget(onexitdock, propdock)
+        
+        self.filteractions(-1)
     
     def activeview (self):
         return self.tabs.currentWidget()
@@ -1729,6 +1732,14 @@ class EditorWindow (QMainWindow):
             [QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_B)], ["edit-paste"], "Paste cloned node as subnode")
         self.actions["parentswap"] = self.createaction("S&wap with Parent", self.parentswap,
             [QKeySequence(Qt.ShiftModifier+Qt.Key_Left)], ["go-left"], "Swap places with parent node")
+    
+    @pyqtSlot(int)
+    def filteractions (self, index):
+        if index == -1:
+            defaultactions = ("openfile", "newtree")
+            for name, action in self.actions.items():
+                if name not in defaultactions:
+                    action.setEnabled(False)
     
     def createaction (self, text, slot=None, shortcuts=None, icons=None,
                      tip=None, checkable=False):
@@ -1886,7 +1897,10 @@ class EditorWindow (QMainWindow):
     
     @pyqtSlot()
     def save (self, newfile=False):
-        nodecont = self.activeview().nodecontainer
+        view = self.activeview()
+        if view is None:
+            return
+        nodecont = view.nodecontainer
         if nodecont.filename == "" or newfile:
             filename = QFileDialog.getSaveFileName(self, "Save as...", 
                 os.path.join(os.getcwd(), (nodecont.name or "Untitled")+".json"),
@@ -1901,6 +1915,8 @@ class EditorWindow (QMainWindow):
     @pyqtSlot()
     def closefile (self):
         view = self.activeview()
+        if view is None:
+            return
         index = self.tabs.indexOf(view)
         self.closetab(index)
     
