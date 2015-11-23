@@ -1206,6 +1206,8 @@ class MapView (QGraphicsView):
         self.scenerect = self.viewrect = QRectF()
     
     def mousePressEvent (self, event):
+        if self.treeview is None:
+            return
         pos = event.pos()
         adjpos = self.mapToScene(pos)
         self.treeview.centerOn(adjpos)
@@ -1223,6 +1225,7 @@ class MapView (QGraphicsView):
         window = FlGlob.mainwindow
         activeview = window.activeview()
         if activeview is None:
+            self.treeview = None
             return
         if activeview is not self.treeview:
             self.treeview = activeview
