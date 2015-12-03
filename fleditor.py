@@ -1432,7 +1432,7 @@ class TreeView (QGraphicsView):
             self.selectednode.setselected(True)
             self.shownode(self.selectednode)
             if signal:
-                self.selectedChanged.emit(self.selectednode.realid())
+                self.selectedChanged.emit(self.selectednode.id())
     
     def setactivenode (self, nodeitem, signal=True):
         if nodeitem is not None:
@@ -1527,7 +1527,7 @@ class TreeView (QGraphicsView):
     def filteractions (self, nodeID=""):
         if nodeID == "":
             nodeID = self.selectednode.id()
-        nodeitem = self.itembyID(nodeID)
+        nodeitem = self.nodeitems[nodeID]
         genericactions = ["zoomin", "zoomout", "zoomorig", "gotoactive",
             "collapse", "openfile", "save", "saveas", "newtree", "close"]
         if isinstance(nodeitem, TextNodeItem):
