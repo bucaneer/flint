@@ -182,7 +182,7 @@ class NodeItem(QGraphicsItem):
         return self.ghost
     
     def realnode (self):
-        return self.view.nodedict[self.nodeobj.ID]
+        return self.view.itembyID(self.nodeobj.ID)
     
     def isactive (self):
         return self.view.activenode is self
@@ -1309,25 +1309,26 @@ class TreeView (QGraphicsView):
         self.constructed = False
         self.updatedocs()
         self.scene().clear()
-        self.nodedict = dict()
+        self.nodeitems = dict()
+        self.itemindex = dict()
         self.viewframe = FrameItem(view=self)
         self.scene().addItem(self.viewframe)
         self.constructed = self.constructgraph()
         self.updatelayout()
         
-        if activeID and activeID in self.nodedict:
-            self.setactivenode(self.nodedict[activeID], signal=False)
+        if activeID and activeID in self.itemindex:
+            self.setactivenode(self.itembyID(activeID), signal=False)
         else:
             self.setactivenode(None)
         
         baseID = ""
         while selectedID:
             swappedID = "<-".join([baseID, selectedID])
-            if baseID and swappedID in self.nodedict:
-                self.setselectednode(self.nodedict[swappedID], signal=False)
+            if baseID and swappedID in self.nodeitems:
+                self.setselectednode(self.nodeitems[swappedID], signal=False)
                 break
-            elif selectedID in self.nodedict:
-                self.setselectednode(self.nodedict[selectedID])
+            elif selectedID in self.nodeitems:
+                self.setselectednode(self.nodeitems[selectedID])
                 break
             split = selectedID.split("<-", 1)
             selectedID = split[1]
@@ -1361,28 +1362,35 @@ class TreeView (QGraphicsView):
         edgeitem = EdgeItem(nodeitem, view=self)
         self.scene().addItem(edgeitem)
         self.scene().addItem(nodeitem)
-        defaultid = "<-".join([nodeobj.ID, refid])
-        if isghost:
-            graphid = defaultid
-        elif nodeobj.ID in self.nodedict:
-            oldnode = self.nodedict[nodeobj.ID]
-            oldnode.setghost(True)
-            self.nodedict[oldnode.id()] = oldnode
-            nodeitem.referrers = oldnode.referrers
-            oldnode.referrers = []
-            graphid = nodeobj.ID
+        
+        if nodeobj.ID in self.itemindex:
+            if not isghost:
+                oldnode = self.itemindex[nodeobj.ID][0]
+                oldnode.setghost(True)
+                nodeitem.referrers = oldnode.referrers
+                oldnode.referrers = []
+                self.itemindex[nodeobj.ID].insert(0, nodeitem)
+            else:
+                self.itemindex[nodeobj.ID].append(nodeitem)
         else:
-            graphid = nodeobj.ID
-        self.nodedict[graphid] = nodeitem
-        self.nodedict[defaultid] = nodeitem
+            self.itemindex[nodeobj.ID] = [nodeitem]
+        
+        idstring = "<-".join([nodeobj.ID, refid])
+        self.nodeitems[idstring] = nodeitem
         
         if refid:
-            self.nodedict[nodeobj.ID].addreferrer(refid)
+            self.itembyID(nodeobj.ID).addreferrer(refid)
         
         return nodeitem
     
+    def itembyID (self, nodeID):
+        if nodeID in self.itemindex:
+            return self.itemindex[nodeID][0]
+        else:
+            return #EXCEPTION
+    
     def treeroot (self):
-        return self.nodedict["0"]
+        return self.itembyID("0")
     
     def updatelayout (self):
         if not self.constructed:
@@ -1455,7 +1463,7 @@ class TreeView (QGraphicsView):
             newobj = self.nodecontainer.newnode(nodedict, refID=selectedid)
         newid = newobj.ID
         self.updateview()
-        self.shownode(self.nodedict[newid])
+        self.shownode(self.itembyID(newid))
     
     def unlink (self, inherit=False):
         selID = self.selectednode.realid()
@@ -1519,7 +1527,7 @@ class TreeView (QGraphicsView):
     def filteractions (self, nodeID=""):
         if nodeID == "":
             nodeID = self.selectednode.id()
-        nodeitem = self.nodedict[nodeID]
+        nodeitem = self.itembyID(nodeID)
         genericactions = ["zoomin", "zoomout", "zoomorig", "gotoactive",
             "collapse", "openfile", "save", "saveas", "newtree", "close"]
         if isinstance(nodeitem, TextNodeItem):
