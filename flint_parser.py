@@ -86,14 +86,16 @@ class ChartNode (object):
 		else:
 			self.exitscripts = []
 			
-		if 'nodebank' in node_dict:
-			self.nodebank = node_dict['nodebank']
-		else:
-			self.nodebank = -1
-		
-		self.optvars = node_dict['vars'] if 'vars' in node_dict else dict()
-		self.comment = node_dict['comment'] if 'comment' in node_dict else ""
-		self.persistence = node_dict['persistence'] if 'persistence' in node_dict else ""
+		self.nodebank    = self.fromdict(node_dict, "nodebank",    -1)		
+		self.text        = self.fromdict(node_dict, "text",        "")
+		self.speaker     = self.fromdict(node_dict, "speaker",     "")		
+		self.optvars     = self.fromdict(node_dict, "vars",    dict())
+		self.comment     = self.fromdict(node_dict, "comment",     "")
+		self.persistence = self.fromdict(node_dict, "persistence", "")
+		self.subnodes    = self.fromdict(node_dict, "subnodes",    [])
+	
+	def fromdict (self, nodedict, key, default=False):
+		return nodedict[key] if key in nodedict else default
 	
 	def checkcond (self):
 		return self.condition.run()
@@ -141,11 +143,6 @@ class ChartNode (object):
 		return node_dict
 
 class TextNode (ChartNode):
-	def __init__ (self, container, node_dict, nodeID):
-		super().__init__(container, node_dict, nodeID)
-		self.text = node_dict['text'] if 'text' in node_dict else ""
-		self.speaker = node_dict['speaker'] if 'speaker' in node_dict else ""
-	
 	def todict (self):
 		node_dict = super().todict()
 		node_dict.update({ "text": self.text, "speaker": self.speaker })
@@ -169,13 +166,6 @@ class ResponseNode (TextNode):
 	pass
 
 class BankNode (ChartNode):
-	def __init__ (self, container, node_dict, nodeID):
-		super().__init__(container, node_dict, nodeID)
-		self.subnodes = []
-		if 'subnodes' in node_dict:
-			for subnode in node_dict['subnodes']:
-				self.subnodes.append(subnode)
-	
 	def todict (self):
 		node_dict = super().todict()
 		node_dict.update({"subnodes": self.subnodes})
@@ -194,12 +184,12 @@ class NodesContainer (object):
 		self.nodes = dict()
 		for nodeID, nodedict in nodes_dict['nodes'].items():
 			nodeID = str(nodeID)
-			self.newnode(nodedict, nodeID, traverse=False)
+			self.newnode(nodedict, nodeID)
 	
 	def getnode (self, ID):
 		return self.nodes[ID]
 	
-	def newnode (self, node_dict, newID=False, refID=False, bankID=False, traverse=True):
+	def newnode (self, node_dict, newID=False, refID=False, bankID=False):
 		if not newID:
 			newID = self.nextID
 			self.nextID = str(int(self.nextID) + 1)
