@@ -1170,9 +1170,9 @@ class PropertiesEditWidget (QWidget):
         self.nodeobj.persistence = persistence
         self.nodeobj.comment = comment
         
-        #HACK
-        if FlGlob.mainwindow.activeview().activenode is not None:
-            FlGlob.mainwindow.activeview().activenode.updatepersistence()
+        view = FlGlob.mainwindow.activeview()
+        for nodeitem in view.itemindex[self.nodeobj.ID]:
+            nodeitem.updatepersistence()
 
 class SearchWidget (QWidget):
     def __init__ (self, parent):
