@@ -1017,18 +1017,12 @@ class ConditionCallWidget (CallWidget):
             return "()"
         else:
             return "(%s)" % fullname
-    
-    def elidestring (self, string, length):
-        if len(string) <= length:
-            return string
-        else:
-            return string[:length-1]+"…"
-    
+        
     @pyqtSlot()
     def newtitle (self):
         fullname = self.fullname(self.callobj, recursive=True)
         shortname = self.fullname(self.callobj)
-        self.setTitle(self.elidestring(shortname,30))
+        self.setTitle(elidestring(shortname,30))
         self.setToolTip(fullname)
         self.changed.emit()
     
@@ -1173,6 +1167,53 @@ class PropertiesEditWidget (QWidget):
         view = FlGlob.mainwindow.activeview()
         for nodeitem in view.itemindex[self.nodeobj.ID]:
             nodeitem.updatepersistence()
+
+class NodeListItem (QListWidgetItem):
+    IDRole = Qt.UserRole + 1
+    
+    def __lt__ (self, other):
+        return self.data(self.IDRole) < other.data(self.IDRole)
+
+class NodeListWidget (QWidget):
+    def __init__ (self, parent):
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        self.nodelist = QListWidget(self)
+        self.nodelist.setSortingEnabled(True)
+        self.nodelist.setIconSize(QSize(*[FlGlob.mainwindow.style.boldheight]*2))
+        layout.addWidget(self.nodelist)
+    
+    @pyqtSlot()
+    def populatelist (self):
+        self.nodelist.clear()
+        view = FlGlob.mainwindow.activeview()
+        if view is None:
+            return
+        nodecont = view.nodecontainer.nodes
+        for nodeID, nodeobj in nodecont.items():
+            self.nodelist.addItem(self.listitem(view, nodeobj, nodeID))
+    
+    def listitem (self, view, nodeobj, nodeID):
+        typename = nodeobj.typename
+        if   typename == "root":
+            descr = ""
+        elif typename == "bank":
+            descr = ""
+        elif typename == "talk":
+            descr = "[%s]" % elidestring(nodeobj.text, 30)
+        elif typename == "response":
+            descr = "[%s]" % elidestring(nodeobj.text, 30)
+        else:
+            descr = ""
+        
+        label = "%s: %s %s" % (nodeID, typename, descr) 
+        if nodeID not in view.itemindex:
+            icon = QIcon.fromTheme("user-trash")
+        else:
+            icon = QIcon.fromTheme("text-x-generic")
+        item = NodeListItem(icon, label)
+        item.setData(NodeListItem.IDRole, int(nodeID))        
+        return item
 
 class SearchWidget (QWidget):
     def __init__ (self, parent):
@@ -1675,6 +1716,13 @@ class EditorWindow (QMainWindow):
         propdock.setEnabled(False)
         self.propdock = propdock
         
+        nodelist = NodeListWidget(self)
+        self.tabs.currentChanged.connect(nodelist.populatelist)
+        listdock = QDockWidget("Node List", self)
+        listdock.setWidget(nodelist)
+        listdock.hide()
+        self.listdock = listdock
+        
         self.setCentralWidget(tabs)
         self.setTabPosition(Qt.AllDockWidgetAreas, QTabWidget.North)
         self.addDockWidget(Qt.RightDockWidgetArea, mapdock)
@@ -1684,6 +1732,8 @@ class EditorWindow (QMainWindow):
         self.tabifyDockWidget(onenterdock, onexitdock)
         self.tabifyDockWidget(onexitdock, propdock)
         textdock.raise_()
+        
+        self.addDockWidget(Qt.LeftDockWidgetArea, listdock)
         
         self.filteractions(-1)
     
@@ -2058,6 +2108,11 @@ class EditorWindow (QMainWindow):
     def collapse (self):
         self.activeview().collapse()
 
+def elidestring (string, length):
+    if len(string) <= length:
+        return string
+    else:
+        return string[:length-1]+"…"
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
