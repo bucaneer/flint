@@ -1683,6 +1683,7 @@ class EditorWindow (QMainWindow):
         self.tabifyDockWidget(conddock, onenterdock)
         self.tabifyDockWidget(onenterdock, onexitdock)
         self.tabifyDockWidget(onexitdock, propdock)
+        textdock.raise_()
         
         self.filteractions(-1)
     
