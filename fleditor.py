@@ -1185,16 +1185,28 @@ class NodeListWidget (QWidget):
         self.nodelist.currentItemChanged.connect(self.selectnode)
         self.nodelist.itemActivated.connect(self.activatenode)
         layout.addWidget(self.nodelist)
+        self.view = None
     
     @pyqtSlot()
     def populatelist (self):
+        self.index = dict()
         self.nodelist.clear()
-        view = FlGlob.mainwindow.activeview
-        if view is None:
+        self.view = FlGlob.mainwindow.activeview
+        if self.view is None:
             return
-        nodecont = view.nodecontainer.nodes
+        nodecont = self.view.nodecontainer.nodes
         for nodeID, nodeobj in nodecont.items():
-            self.nodelist.addItem(self.listitem(view, nodeobj, nodeID))
+            listitem = self.listitem(self.view, nodeobj, nodeID)
+            self.nodelist.addItem(listitem)
+            self.index[nodeID] = listitem
+        if self.view.selectednode is not None:
+            self.selectbyID(self.view.selectednode.realid())
+    
+    @pyqtSlot(str)
+    def selectbyID(self, nodeID):
+        if FlGlob.mainwindow.activeview is not self.view:
+            return
+        self.nodelist.setCurrentItem(self.index[nodeID])
     
     def listitem (self, view, nodeobj, nodeID):
         typename = nodeobj.typename
@@ -1722,6 +1734,7 @@ class EditorWindow (QMainWindow):
         nodelist = NodeListWidget(self)
         self.viewChanged.connect(nodelist.populatelist)
         self.viewUpdated.connect(nodelist.populatelist)
+        self.selectedChanged.connect(nodelist.selectbyID)
         listdock = QDockWidget("Node List", self)
         listdock.setWidget(nodelist)
         listdock.hide()
