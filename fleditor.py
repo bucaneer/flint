@@ -1370,6 +1370,7 @@ class TreeView (QGraphicsView):
         self.scene().addItem(self.viewframe)
         self.constructed = self.constructgraph()
         self.updatelayout()
+        FlGlob.mainwindow.viewUpdated.emit()
         
         if activeID and activeID in self.itemindex:
             self.setactivenode(self.itembyID(activeID))
@@ -1654,6 +1655,7 @@ class EditorWindow (QMainWindow):
     activenode = ""
     selectednode = ""
     viewChanged = pyqtSignal()
+    viewUpdated = pyqtSignal()
     activeChanged = pyqtSignal(str)
     selectedChanged = pyqtSignal(str)
     
@@ -1719,6 +1721,7 @@ class EditorWindow (QMainWindow):
         
         nodelist = NodeListWidget(self)
         self.viewChanged.connect(nodelist.populatelist)
+        self.viewUpdated.connect(nodelist.populatelist)
         listdock = QDockWidget("Node List", self)
         listdock.setWidget(nodelist)
         listdock.hide()
