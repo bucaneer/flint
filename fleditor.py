@@ -1169,6 +1169,30 @@ class PropertiesEditWidget (QWidget):
             for nodeitem in view.itemindex[self.nodeobj.ID]:
                 nodeitem.updatepersistence()
 
+class SearchWidget (QWidget):
+    searched = pyqtSignal()
+    
+    def __init__ (self, parent):
+        super().__init__(parent)
+        layout = QHBoxLayout(self)
+        self.inputline = QLineEdit(self)
+        self.inputline.editingFinished.connect(self.search)
+        self.inputline.setPlaceholderText("Search")
+        searchbutton = QPushButton(self)
+        searchbutton.setIcon(QIcon.fromTheme("edit-find"))
+        searchbutton.setToolTip("Search")
+        searchbutton.clicked.connect(self.search)
+        
+        layout.addWidget(self.inputline)
+        layout.addWidget(searchbutton)
+    
+    def search (self):
+        query = self.inputline.text().casefold()
+        view = self.parent().view
+        if view is not None:
+            view.search(query)
+            self.searched.emit()
+
 class NodeListItem (QListWidgetItem):
     IDRole = Qt.UserRole + 1
     
@@ -1178,24 +1202,44 @@ class NodeListItem (QListWidgetItem):
 class NodeListWidget (QWidget):
     def __init__ (self, parent):
         super().__init__(parent)
-        layout = QHBoxLayout(self)
+        self.search = SearchWidget(self)
+        self.search.searched.connect(self.populatelist)
+        
         self.nodelist = QListWidget(self)
         self.nodelist.setSortingEnabled(True)
         self.nodelist.setIconSize(QSize(*[FlGlob.mainwindow.style.boldheight]*2))
         self.nodelist.currentItemChanged.connect(self.selectnode)
         self.nodelist.itemActivated.connect(self.activatenode)
+        self.nodelist.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.search)
         layout.addWidget(self.nodelist)
         self.view = None
+        self.active = False
+        self.setEnabled(False)
+    
+    @pyqtSlot()
+    def setview (self):
+        self.view = FlGlob.mainwindow.activeview
+        if self.view is None:
+            self.setEnabled(False)
+            self.active = False
+        else:
+            self.setEnabled(True)
+            self.active = True
+        self.populatelist()
     
     @pyqtSlot()
     def populatelist (self):
         self.index = dict()
         self.nodelist.clear()
-        self.view = FlGlob.mainwindow.activeview
-        if self.view is None:
+        if not self.active:
             return
         nodecont = self.view.nodecontainer.nodes
         for nodeID, nodeobj in nodecont.items():
+            if self.view.hits is not None and nodeID not in self.view.hits:
+                continue
             listitem = self.listitem(self.view, nodeobj, nodeID)
             self.nodelist.addItem(listitem)
             self.index[nodeID] = listitem
@@ -1204,9 +1248,10 @@ class NodeListWidget (QWidget):
     
     @pyqtSlot(str)
     def selectbyID(self, nodeID):
-        if FlGlob.mainwindow.activeview is not self.view:
+        if not self.active:
             return
-        self.nodelist.setCurrentItem(self.index[nodeID])
+        if nodeID in self.index:
+            self.nodelist.setCurrentItem(self.index[nodeID])
     
     def listitem (self, view, nodeobj, nodeID):
         typename = nodeobj.typename
@@ -1245,29 +1290,6 @@ class NodeListWidget (QWidget):
         view = window.activeview
         nodeID = str(listitem.data(listitem.IDRole))
         window.setactivenode(view, nodeID)
-
-class SearchWidget (QWidget):
-    def __init__ (self, parent):
-        super().__init__(parent)
-        layout = QHBoxLayout(self)
-        self.inputline = QLineEdit(self)
-        self.inputline.editingFinished.connect(self.search)
-        self.inputline.setPlaceholderText("Search")
-        searchbutton = QPushButton(self)
-        searchbutton.setIcon(QIcon.fromTheme("edit-find"))
-        searchbutton.setToolTip("Search")
-        searchbutton.clicked.connect(self.search)
-        self.setMaximumWidth(200)
-        
-        layout.addWidget(self.inputline)
-        layout.addWidget(searchbutton)
-        
-        self.setEnabled(False)
-    
-    def search (self):
-        query = self.inputline.text().casefold()
-        view = FlGlob.mainwindow.activeview
-        view.search(query)
 
 class MapView (QGraphicsView):
     def __init__ (self, parent):
@@ -1325,7 +1347,7 @@ class TreeView (QGraphicsView):
         self.activenode = None
         self.selectednode = None
         self.collapsednodes = []
-        self.hits = []
+        self.hits = None
         
         self.setOptimizationFlags(QGraphicsView.DontAdjustForAntialiasing | QGraphicsView.DontSavePainterState)
         self.setDragMode(QGraphicsView.ScrollHandDrag)
@@ -1618,12 +1640,12 @@ class TreeView (QGraphicsView):
     
     def search (self, query):
         if not query:
-            self.hits = []
+            self.hits = None
         else:
             hits = []
-            for nodeobj in self.nodecontainer.nodes.values():
+            for nodeID, nodeobj in self.nodecontainer.nodes.items():
                 if query in nodeobj.text.casefold():
-                    hits.append(nodeobj)
+                    hits.append(nodeID)
             self.hits = hits
     
     def wheelEvent (self, event):
@@ -1732,7 +1754,7 @@ class EditorWindow (QMainWindow):
         self.propdock = propdock
         
         nodelist = NodeListWidget(self)
-        self.viewChanged.connect(nodelist.populatelist)
+        self.viewChanged.connect(nodelist.setview)
         self.viewUpdated.connect(nodelist.populatelist)
         self.selectedChanged.connect(nodelist.selectbyID)
         listdock = QDockWidget("Node List", self)
@@ -1959,11 +1981,6 @@ class EditorWindow (QMainWindow):
         edittoolbar.addAction(self.actions["moveup"])
         edittoolbar.addAction(self.actions["movedown"])
         self.addToolBar(edittoolbar)
-        
-        searchtoolbar = QToolBar("Search")
-        searchwidget = SearchWidget(self)
-        searchtoolbar.addWidget(searchwidget)
-        self.addToolBar(searchtoolbar)
     
     @pyqtSlot(int)
     def tabswitched (self, index):
