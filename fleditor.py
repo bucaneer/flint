@@ -729,7 +729,7 @@ class ParagraphEdit (QPlainTextEdit):
         key = event.key()
         mod = event.modifiers()
         if not (mod & Qt.ShiftModifier) and (key == Qt.Key_Enter or key == Qt.Key_Return):
-            FlGlob.mainwindow.activeview().setFocus()
+            FlGlob.mainwindow.activeview.setFocus()
         else:
             super().keyPressEvent(event)
 
@@ -756,7 +756,7 @@ class TextEditWidget (QWidget):
         
     @pyqtSlot(str)
     def loadnode (self, nodeID):
-        view = FlGlob.mainwindow.activeview()
+        view = FlGlob.mainwindow.activeview
         self.nodeobj = view.nodecontainer.nodes[nodeID]
         if not isinstance(self.nodeobj, fp.TextNode):
             return
@@ -986,7 +986,7 @@ class ConditionCallWidget (CallWidget):
         callobj = metacall.callobj
         self.callobj.calls.append(callobj)
         self.addcallwidget(callobj)
-        FlGlob.mainwindow.activeview().viewport().update()
+        FlGlob.mainwindow.activeview.viewport().update()
     
     def addcallwidget (self, callobj):
         widget = self.types[callobj.typename](self, callobj, cond=True)
@@ -1038,7 +1038,7 @@ class ConditionCallWidget (CallWidget):
         self.callswidget.layout().removeWidget(widget)
         widget.deleteLater()
         self.callobj.calls.remove(callobj)
-        FlGlob.mainwindow.activeview().viewport().update()
+        FlGlob.mainwindow.activeview.viewport().update()
 
 class CallEditWidget (QWidget):
     def __init__ (self, parent):
@@ -1063,7 +1063,7 @@ class ConditionEditWidget (CallEditWidget):
     
     @pyqtSlot(str)
     def loadnode (self, nodeID):
-        view = FlGlob.mainwindow.activeview()
+        view = FlGlob.mainwindow.activeview
         nodeobj = view.nodecontainer.nodes[nodeID]
         self.nodeobj = nodeobj
         callobj = nodeobj.condition
@@ -1091,7 +1091,7 @@ class ScriptEditWidget (CallEditWidget):
     
     @pyqtSlot(str)
     def loadnode (self, nodeID):
-        view = FlGlob.mainwindow.activeview()
+        view = FlGlob.mainwindow.activeview
         nodeobj = view.nodecontainer.nodes[nodeID]
         if self.slot == "enter":
             self.scripts = nodeobj.enterscripts
@@ -1105,7 +1105,7 @@ class ScriptEditWidget (CallEditWidget):
         callobj = metacall.callobj
         self.scripts.append(callobj)
         self.addscriptcallwidget(callobj)
-        FlGlob.mainwindow.activeview().viewport().update()
+        FlGlob.mainwindow.activeview.viewport().update()
     
     def addscriptcallwidget (self, callobj):
         callswidget = self.callsarea.widget()
@@ -1121,7 +1121,7 @@ class ScriptEditWidget (CallEditWidget):
         callswidget.layout().removeWidget(scwidget)
         scwidget.deleteLater()
         self.scripts.remove(callobj)
-        FlGlob.mainwindow.activeview().viewport().update()
+        FlGlob.mainwindow.activeview.viewport().update()
 
 class PropertiesEditWidget (QWidget):
     def __init__ (self, parent):
@@ -1147,7 +1147,7 @@ class PropertiesEditWidget (QWidget):
     
     @pyqtSlot(str)
     def loadnode (self, nodeID):
-        view = FlGlob.mainwindow.activeview()
+        view = FlGlob.mainwindow.activeview
         nodeobj = view.nodecontainer.nodes[nodeID]
         self.nodeobj = nodeobj
         self.persistence.setCurrentText(str(nodeobj.persistence))
@@ -1164,7 +1164,7 @@ class PropertiesEditWidget (QWidget):
         self.nodeobj.persistence = persistence
         self.nodeobj.comment = comment
         
-        view = FlGlob.mainwindow.activeview()
+        view = FlGlob.mainwindow.activeview
         for nodeitem in view.itemindex[self.nodeobj.ID]:
             nodeitem.updatepersistence()
 
@@ -1186,7 +1186,7 @@ class NodeListWidget (QWidget):
     @pyqtSlot()
     def populatelist (self):
         self.nodelist.clear()
-        view = FlGlob.mainwindow.activeview()
+        view = FlGlob.mainwindow.activeview
         if view is None:
             return
         nodecont = view.nodecontainer.nodes
@@ -1235,7 +1235,7 @@ class SearchWidget (QWidget):
     
     def search (self):
         query = self.inputline.text().casefold()
-        view = FlGlob.mainwindow.activeview()
+        view = FlGlob.mainwindow.activeview
         view.search(query)
 
 class MapView (QGraphicsView):
@@ -1264,7 +1264,7 @@ class MapView (QGraphicsView):
     def update (self):
         change = False
         window = FlGlob.mainwindow
-        activeview = window.activeview()
+        activeview = window.activeview
         if activeview is None:
             self.treeview = None
             return
@@ -1285,9 +1285,6 @@ class MapView (QGraphicsView):
             self.fitInView(scenerect, Qt.KeepAspectRatio)
 
 class TreeView (QGraphicsView):
-    
-    activeChanged = pyqtSignal(str)
-    selectedChanged = pyqtSignal(str)
     __types = {'talk': TalkNodeItem, 'response': ResponseNodeItem, 
         'bank': BankNodeItem, 'root': RootNodeItem}
     
@@ -1313,8 +1310,6 @@ class TreeView (QGraphicsView):
         self.setScene(scene)
         
         self.style = FlGlob.mainwindow.style
-        
-        self.selectedChanged.connect(self.filteractions)
         
         self.nodecontainer = nodecontainer
         self.nodedocs = dict()
@@ -1358,7 +1353,7 @@ class TreeView (QGraphicsView):
         self.updatelayout()
         
         if activeID and activeID in self.itemindex:
-            self.setactivenode(self.itembyID(activeID), signal=False)
+            self.setactivenode(self.itembyID(activeID))
         else:
             self.setactivenode(None)
         
@@ -1366,7 +1361,7 @@ class TreeView (QGraphicsView):
         while selectedID:
             swappedID = "<-".join([baseID, selectedID])
             if baseID and swappedID in self.nodeitems:
-                self.setselectednode(self.nodeitems[swappedID], signal=False)
+                self.setselectednode(self.nodeitems[swappedID])
                 break
             elif selectedID in self.nodeitems:
                 self.setselectednode(self.nodeitems[selectedID])
@@ -1465,29 +1460,48 @@ class TreeView (QGraphicsView):
             self.style.rankgap/2,
             self.style.rowgap/2)
     
-    def setselectednode (self, nodeitem, signal=True):
+    def setselectednode (self, nodeitem):
         if nodeitem is not None:
             if self.selectednode:
                 self.selectednode.setselected(False)
             self.selectednode = nodeitem
             self.selectednode.setselected(True)
             self.shownode(self.selectednode)
-            if signal:
-                self.selectedChanged.emit(self.selectednode.id())
+            FlGlob.mainwindow.setselectednode(self, nodeitem.realid())
     
-    def setactivenode (self, nodeitem, signal=True):
+    @pyqtSlot(str)
+    def selectbyID (self, nodeID):
+        if FlGlob.mainwindow.activeview is not self:
+            return
+        if self.selectednode.realid() == nodeID:
+            return
+        nodeitem = self.itembyID(nodeID)
+        if self.selectednode:
+            self.selectednode.setselected(False)
+        self.selectednode = nodeitem
+        self.selectednode.setselected(True)
+        self.shownode(self.selectednode)
+    
+    def setactivenode (self, nodeitem):
         if nodeitem is not None:
+            nodeID = nodeitem.realid()
+        else:
+            nodeID = "-1"
+        FlGlob.mainwindow.setactivenode(self, nodeID)
+    
+    @pyqtSlot(str)
+    def activatebyID (self, nodeID):
+        if FlGlob.mainwindow.activeview is not self:
+            return
+        if nodeID != "-1":
+            nodeitem = self.itembyID(nodeID)
             if self.activenode:
                 self.activenode.setactive(False)
-            self.activenode = nodeitem.realnode()
+            self.activenode = nodeitem
             self.activenode.setactive(True)
-            if signal:
-                self.activeChanged.emit(self.activenode.realid())
         else:
             if self.activenode is not None:
                 self.activenode = None
-            if signal:
-                self.activeChanged.emit("-1")
     
     def createlink (self, toID):
         fromID = self.selectednode.realid()
@@ -1658,11 +1672,19 @@ class TreeView (QGraphicsView):
 class EditorWindow (QMainWindow):
     copiednode = (None, None, None)
     actions = dict()
+    activeview = None
+    activenode = ""
+    selectednode = ""
+    viewChanged = pyqtSignal()
+    activeChanged = pyqtSignal(str)
+    selectedChanged = pyqtSignal(str)
     
     def __init__ (self):
         super().__init__()
         
         FlGlob.mainwindow = self
+        self.activeChanged.connect(self.loadnode)
+        self.viewChanged.connect(self.filteractions)
         
         self.style = FlNodeStyle(QFont())
         self.initactions()
@@ -1674,7 +1696,7 @@ class EditorWindow (QMainWindow):
         tabs.setTabBarAutoHide(True)
         tabs.tabCloseRequested.connect(self.closetab)
         tabs.tabBarDoubleClicked.connect(self.nametab)
-        tabs.currentChanged.connect(self.filteractions)
+        tabs.currentChanged.connect(self.tabswitched)
         self.tabs = tabs                        
         
         mapview = MapView(self)
@@ -1735,10 +1757,7 @@ class EditorWindow (QMainWindow):
         
         self.addDockWidget(Qt.LeftDockWidgetArea, listdock)
         
-        self.filteractions(-1)
-    
-    def activeview (self):
-        return self.tabs.currentWidget()
+        self.filteractions()
     
     def initactions (self):
         self.actions["openfile"] = self.createaction("Open", self.selectopenfile,
@@ -1795,9 +1814,9 @@ class EditorWindow (QMainWindow):
         self.actions["parentswap"] = self.createaction("S&wap with Parent", self.parentswap,
             [QKeySequence(Qt.ShiftModifier+Qt.Key_Left)], ["go-left"], "Swap places with parent node")
     
-    @pyqtSlot(int)
-    def filteractions (self, index):
-        if index == -1:
+    @pyqtSlot()
+    def filteractions (self):
+        if self.activeview is None:
             defaultactions = ("openfile", "newtree")
             for name, action in self.actions.items():
                 if name not in defaultactions:
@@ -1904,6 +1923,31 @@ class EditorWindow (QMainWindow):
         searchtoolbar.addWidget(searchwidget)
         self.addToolBar(searchtoolbar)
     
+    @pyqtSlot(int)
+    def tabswitched (self, index):
+        view = self.tabs.widget(index)
+        self.setactiveview(view)
+    
+    def setactiveview (self, view):
+        if view is self.activeview:
+            return #nothing to do
+        self.activeview = view
+        self.viewChanged.emit()
+    
+    def setactivenode (self, view, nodeID):
+        self.setactiveview(view)
+        if nodeID == self.activenode:
+            return #nothing to do
+        self.activenode = nodeID
+        self.activeChanged.emit(nodeID)
+    
+    def setselectednode (self, view, nodeID):
+        self.setactiveview(view)
+        if nodeID == self.selectednode:
+            return #nothing to do
+        self.selectednode = nodeID
+        self.selectedChanged.emit(nodeID)
+    
     def resetdocks (self):
         for dock in (self.textdock, self.onenterdock, self.onexitdock, self.conddock, self.propdock):
             dock.setEnabled(False)
@@ -1916,7 +1960,7 @@ class EditorWindow (QMainWindow):
         self.resetdocks()
         if nodeID == "-1":
             return
-        view = self.activeview()
+        view = self.activeview #()
         nodeobj = view.nodecontainer.nodes[nodeID]
         if nodeobj.typename in ["talk", "response"]:
             self.textdock.setEnabled(True)
@@ -1953,13 +1997,14 @@ class EditorWindow (QMainWindow):
     
     def newtab (self, treeview):
         name = treeview.nodecontainer.name
-        treeview.activeChanged.connect(self.loadnode)
+        self.selectedChanged.connect(treeview.selectbyID)
+        self.activeChanged.connect(treeview.activatebyID)
         tabindex = self.tabs.addTab(treeview, name)
         self.tabs.setCurrentIndex(tabindex)
     
     @pyqtSlot()
     def save (self, newfile=False):
-        view = self.activeview()
+        view = self.activeview #()
         if view is None:
             return
         nodecont = view.nodecontainer
@@ -1976,7 +2021,7 @@ class EditorWindow (QMainWindow):
     
     @pyqtSlot()
     def closefile (self):
-        view = self.activeview()
+        view = self.activeview #()
         if view is None:
             return
         index = self.tabs.indexOf(view)
@@ -2003,44 +2048,44 @@ class EditorWindow (QMainWindow):
     
     @pyqtSlot()
     def zoomin (self):
-        self.activeview().zoomstep(1)
+        self.activeview.zoomstep(1)
     
     @pyqtSlot()
     def zoomout (self):
-        self.activeview().zoomstep(-1)
+        self.activeview.zoomstep(-1)
     
     @pyqtSlot()
     def zoomorig (self):
-        self.activeview().zoomfixed(1)
+        self.activeview.zoomfixed(1)
     
     @pyqtSlot()
     def gotoactive (self):
-        view = self.activeview()
+        view = self.activeview
         view.centerOn(view.activenode)
     
     @pyqtSlot()
     def newtalk (self):
-        self.activeview().addnode({"type":"talk"})
+        self.activeview.addnode({"type":"talk"})
     
     @pyqtSlot()
     def newresponse (self):
-        self.activeview().addnode({"type":"response"})
+        self.activeview.addnode({"type":"response"})
     
     @pyqtSlot()
     def newbank (self):
-        self.activeview().addnode({"type":"bank"})
+        self.activeview.addnode({"type":"bank"})
     
     @pyqtSlot()
     def newtalksub (self):
-        self.activeview().addnode({"type":"talk"}, subnode=True)
+        self.activeview.addnode({"type":"talk"}, subnode=True)
     
     @pyqtSlot()
     def newresponsesub (self):
-        self.activeview().addnode({"type":"response"}, subnode=True)
+        self.activeview.addnode({"type":"response"}, subnode=True)
     
     @pyqtSlot()
     def copynode (self):
-        view = self.activeview()
+        view = self.activeview
         nodeobj = view.selectednode.nodeobj
         nodedict = nodeobj.todict()
         nodedict["links"] = []
@@ -2060,15 +2105,15 @@ class EditorWindow (QMainWindow):
     
     @pyqtSlot()
     def pasteclone (self):
-        self.activeview().addnode(self.copiednode[2])
+        self.activeview.addnode(self.copiednode[2])
     
     @pyqtSlot()
     def pastelink (self):
-        self.activeview().createlink(self.copiednode[0])
+        self.activeview.createlink(self.copiednode[0])
     
     @pyqtSlot()
     def pastesubnode (self):
-        self.activeview().addnode(self.copiednode[2], subnode=True)
+        self.activeview.addnode(self.copiednode[2], subnode=True)
     
     @pyqtSlot()
     def unlinkinherit (self):
@@ -2076,7 +2121,7 @@ class EditorWindow (QMainWindow):
     
     @pyqtSlot()
     def unlink (self, inherit=False):
-        view = self.activeview()
+        view = self.activeview
         selected = view.selectednode
         if selected.parent is None:
             return
@@ -2090,23 +2135,23 @@ class EditorWindow (QMainWindow):
         answer = QMessageBox.question(self, "Node removal", text)
         if answer == QMessageBox.No:
             return
-        self.activeview().unlink(inherit)
+        self.activeview.unlink(inherit)
     
     @pyqtSlot()
     def moveup (self):
-        self.activeview().moveup()
+        self.activeview.moveup()
     
     @pyqtSlot()
     def movedown (self):
-        self.activeview().movedown()
+        self.activeview.movedown()
     
     @pyqtSlot()
     def parentswap (self):
-        self.activeview().parentswap()
+        self.activeview.parentswap()
     
     @pyqtSlot()
     def collapse (self):
-        self.activeview().collapse()
+        self.activeview.collapse()
 
 def elidestring (string, length):
     if len(string) <= length:
