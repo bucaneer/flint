@@ -1603,53 +1603,6 @@ class TreeView (QGraphicsView):
                 self.collapsednodes.append(selID)
         self.updateview()
     
-    @pyqtSlot(str)
-    def filteractions (self, nodeID=""):
-        if nodeID == "":
-            nodeID = self.selectednode.id()
-        nodeitem = self.nodeitems[nodeID]
-        genericactions = ["zoomin", "zoomout", "zoomorig", "gotoactive",
-            "collapse", "openfile", "save", "saveas", "newtree", "close"]
-        if isinstance(nodeitem, TextNodeItem):
-            actions = ["copynode", "moveup", "movedown", "unlinknode", 
-                "unlinkstree"]
-            if not nodeitem.issubnode():
-                actions.extend(["newtalk", "newresponse", "newbank", 
-                    "pasteclone", "pastelink", "parentswap"])
-        elif isinstance(nodeitem, BankNodeItem):
-            actions = ["copynode", "moveup", "movedown", "unlinknode", 
-                "newtalk", "newresponse", "newbank", "pasteclone", "pastelink",
-                "unlinkstree", "newtalksub", "newresponsesub", "pastesubnode",
-                "parentswap"]
-        elif isinstance(nodeitem, RootNodeItem):
-            actions = ["newtalk", "newresponse", "newbank", "pasteclone",
-                "pastelink"]
-        
-        actions.extend(genericactions)
-        windowactions = FlGlob.mainwindow.actions
-        copiednode = FlGlob.mainwindow.copiednode
-        for name, action in windowactions.items():
-            if name in actions:
-                if name == "pasteclone" or name == "pastesubnode":
-                    if copiednode[2] is not None:
-                        action.setEnabled(True)
-                    else:
-                        action.setEnabled(False)
-                elif name == "pastelink":
-                    if copiednode[0] is not None and copiednode[1] is self:
-                        action.setEnabled(True)
-                    else:
-                        action.setEnabled(False)
-                else:
-                    action.setEnabled(True)
-                    if name == "collapse":
-                        if nodeitem.iscollapsed():
-                            action.setText("Uncolla&pse Subtree")
-                        else:
-                            action.setText("Colla&pse Subtree")
-            else:
-                action.setEnabled(False)
-    
     def search (self, query):
         if not query:
             self.hits = []
@@ -1709,6 +1662,7 @@ class EditorWindow (QMainWindow):
         
         FlGlob.mainwindow = self
         self.activeChanged.connect(self.loadnode)
+        self.selectedChanged.connect(self.filteractions)
         self.viewChanged.connect(self.filteractions)
         
         self.style = FlNodeStyle(QFont())
@@ -1841,10 +1795,57 @@ class EditorWindow (QMainWindow):
     
     @pyqtSlot()
     def filteractions (self):
-        if self.activeview is None:
+        view = self.activeview
+        if view is None:
             defaultactions = ("openfile", "newtree")
             for name, action in self.actions.items():
                 if name not in defaultactions:
+                    action.setEnabled(False)
+                else:
+                    action.setEnabled(True)
+        else:
+            nodes = view.nodecontainer.nodes
+            if not self.selectednode or self.selectednode not in nodes:
+                return
+            nodeobj = view.nodecontainer.nodes[self.selectednode]
+            genericactions = ["zoomin", "zoomout", "zoomorig", "gotoactive",
+                "collapse", "openfile", "save", "saveas", "newtree", "close"]
+            if self.selectednode not in self.activeview.itemindex:
+                if nodeobj.typename != "root":
+                    actions = ["copynode"]
+                else:
+                    actions = []
+            elif nodeobj.typename in ["talk", "response"]:
+                actions = ["copynode", "moveup", "movedown", "unlinknode", 
+                    "unlinkstree"]
+                if nodeobj.nodebank == -1:
+                    actions.extend(["newtalk", "newresponse", "newbank", 
+                        "pasteclone", "pastelink", "parentswap"])
+            elif nodeobj.typename == "bank":
+                actions = ["copynode", "moveup", "movedown", "unlinknode", 
+                    "newtalk", "newresponse", "newbank", "pasteclone", "pastelink",
+                    "unlinkstree", "newtalksub", "newresponsesub", "pastesubnode",
+                    "parentswap"]
+            elif nodeobj.typename == "root":
+                actions = ["newtalk", "newresponse", "newbank", "pasteclone",
+                    "pastelink"]
+            
+            actions.extend(genericactions)
+            for name, action in self.actions.items():
+                if name in actions:
+                    if name == "pasteclone" or name == "pastesubnode":
+                        if self.copiednode[2] is not None:
+                            action.setEnabled(True)
+                        else:
+                            action.setEnabled(False)
+                    elif name == "pastelink":
+                        if self.copiednode[0] is not None and self.copiednode[1] is self.activeview:
+                            action.setEnabled(True)
+                        else:
+                            action.setEnabled(False)
+                    else:
+                        action.setEnabled(True)
+                else:
                     action.setEnabled(False)
     
     def createaction (self, text, slot=None, shortcuts=None, icons=None,
@@ -1957,19 +1958,22 @@ class EditorWindow (QMainWindow):
         if view is self.activeview:
             return #nothing to do
         self.activeview = view
+        if view is not None:
+            if view.activenode is not None:
+                self.setactivenode(view, view.activenode.realid())
+            else:
+                self.setactivenode(view, "-1")
+            if view.selectednode is not None:
+                self.setselectednode(view, view.selectednode.realid())
         self.viewChanged.emit()
     
     def setactivenode (self, view, nodeID):
         self.setactiveview(view)
-        if nodeID == self.activenode:
-            return #nothing to do
         self.activenode = nodeID
         self.activeChanged.emit(nodeID)
     
     def setselectednode (self, view, nodeID):
         self.setactiveview(view)
-        if nodeID == self.selectednode:
-            return #nothing to do
         self.selectednode = nodeID
         self.selectedChanged.emit(nodeID)
     
@@ -2111,14 +2115,14 @@ class EditorWindow (QMainWindow):
     @pyqtSlot()
     def copynode (self):
         view = self.activeview
-        nodeobj = view.selectednode.nodeobj
+        nodeobj = view.nodecontainer.nodes[self.selectednode]
         nodedict = nodeobj.todict()
         nodedict["links"] = []
         nodedict["nodebank"] = -1
         if "subnodes" in nodedict:
             nodedict["subnodes"] = []
         
-        if view.selectednode.issubnode():
+        if nodeobj.nodebank != -1:
             self.copiednode = (None, None, nodedict)
         else:
             self.copiednode = (nodeobj.ID, view, nodedict)
@@ -2126,7 +2130,7 @@ class EditorWindow (QMainWindow):
         self.actions["pasteclone"].setText("Paste &Clone (node %s)" % nodeobj.ID)
         self.actions["pastelink"].setText("Paste &Link (node %s)" % nodeobj.ID)
         self.actions["pastesubnode"].setText("&Paste Subnode (node %s)" % nodeobj.ID)
-        view.filteractions()
+        self.filteractions()
     
     @pyqtSlot()
     def pasteclone (self):
