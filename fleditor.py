@@ -1165,8 +1165,9 @@ class PropertiesEditWidget (QWidget):
         self.nodeobj.comment = comment
         
         view = FlGlob.mainwindow.activeview
-        for nodeitem in view.itemindex[self.nodeobj.ID]:
-            nodeitem.updatepersistence()
+        if self.nodeobj.ID in view.itemindex:
+            for nodeitem in view.itemindex[self.nodeobj.ID]:
+                nodeitem.updatepersistence()
 
 class NodeListItem (QListWidgetItem):
     IDRole = Qt.UserRole + 1
@@ -1181,6 +1182,8 @@ class NodeListWidget (QWidget):
         self.nodelist = QListWidget(self)
         self.nodelist.setSortingEnabled(True)
         self.nodelist.setIconSize(QSize(*[FlGlob.mainwindow.style.boldheight]*2))
+        self.nodelist.currentItemChanged.connect(self.selectnode)
+        self.nodelist.itemActivated.connect(self.activatenode)
         layout.addWidget(self.nodelist)
     
     @pyqtSlot()
@@ -1214,6 +1217,22 @@ class NodeListWidget (QWidget):
         item = NodeListItem(icon, label)
         item.setData(NodeListItem.IDRole, int(nodeID))        
         return item
+    
+    @pyqtSlot(NodeListItem, NodeListItem)
+    def selectnode (self, listitem, olditem):
+        if listitem is None:
+            return
+        window = FlGlob.mainwindow
+        view = window.activeview
+        nodeID = str(listitem.data(listitem.IDRole))
+        window.setselectednode(view, nodeID)
+    
+    @pyqtSlot(NodeListItem)
+    def activatenode (self, listitem):
+        window = FlGlob.mainwindow
+        view = window.activeview
+        nodeID = str(listitem.data(listitem.IDRole))
+        window.setactivenode(view, nodeID)
 
 class SearchWidget (QWidget):
     def __init__ (self, parent):
@@ -1473,14 +1492,19 @@ class TreeView (QGraphicsView):
     def selectbyID (self, nodeID):
         if FlGlob.mainwindow.activeview is not self:
             return
-        if self.selectednode.realid() == nodeID:
+        if self.selectednode is not None and self.selectednode.realid() == nodeID:
             return
-        nodeitem = self.itembyID(nodeID)
-        if self.selectednode:
-            self.selectednode.setselected(False)
-        self.selectednode = nodeitem
-        self.selectednode.setselected(True)
-        self.shownode(self.selectednode)
+        if nodeID in self.itemindex:
+            nodeitem = self.itembyID(nodeID)
+            if self.selectednode:
+                self.selectednode.setselected(False)
+            self.selectednode = nodeitem
+            self.selectednode.setselected(True)
+            self.shownode(self.selectednode)
+        else:
+            if self.selectednode is not None:
+                self.selectednode.setselected(False)
+                self.selectednode = None
     
     def setactivenode (self, nodeitem):
         if nodeitem is not None:
@@ -1493,7 +1517,7 @@ class TreeView (QGraphicsView):
     def activatebyID (self, nodeID):
         if FlGlob.mainwindow.activeview is not self:
             return
-        if nodeID != "-1":
+        if nodeID in self.itemindex:
             nodeitem = self.itembyID(nodeID)
             if self.activenode:
                 self.activenode.setactive(False)
@@ -1501,6 +1525,7 @@ class TreeView (QGraphicsView):
             self.activenode.setactive(True)
         else:
             if self.activenode is not None:
+                self.activenode.setactive(False)
                 self.activenode = None
     
     def createlink (self, toID):
@@ -1739,7 +1764,7 @@ class EditorWindow (QMainWindow):
         self.propdock = propdock
         
         nodelist = NodeListWidget(self)
-        self.tabs.currentChanged.connect(nodelist.populatelist)
+        self.viewChanged.connect(nodelist.populatelist)
         listdock = QDockWidget("Node List", self)
         listdock.setWidget(nodelist)
         listdock.hide()
