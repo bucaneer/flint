@@ -502,6 +502,7 @@ class TextNodeItem (NodeItem):
             window = FlGlob.mainwindow
             menu.addAction(window.actions["collapse"])
             menu.addAction(window.actions["copynode"])
+            menu.addAction(window.actions["settemplate"])
             menu.addMenu(window.addmenu)
             menu.addAction(window.actions["moveup"])
             menu.addAction(window.actions["movedown"])
@@ -607,6 +608,7 @@ class BankNodeItem (NodeItem):
             window = FlGlob.mainwindow
             menu.addAction(window.actions["collapse"])
             menu.addAction(window.actions["copynode"])
+            menu.addAction(window.actions["settemplate"])
             menu.addMenu(window.subnodemenu)
             menu.addMenu(window.addmenu)
             menu.addAction(window.actions["moveup"])
@@ -1568,7 +1570,13 @@ class TreeView (QGraphicsView):
         self.nodecontainer.newlink(fromID, toID)
         self.updateview()
     
-    def addnode (self, nodedict, subnode=False):
+    def addnode (self, typename="", ndict=None, subnode=False):
+        if ndict is not None:
+            nodedict = ndict
+        elif typename and typename in self.nodecontainer.templates:
+            nodedict = self.nodecontainer.templates[typename]
+        else:
+            return
         selectedid = self.selectednode.realid()
         if subnode:
             nodedictmod = nodedict.copy()
@@ -1759,7 +1767,7 @@ class EditorWindow (QMainWindow):
         self.selectedChanged.connect(nodelist.selectbyID)
         listdock = QDockWidget("Node List", self)
         listdock.setWidget(nodelist)
-        listdock.hide()
+        #listdock.hide()
         self.listdock = listdock
         
         self.setCentralWidget(tabs)
@@ -1830,6 +1838,8 @@ class EditorWindow (QMainWindow):
             [QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_B)], ["edit-paste"], "Paste cloned node as subnode")
         self.actions["parentswap"] = self.createaction("S&wap with Parent", self.parentswap,
             [QKeySequence(Qt.ShiftModifier+Qt.Key_Left)], ["go-left"], "Swap places with parent node")
+        self.actions["settemplate"] = self.createaction("Set as Te&mplate", self.settemplate,
+            None, ["text-x-generic-template"], "Set node as the template for its type")
     
     @pyqtSlot()
     def filteractions (self):
@@ -1850,12 +1860,12 @@ class EditorWindow (QMainWindow):
                 "collapse", "openfile", "save", "saveas", "newtree", "close"]
             if self.selectednode not in self.activeview.itemindex:
                 if nodeobj.typename != "root":
-                    actions = ["copynode"]
+                    actions = ["copynode", "settemplate"]
                 else:
                     actions = []
             elif nodeobj.typename in ["talk", "response"]:
                 actions = ["copynode", "moveup", "movedown", "unlinknode", 
-                    "unlinkstree"]
+                    "unlinkstree", "settemplate"]
                 if nodeobj.nodebank == -1:
                     actions.extend(["newtalk", "newresponse", "newbank", 
                         "pasteclone", "pastelink", "parentswap"])
@@ -1863,7 +1873,7 @@ class EditorWindow (QMainWindow):
                 actions = ["copynode", "moveup", "movedown", "unlinknode", 
                     "newtalk", "newresponse", "newbank", "pasteclone", "pastelink",
                     "unlinkstree", "newtalksub", "newresponsesub", "pastesubnode",
-                    "parentswap"]
+                    "parentswap", "settemplate"]
             elif nodeobj.typename == "root":
                 actions = ["newtalk", "newresponse", "newbank", "pasteclone",
                     "pastelink"]
@@ -1941,6 +1951,7 @@ class EditorWindow (QMainWindow):
         editmenu.addMenu(addmenu)
         editmenu.addMenu(subnodemenu)
         editmenu.addAction(self.actions["copynode"])
+        editmenu.addAction(self.actions["settemplate"])
         editmenu.addAction(self.actions["moveup"])
         editmenu.addAction(self.actions["movedown"])
         editmenu.addAction(self.actions["parentswap"])
@@ -2127,23 +2138,23 @@ class EditorWindow (QMainWindow):
     
     @pyqtSlot()
     def newtalk (self):
-        self.activeview.addnode({"type":"talk"})
+        self.activeview.addnode(typename="talk")
     
     @pyqtSlot()
     def newresponse (self):
-        self.activeview.addnode({"type":"response"})
+        self.activeview.addnode(typename="response")
     
     @pyqtSlot()
     def newbank (self):
-        self.activeview.addnode({"type":"bank"})
+        self.activeview.addnode(typename="bank")
     
     @pyqtSlot()
     def newtalksub (self):
-        self.activeview.addnode({"type":"talk"}, subnode=True)
+        self.activeview.addnode(typename="talk", subnode=True)
     
     @pyqtSlot()
     def newresponsesub (self):
-        self.activeview.addnode({"type":"response"}, subnode=True)
+        self.activeview.addnode(typename="response", subnode=True)
     
     @pyqtSlot()
     def copynode (self):
@@ -2152,8 +2163,7 @@ class EditorWindow (QMainWindow):
         nodedict = nodeobj.todict()
         nodedict["links"] = []
         nodedict["nodebank"] = -1
-        if "subnodes" in nodedict:
-            nodedict["subnodes"] = []
+        nodedict["subnodes"] = []
         
         if nodeobj.nodebank != -1:
             self.copiednode = (None, None, nodedict)
@@ -2166,8 +2176,19 @@ class EditorWindow (QMainWindow):
         self.filteractions()
     
     @pyqtSlot()
+    def settemplate (self):
+        view = self.activeview
+        nodeobj = view.nodecontainer.nodes[self.selectednode].copy()
+        nodeobj.linkIDs = []
+        nodeobj.subnodes = []
+        nodeobj.nodebank = -1
+        nodedict = nodeobj.todict()
+        typename = nodedict["type"]
+        view.nodecontainer.templates[typename] = nodedict
+    
+    @pyqtSlot()
     def pasteclone (self):
-        self.activeview.addnode(self.copiednode[2])
+        self.activeview.addnode(ndict=self.copiednode[2])
     
     @pyqtSlot()
     def pastelink (self):
@@ -2175,7 +2196,7 @@ class EditorWindow (QMainWindow):
     
     @pyqtSlot()
     def pastesubnode (self):
-        self.activeview.addnode(self.copiednode[2], subnode=True)
+        self.activeview.addnode(ndict=self.copiednode[2], subnode=True)
     
     @pyqtSlot()
     def unlinkinherit (self):

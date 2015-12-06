@@ -122,6 +122,9 @@ class ChartNode (object):
 	def hasexitscripts (self):
 		return len(self.exitscripts) > 0
 	
+	def copy (self):
+		return self.container.types[self.typename](self.container, self.todict(), "")
+	
 	def todict (self):
 		node_dict = { "type": self.typename }
 		if self.linkIDs:
@@ -173,7 +176,7 @@ class BankNode (ChartNode):
 		
 
 class NodesContainer (object):
-	__types = { 'talk': TalkNode, 'response': ResponseNode, 'bank': BankNode,
+	types = { 'talk': TalkNode, 'response': ResponseNode, 'bank': BankNode,
 		'root': ChartNode }
 	def __init__ (self, nodes_dict, filename=""):
 		self.defaultcond = {"type":"cond","operator":"and","calls":[]}
@@ -185,6 +188,14 @@ class NodesContainer (object):
 		for nodeID, nodedict in nodes_dict['nodes'].items():
 			nodeID = str(nodeID)
 			self.newnode(nodedict, nodeID)
+		self.defaulttemplates = {
+			"bank":    {"type": "bank"},
+			"talk":    {"type": "talk"},
+			"response":{"type": "response"}
+			}
+		self.templates = self.defaulttemplates.copy()
+		if 'templates' in nodes_dict:
+			self.templates.update(nodes_dict['templates'])
 	
 	def getnode (self, ID):
 		return self.nodes[ID]
@@ -193,7 +204,7 @@ class NodesContainer (object):
 		if not newID:
 			newID = self.nextID
 			self.nextID = str(int(self.nextID) + 1)
-		node = self.__types[node_dict['type']](self, node_dict, newID)
+		node = self.types[node_dict['type']](self, node_dict, newID)
 		if newID in self.nodes:
 			raise RuntimeError("Duplicate ID in nodes list")
 		self.nodes[newID] = node
@@ -275,7 +286,13 @@ class NodesContainer (object):
 		writejson(self, self.filename)
 	
 	def todict (self):
-		return {"name":self.name, "nextID":self.nextID, "nodes":self.nodes}
+		nodes_dict = {"name":self.name, "nextID":self.nextID, "nodes":self.nodes}
+		if self.templates is not self.defaulttemplates:
+			nodes_dict["templates"] = dict()
+			for typename, template in self.templates.items():
+				if template != self.defaulttemplates[typename]:
+					nodes_dict["templates"][typename] = template
+		return nodes_dict
 
 def loadjson (filename):
 	with open(filename, 'r') as f:
