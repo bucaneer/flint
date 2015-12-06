@@ -71,7 +71,7 @@ class QGraphicsRectItemCond (QGraphicsRectItem):
         self.cond = cond
     
     def paint(self, painter, style, widget):
-        if self.cond(self, widget):
+        if widget is self.cond:
             super().paint(painter, style, widget)
 
 class QGraphicsSimpleTextItemCond (QGraphicsSimpleTextItem):
@@ -80,7 +80,7 @@ class QGraphicsSimpleTextItemCond (QGraphicsSimpleTextItem):
         self.cond = cond
     
     def paint(self, painter, style, widget):
-        if self.cond(self, widget):
+        if widget is self.cond:
             super().paint(painter, style, widget)
 
 class QGraphicsTextItemCond (QGraphicsTextItem):
@@ -89,7 +89,7 @@ class QGraphicsTextItemCond (QGraphicsTextItem):
         self.cond = cond
     
     def paint(self, painter, style, widget):
-        if self.cond(self, widget):
+        if widget is self.cond:
             super().paint(painter, style, widget)
 
 class QGraphicsPixmapItemCond (QGraphicsPixmapItem):
@@ -98,7 +98,7 @@ class QGraphicsPixmapItemCond (QGraphicsPixmapItem):
         self.cond = cond
     
     def paint(self, painter, style, widget):
-        if self.cond(self, widget):
+        if widget is self.cond:
             super().paint(painter, style, widget)
 
 class NodeItem(QGraphicsItem):
@@ -300,6 +300,7 @@ class NodeItem(QGraphicsItem):
         mainbrush = QBrush(self.maincolor)
         altbrush = QBrush(self.altcolor)
         nopen = QPen(0)
+        viewport = self.view.viewport()
         
         self.graphgroup = QGraphicsItemGroup(self)
         self.fggroup = QGraphicsItemGroup(self)
@@ -327,8 +328,7 @@ class NodeItem(QGraphicsItem):
         self.mainbox.setPen(nopen)
         self.graphgroup.addToGroup(self.mainbox)
         
-        self.nodelabel = QGraphicsSimpleTextItemCond(self, 
-            lambda s,w: w is self.view.viewport())
+        self.nodelabel = QGraphicsSimpleTextItemCond(self, viewport)
         self.nodelabel.setBrush(lightbrush)
         self.nodelabel.setFont(self.style.boldfont)
         self.nodelabel.setText(self.label % self.realid())
@@ -338,42 +338,36 @@ class NodeItem(QGraphicsItem):
         self.iconx = self.style.nodetextwidth
         
         condpix = QPixmap("images/key.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
-        self.condicon = QGraphicsPixmapItemCond(condpix, self,
-            lambda s,w: w is self.view.viewport() and self.nodeobj.hascond() and not self.iscollapsed())
+        self.condicon = QGraphicsPixmapItemCond(condpix, self, viewport)
         self.condicon.setPos(self.iconx-condpix.width(), self.style.itemmargin)
         self.iconx = self.condicon.x()
         self.fggroup.addToGroup(self.condicon)
         
         randpix = QPixmap("images/dice.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
-        self.randicon = QGraphicsPixmapItemCond(randpix, self,
-            lambda s,w: w is self.view.viewport())
+        self.randicon = QGraphicsPixmapItemCond(randpix, self, viewport)
         self.randicon.setPos(self.iconx-self.style.itemmargin-randpix.width(), self.style.itemmargin)
         self.iconx = self.randicon.x()
         self.fggroup.addToGroup(self.randicon)
         
         exitpix = QPixmap("images/script-exit.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
-        self.exiticon = QGraphicsPixmapItemCond(exitpix, self,
-            lambda s,w: w is self.view.viewport() and self.nodeobj.hasexitscripts() and not self.iscollapsed())
+        self.exiticon = QGraphicsPixmapItemCond(exitpix, self, viewport)
         self.exiticon.setPos(self.iconx-self.style.itemmargin-exitpix.width(), self.style.itemmargin)
         self.iconx = self.exiticon.x()
         self.fggroup.addToGroup(self.exiticon)
         
         enterpix = QPixmap("images/script-enter.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
-        self.entericon = QGraphicsPixmapItemCond(enterpix, self,
-            lambda s,w: w is self.view.viewport() and self.nodeobj.hasenterscripts() and not self.iscollapsed())
+        self.entericon = QGraphicsPixmapItemCond(enterpix, self, viewport)
         self.entericon.setPos(self.iconx-self.style.itemmargin-enterpix.width(), self.style.itemmargin)
         self.iconx = self.entericon.x()
         self.fggroup.addToGroup(self.entericon)
         
         blankpix = QPixmap("images/blank.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
-        self.persisticon = QGraphicsPixmapItemCond(blankpix, self,
-            lambda s,w: w is self.view.viewport() and not self.iscollapsed())
+        self.persisticon = QGraphicsPixmapItemCond(blankpix, self, viewport)
         self.persisticon.setPos(self.iconx-self.style.itemmargin-blankpix.width(), self.style.itemmargin)
         self.iconx = self.persisticon.x()
         self.fggroup.addToGroup(self.persisticon)
         
-        self.comment = QGraphicsTextItemCond(self,
-            lambda s,w: w is self.view.viewport() and not self.iscollapsed())
+        self.comment = QGraphicsTextItemCond(self, viewport)
         self.comment.setTextWidth(self.style.nodetextwidth)
         self.comment.setDefaultTextColor(FlPalette.light)
         self.comment.setPos(0, self.nodelabel.y()+self.nodelabel.boundingRect().height()+self.style.itemmargin)
@@ -382,28 +376,50 @@ class NodeItem(QGraphicsItem):
         self.graphgroup.addToGroup(self.fggroup)
         
         self.view.nodedocs[self.realid()]["comment"].contentsChanged.connect(self.updatecomment)
+        self.updatecondition()
+        self.updateenterscripts()
+        self.updateexitscripts()
         self.updaterandweight()
         self.updatepersistence()
         # Never call updatelayout() from here!
     
-    @pyqtSlot()
+    def updatecondition (self):
+        if self.nodeobj.hascond() and not self.iscollapsed():
+            self.condicon.show()
+        else:
+            self.condicon.hide()
+    
+    def updateenterscripts (self):
+        if self.nodeobj.hasenterscripts() and not self.iscollapsed():
+            self.entericon.show()
+        else:
+            self.entericon.hide()
+    
+    def updateexitscripts (self):
+        if self.nodeobj.hasexitscripts() and not self.iscollapsed():
+            self.exiticon.show()
+        else:
+            self.exiticon.hide()
+    
     def updaterandweight (self):
         if self.nodeobj.randweight and not self.iscollapsed():
             self.randicon.show()
         else:
             self.randicon.hide()
     
-    @pyqtSlot()
     def updatepersistence (self):
         icons = {"Mark": "mark", "OncePerConv": "once", "OnceEver": "onceever", "": "blank"}
-        pixmap = QPixmap("images/%s.png" % icons[self.nodeobj.persistence]).scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
-        self.persisticon.setPixmap(pixmap)
+        if self.nodeobj.persistence in icons and not self.iscollapsed():
+            pixmap = QPixmap("images/%s.png" % icons[self.nodeobj.persistence]).scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
+            self.persisticon.setPixmap(pixmap)
+            self.persisticon.show()
+        else:
+            self.persisticon.hide()
     
-    @pyqtSlot()
     def updatecomment (self):
         self.fggroup.removeFromGroup(self.comment)
         contents = self.view.nodedocs[self.realid()]["comment"].toPlainText()
-        if not contents:
+        if not contents or self.iscollapsed():
             self.comment.hide()
         else:
             self.comment.show()
@@ -475,21 +491,18 @@ class TextNodeItem (NodeItem):
         nopen = QPen(0)
         viewport = self.view.viewport()
         
-        self.textbox = QGraphicsRectItemCond(self, 
-            lambda s,w: w is viewport and not self.iscollapsed())
+        self.textbox = QGraphicsRectItemCond(self, viewport)
         self.textbox.setBrush(lightbrush)
         self.textbox.setPen(nopen)
         self.fggroup.addToGroup(self.textbox)
         
-        self.nodespeaker = QGraphicsSimpleTextItemCond(self,
-            lambda s,w: w is viewport and not self.iscollapsed())
+        self.nodespeaker = QGraphicsSimpleTextItemCond(self, viewport)
         self.nodespeaker.setBrush(lightbrush)
         self.nodespeaker.setText(" ")
         self.nodespeaker.setPos(self.style.itemmargin, self.nodelabel.y()+self.nodelabel.boundingRect().height()+self.style.itemmargin*2)
         self.fggroup.addToGroup(self.nodespeaker)
         
-        self.nodetext = QGraphicsTextItemCond(self,
-            lambda s,w: w is viewport and not self.iscollapsed())
+        self.nodetext = QGraphicsTextItemCond(self, viewport)
         self.nodetext.setTextWidth(self.style.nodetextwidth)
         self.nodetext.setDefaultTextColor(FlPalette.dark)
         self.nodetext.setPos(0, self.nodespeaker.y()+self.nodespeaker.boundingRect().height()+self.style.itemmargin)
@@ -500,30 +513,38 @@ class TextNodeItem (NodeItem):
         self.updatecomment()
         self.updatetext()
     
-    @pyqtSlot()
     def updatespeaker (self):
-        speaker = self.nodeobj.speaker
-        listener = self.nodeobj.listener
-        self.nodespeaker.setText("%s -> %s" % 
-            (elidestring(speaker, 15), elidestring(listener, 15)) )
+        if not self.iscollapsed():
+            speaker = self.nodeobj.speaker
+            listener = self.nodeobj.listener
+            self.nodespeaker.setText("%s -> %s" % 
+                (elidestring(speaker, 15), elidestring(listener, 15)) )
+            self.nodespeaker.show()
+        else:
+            self.nodespeaker.hide()
     
-    @pyqtSlot()
     def updatetext (self):
-        ndtxt = self.nodetext
-        ndtxt.setPlainText(self.view.nodedocs[self.realid()]["text"].toPlainText())
-        textrect = ndtxt.mapRectToParent(ndtxt.boundingRect())
-        self.textbox.setRect(textrect)
-        self.comment.setY(textrect.bottom()+self.style.itemmargin)
-        self.fggroup.removeFromGroup(self.textbox)
-        self.fggroup.addToGroup(self.textbox)
-        self.fggroup.removeFromGroup(ndtxt)
-        self.fggroup.addToGroup(ndtxt)
-        
-        textheight = textrect.height()
-        if textheight == self.textheight:
-            return
-        self.textheight = textheight
-        self.updatelayout()
+        if not self.iscollapsed():
+            ndtxt = self.nodetext
+            ndtxt.setPlainText(self.view.nodedocs[self.realid()]["text"].toPlainText())
+            textrect = ndtxt.mapRectToParent(ndtxt.boundingRect())
+            self.textbox.setRect(textrect)
+            self.comment.setY(textrect.bottom()+self.style.itemmargin)
+            self.fggroup.removeFromGroup(self.textbox)
+            self.fggroup.addToGroup(self.textbox)
+            self.fggroup.removeFromGroup(ndtxt)
+            self.fggroup.addToGroup(ndtxt)
+            
+            textheight = textrect.height()
+            if textheight == self.textheight:
+                return
+            self.textheight = textheight
+            self.updatelayout()
+            self.nodetext.show()
+            self.textbox.show()
+        else:
+            self.nodetext.hide()
+            self.textbox.hide()
     
     def contextMenuEvent (self, event):
         menu = QMenu()
@@ -572,16 +593,15 @@ class BankNodeItem (NodeItem):
         super().graphicsetup()
         darkbrush = QBrush(FlPalette.bg)
         nopen = QPen(0)
+        viewport = self.view.viewport()
         
         firstpix = QPixmap("images/bank-first.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
-        self.btypeicon = QGraphicsPixmapItemCond(firstpix, self,
-            lambda s,w: w is self.view.viewport() and not self.iscollapsed())
+        self.btypeicon = QGraphicsPixmapItemCond(firstpix, self, viewport)
         self.btypeicon.setPos(self.iconx-self.style.itemmargin-firstpix.width(), self.style.itemmargin)
         self.iconx = self.btypeicon.x()
         self.fggroup.addToGroup(self.btypeicon)
         
-        self.centerbox = QGraphicsRectItemCond(self, 
-            lambda s,w: w is self.view.viewport() and not self.iscollapsed())
+        self.centerbox = QGraphicsRectItemCond(self, viewport)
         self.centerbox.setRect(QRectF())
         self.centerbox.setBrush(darkbrush)
         self.centerbox.setPen(nopen)
@@ -590,30 +610,38 @@ class BankNodeItem (NodeItem):
     
     def updatebanktype (self):
         icons = {"First": "bank-first", "All": "bank-all", "Append": "bank-append"}
-        pixmap = QPixmap("images/%s.png" % icons[self.nodeobj.banktype]).scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
-        self.btypeicon.setPixmap(pixmap)
+        if not self.iscollapsed() and self.nodeobj.banktype in icons:
+            pixmap = QPixmap("images/%s.png" % icons[self.nodeobj.banktype]).scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
+            self.btypeicon.setPixmap(pixmap)
+            self.btypeicon.show()
+        else:
+            self.btypeicon.hide()
     
     def updatecenterbox (self):
-        verticalpos = self.centerbox.y()
-        maxwidth = 0
-        for subnode in self.subnodes:
-            noderect = subnode.boundingRect()
-            nodeheight = noderect.height()
-            nodewidth = noderect.width()
-            subnode.show()
-            subnode.yoffset = self.mapToScene(0,verticalpos + nodeheight/2+self.style.activemargin).y()-self.y_bottom()
-            verticalpos += nodeheight
-            maxwidth = max(maxwidth, nodewidth)
-        centerrect = self.centerbox.rect()
-        centerrect.setWidth(maxwidth)
-        centerrect.setHeight(verticalpos-self.centerbox.y())
-        self.centerbox.setRect(centerrect)
-        centerrect = self.centerbox.mapRectToParent(centerrect)
-        
-        self.comment.setY(centerrect.bottom()+self.style.itemmargin)
-        
-        self.fggroup.removeFromGroup(self.centerbox)
-        self.fggroup.addToGroup(self.centerbox)
+        if not self.iscollapsed():
+            verticalpos = self.centerbox.y()
+            maxwidth = 0
+            for subnode in self.subnodes:
+                noderect = subnode.boundingRect()
+                nodeheight = noderect.height()
+                nodewidth = noderect.width()
+                subnode.show()
+                subnode.yoffset = self.mapToScene(0,verticalpos + nodeheight/2+self.style.activemargin).y()-self.y_bottom()
+                verticalpos += nodeheight
+                maxwidth = max(maxwidth, nodewidth)
+            centerrect = self.centerbox.rect()
+            centerrect.setWidth(maxwidth)
+            centerrect.setHeight(verticalpos-self.centerbox.y())
+            self.centerbox.setRect(centerrect)
+            centerrect = self.centerbox.mapRectToParent(centerrect)
+            
+            self.comment.setY(centerrect.bottom()+self.style.itemmargin)
+            
+            self.fggroup.removeFromGroup(self.centerbox)
+            self.fggroup.addToGroup(self.centerbox)
+            self.centerbox.show()
+        else:
+            self.centerbox.hide()
     
     def updatelayout (self):
         if self.iscollapsed():
@@ -818,18 +846,14 @@ class TextEditWidget (QWidget):
     @pyqtSlot()
     def setnodespeaker (self):
         self.nodeobj.speaker = self.speaker.text()
-        self.updatespeaker()
+        view = FlGlob.mainwindow.activeview
+        view.callupdates(self.nodeobj.ID, "updatespeaker")
     
     @pyqtSlot()
     def setnodelistener (self):
         self.nodeobj.listener = self.listener.text()
-        self.updatespeaker()
-    
-    def updatespeaker (self):
         view = FlGlob.mainwindow.activeview
-        if self.nodeobj.ID in view.itemindex:
-            for nodeitem in view.itemindex[self.nodeobj.ID]:
-                nodeitem.updatespeaker()
+        view.callupdates(self.nodeobj.ID, "updatespeaker")
     
     @pyqtSlot()
     def setnodetext (self):
@@ -915,9 +939,10 @@ class CallWidget (QGroupBox):
 class ScriptCallWidget (CallWidget):
     removed = pyqtSignal(fp.ScriptCall)
     
-    def __init__ (self, parent, callobj, cond=False):
+    def __init__ (self, parent, callobj, nodeID, cond=False):
         name = callobj.funcname
         super().__init__(parent, callobj, name)
+        self.nodeID = nodeID
         params = callobj.funcparams[::-1]
         layout = QVBoxLayout(self)
         layout.setContentsMargins(*[9, 4]*2)
@@ -1006,9 +1031,10 @@ class CallCreateWidget (QWidget):
 class ConditionCallWidget (CallWidget):
     removed = pyqtSignal(fp.ConditionCall)
     
-    def __init__ (self, parent, callobj, cond=True):
+    def __init__ (self, parent, callobj, nodeID, cond=True):
         name = "()"
         super().__init__ (parent, callobj, name)
+        self.nodeID = nodeID
         operatorwidget = QWidget(self)
         operatorlabel = QLabel("Operator", operatorwidget)
         operatorcombo = QComboBox(operatorwidget)
@@ -1047,10 +1073,11 @@ class ConditionCallWidget (CallWidget):
         callobj = metacall.callobj
         self.callobj.calls.append(callobj)
         self.addcallwidget(callobj)
-        FlGlob.mainwindow.activeview.viewport().update()
+        view = FlGlob.mainwindow.activeview
+        view.callupdates(self.nodeID, "updatecondition")
     
     def addcallwidget (self, callobj):
-        widget = self.types[callobj.typename](self, callobj, cond=True)
+        widget = self.types[callobj.typename](self, callobj, self.nodeID, cond=True)
         widget.removed.connect(self.removecall)
         widget.changed.connect(self.newtitle)
         self.widgets[callobj] = widget
@@ -1099,7 +1126,8 @@ class ConditionCallWidget (CallWidget):
         self.callswidget.layout().removeWidget(widget)
         widget.deleteLater()
         self.callobj.calls.remove(callobj)
-        FlGlob.mainwindow.activeview.viewport().update()
+        view = FlGlob.mainwindow.activeview
+        view.callupdates(self.nodeID, "updatecondition")
 
 class CallEditWidget (QWidget):
     def __init__ (self, parent):
@@ -1129,7 +1157,7 @@ class ConditionEditWidget (CallEditWidget):
         self.nodeobj = nodeobj
         callobj = nodeobj.condition
         callswidget = self.callsarea.widget()
-        scwidget = ConditionCallWidget(callswidget, callobj)
+        scwidget = ConditionCallWidget(callswidget, callobj, nodeID)
         scwidget.actremove.setEnabled(False)
         callswidget.layout().addWidget(scwidget)
 
@@ -1154,6 +1182,7 @@ class ScriptEditWidget (CallEditWidget):
     def loadnode (self, nodeID):
         view = FlGlob.mainwindow.activeview
         nodeobj = view.nodecontainer.nodes[nodeID]
+        self.nodeobj = nodeobj
         if self.slot == "enter":
             self.scripts = nodeobj.enterscripts
         elif self.slot == "exit":
@@ -1166,11 +1195,12 @@ class ScriptEditWidget (CallEditWidget):
         callobj = metacall.callobj
         self.scripts.append(callobj)
         self.addscriptcallwidget(callobj)
-        FlGlob.mainwindow.activeview.viewport().update()
+        view = FlGlob.mainwindow.activeview
+        view.callupdates(self.nodeobj.ID, "update%sscripts" % self.slot)
     
     def addscriptcallwidget (self, callobj):
         callswidget = self.callsarea.widget()
-        scwidget = ScriptCallWidget(callswidget, callobj)
+        scwidget = ScriptCallWidget(callswidget, callobj, self.nodeobj.ID)
         scwidget.removed.connect(self.removescriptcall)
         self.widgets[callobj] = scwidget
         callswidget.layout().addWidget(scwidget)
@@ -1182,7 +1212,8 @@ class ScriptEditWidget (CallEditWidget):
         callswidget.layout().removeWidget(scwidget)
         scwidget.deleteLater()
         self.scripts.remove(callobj)
-        FlGlob.mainwindow.activeview.viewport().update()
+        view = FlGlob.mainwindow.activeview
+        view.callupdates(self.nodeobj.ID, "update%sscripts" % self.slot)
 
 class PropertiesEditWidget (QWidget):
     def __init__ (self, parent):
@@ -1251,27 +1282,21 @@ class PropertiesEditWidget (QWidget):
         persistence = self.persistence.currentText()
         self.nodeobj.persistence = persistence
         view = FlGlob.mainwindow.activeview
-        if self.nodeobj.ID in view.itemindex:
-            for nodeitem in view.itemindex[self.nodeobj.ID]:
-                nodeitem.updatepersistence()
+        view.callupdates(self.nodeobj.ID, "updatepersistence")
     
     @pyqtSlot()
     def banktypechanged (self):
         banktype = self.banktype.currentText()
         self.nodeobj.banktype = banktype
         view = FlGlob.mainwindow.activeview
-        if self.nodeobj.ID in view.itemindex:
-            for nodeitem in view.itemindex[self.nodeobj.ID]:
-                nodeitem.updatebanktype()
+        view.callupdates(self.nodeobj.ID, "updatebanktype")
     
     @pyqtSlot()
     def randweightchanged (self):
         randweight = float(self.randweight.text())
         self.nodeobj.randweight = randweight
         view = FlGlob.mainwindow.activeview
-        if self.nodeobj.ID in view.itemindex:
-            for nodeitem in view.itemindex[self.nodeobj.ID]:
-                nodeitem.updaterandweight()
+        view.callupdates(self.nodeobj.ID, "updaterandweight")
     
     @pyqtSlot()
     def commentchanged (self):
@@ -1671,6 +1696,13 @@ class TreeView (QGraphicsView):
             if self.activenode is not None:
                 self.activenode.setactive(False)
                 self.activenode = None
+    
+    def callupdates (self, nodeID, funcname):
+        if nodeID in self.itemindex:
+            for nodeitem in self.itemindex[nodeID]:
+                func = getattr(nodeitem, funcname, None)
+                if func is not None:
+                    func()
     
     def createlink (self, toID):
         fromID = self.selectednode.realid()
