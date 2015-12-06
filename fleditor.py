@@ -475,8 +475,16 @@ class TextNodeItem (NodeItem):
         self.fggroup.addToGroup(self.nodetext)
         
         self.view.nodedocs[self.realid()]["text"].contentsChanged.connect(self.updatetext)
+        self.updatespeaker()
         self.updatecomment()
         self.updatetext()
+    
+    @pyqtSlot()
+    def updatespeaker (self):
+        speaker = self.nodeobj.speaker
+        listener = self.nodeobj.listener
+        self.nodespeaker.setText("%s -> %s" % 
+            (elidestring(speaker, 15), elidestring(listener, 15)) )
     
     @pyqtSlot()
     def updatetext (self):
@@ -738,22 +746,26 @@ class ParagraphEdit (QPlainTextEdit):
 class TextEditWidget (QWidget):
     def __init__ (self, parent):
         super().__init__(parent)
-        layout = QVBoxLayout(self)
+        layout = QFormLayout(self)
         l_speaker = QLabel("Speaker")
         self.speaker = QLineEdit(self)
         l_speaker.setBuddy(self.speaker)
+        
+        l_listener = QLabel("Listener")
+        self.listener = QLineEdit(self)
+        l_listener.setBuddy(self.listener)
         
         l_nodetext = QLabel("Text")
         self.nodetext = ParagraphEdit(self)
         l_nodetext.setBuddy(self.nodetext)
         
-        layout.addWidget(l_speaker)
-        layout.addWidget(self.speaker)
-        layout.addWidget(l_nodetext)
-        layout.addWidget(self.nodetext)
+        layout.addRow(l_speaker, self.speaker)
+        layout.addRow(l_listener, self.listener)
+        layout.addRow(l_nodetext, self.nodetext)
         
         self.nodeobj = None
         self.speaker.textChanged.connect(self.setnodespeaker)
+        self.listener.textChanged.connect(self.setnodelistener)
         self.nodetext.textChanged.connect(self.setnodetext)
         
     @pyqtSlot(str)
@@ -764,6 +776,7 @@ class TextEditWidget (QWidget):
             return
         nodetextdoc = view.nodedocs[nodeID]["text"]
         self.speaker.setText(self.nodeobj.speaker)
+        self.listener.setText(self.nodeobj.listener)
         self.nodetext.setDocument(nodetextdoc)
         self.nodetext.setFocus()
         self.nodetext.moveCursor(QTextCursor.End)
@@ -771,6 +784,18 @@ class TextEditWidget (QWidget):
     @pyqtSlot()
     def setnodespeaker (self):
         self.nodeobj.speaker = self.speaker.text()
+        self.updatespeaker()
+    
+    @pyqtSlot()
+    def setnodelistener (self):
+        self.nodeobj.listener = self.listener.text()
+        self.updatespeaker()
+    
+    def updatespeaker (self):
+        view = FlGlob.mainwindow.activeview
+        if self.nodeobj.ID in view.itemindex:
+            for nodeitem in view.itemindex[self.nodeobj.ID]:
+                nodeitem.updatespeaker()
     
     @pyqtSlot()
     def setnodetext (self):

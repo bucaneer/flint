@@ -85,10 +85,11 @@ class ChartNode (object):
 			self.exitscripts = [ScriptCall(s) for s in node_dict['exitscripts']]
 		else:
 			self.exitscripts = []
-			
-		self.nodebank    = self.fromdict(node_dict, "nodebank",    -1)		
+		
+		self.nodebank    = self.fromdict(node_dict, "nodebank",    -1)
 		self.text        = self.fromdict(node_dict, "text",        "")
-		self.speaker     = self.fromdict(node_dict, "speaker",     "")		
+		self.speaker     = self.fromdict(node_dict, "speaker",     "")
+		self.listener	 = self.fromdict(node_dict, "listener",	   "")
 		self.optvars     = self.fromdict(node_dict, "vars",    dict())
 		self.comment     = self.fromdict(node_dict, "comment",     "")
 		self.persistence = self.fromdict(node_dict, "persistence", "")
@@ -148,7 +149,8 @@ class ChartNode (object):
 class TextNode (ChartNode):
 	def todict (self):
 		node_dict = super().todict()
-		node_dict.update({ "text": self.text, "speaker": self.speaker })
+		node_dict.update({ "text": self.text, "speaker": self.speaker,
+			"listener": self.listener })
 		return node_dict
 
 class TalkNode (TextNode):
@@ -173,7 +175,6 @@ class BankNode (ChartNode):
 		node_dict = super().todict()
 		node_dict.update({"subnodes": self.subnodes})
 		return node_dict
-		
 
 class NodesContainer (object):
 	types = { 'talk': TalkNode, 'response': ResponseNode, 'bank': BankNode,
@@ -307,4 +308,3 @@ def writejson (nodecont, filename):
 def newcontainer ():
 	nodes_dict = { "name": "Untitled", "nextID": 1, "nodes": { "0": {"type": "root"} } }
 	return NodesContainer(nodes_dict)
-
