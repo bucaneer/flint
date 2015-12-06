@@ -468,7 +468,7 @@ class TextNodeItem (NodeItem):
         self.nodespeaker = QGraphicsSimpleTextItemCond(self,
             lambda s,w: w is viewport and not self.iscollapsed())
         self.nodespeaker.setBrush(lightbrush)
-        self.nodespeaker.setText(self.nodeobj.speaker)
+        self.nodespeaker.setText(" ")
         self.nodespeaker.setPos(self.style.itemmargin, self.nodelabel.y()+self.nodelabel.boundingRect().height()+self.style.itemmargin*2)
         self.fggroup.addToGroup(self.nodespeaker)
         
