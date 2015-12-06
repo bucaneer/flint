@@ -336,12 +336,20 @@ class NodeItem(QGraphicsItem):
         self.fggroup.addToGroup(self.nodelabel)
         
         self.iconx = self.style.nodetextwidth
+        
         condpix = QPixmap("images/key.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
         self.condicon = QGraphicsPixmapItemCond(condpix, self,
             lambda s,w: w is self.view.viewport() and self.nodeobj.hascond() and not self.iscollapsed())
         self.condicon.setPos(self.iconx-condpix.width(), self.style.itemmargin)
         self.iconx = self.condicon.x()
         self.fggroup.addToGroup(self.condicon)
+        
+        randpix = QPixmap("images/dice.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
+        self.randicon = QGraphicsPixmapItemCond(randpix, self,
+            lambda s,w: w is self.view.viewport())
+        self.randicon.setPos(self.iconx-self.style.itemmargin-randpix.width(), self.style.itemmargin)
+        self.iconx = self.randicon.x()
+        self.fggroup.addToGroup(self.randicon)
         
         exitpix = QPixmap("images/script-exit.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
         self.exiticon = QGraphicsPixmapItemCond(exitpix, self,
@@ -374,8 +382,16 @@ class NodeItem(QGraphicsItem):
         self.graphgroup.addToGroup(self.fggroup)
         
         self.view.nodedocs[self.realid()]["comment"].contentsChanged.connect(self.updatecomment)
+        self.updaterandweight()
         self.updatepersistence()
         # Never call updatelayout() from here!
+    
+    @pyqtSlot()
+    def updaterandweight (self):
+        if self.nodeobj.randweight and not self.iscollapsed():
+            self.randicon.show()
+        else:
+            self.randicon.hide()
     
     @pyqtSlot()
     def updatepersistence (self):
@@ -1189,6 +1205,16 @@ class PropertiesEditWidget (QWidget):
         l_banktype.setBuddy(banktype)
         self.banktype = banktype
         
+        l_randweight = QLabel("Random weight", self)
+        randweight = QLineEdit(self)
+        rwvalidator = QDoubleValidator(self)
+        rwvalidator.setBottom(0)
+        rwvalidator.setDecimals(3)
+        randweight.setValidator(rwvalidator)
+        randweight.editingFinished.connect(self.randweightchanged)
+        l_randweight.setBuddy(randweight)
+        self.randweight = randweight
+        
         l_comment = QLabel("Comment", self)
         comment = ParagraphEdit(self)
         comment.textChanged.connect(self.commentchanged)
@@ -1197,6 +1223,7 @@ class PropertiesEditWidget (QWidget):
         
         layout.addRow(l_persistence, persistence)
         layout.addRow(l_banktype, banktype)
+        layout.addRow(l_randweight, randweight)
         layout.addRow(l_comment, comment)
     
     @pyqtSlot(str)
@@ -1204,12 +1231,16 @@ class PropertiesEditWidget (QWidget):
         view = FlGlob.mainwindow.activeview
         nodeobj = view.nodecontainer.nodes[nodeID]
         self.nodeobj = nodeobj
+        
         self.persistence.setCurrentText(nodeobj.persistence)
+        
         if nodeobj.typename == "bank":
             self.banktype.setCurrentText(nodeobj.banktype)
             self.banktype.setEnabled(True)
         else:
             self.banktype.setEnabled(False)
+        
+        self.randweight.setText(str(nodeobj.randweight))
         
         commentdoc = view.nodedocs[nodeID]["comment"]
         self.comment.setDocument(commentdoc)
@@ -1232,6 +1263,15 @@ class PropertiesEditWidget (QWidget):
         if self.nodeobj.ID in view.itemindex:
             for nodeitem in view.itemindex[self.nodeobj.ID]:
                 nodeitem.updatebanktype()
+    
+    @pyqtSlot()
+    def randweightchanged (self):
+        randweight = float(self.randweight.text())
+        self.nodeobj.randweight = randweight
+        view = FlGlob.mainwindow.activeview
+        if self.nodeobj.ID in view.itemindex:
+            for nodeitem in view.itemindex[self.nodeobj.ID]:
+                nodeitem.updaterandweight()
     
     @pyqtSlot()
     def commentchanged (self):

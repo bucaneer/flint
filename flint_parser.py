@@ -86,6 +86,7 @@ class ChartNode (object):
 		else:
 			self.exitscripts = []
 		
+		self.randweight  = self.fromdict(node_dict, "randweight",     0)
 		self.nodebank    = self.fromdict(node_dict, "nodebank",      -1)
 		self.text        = self.fromdict(node_dict, "text",          "")
 		self.speaker     = self.fromdict(node_dict, "speaker",       "")
@@ -130,21 +131,23 @@ class ChartNode (object):
 	def todict (self):
 		node_dict = { "type": self.typename }
 		if self.linkIDs:
-			node_dict["links"]     = self.linkIDs
+			node_dict["links"]        = self.linkIDs
 		if self.hascond():
-			node_dict['condition'] = self.condition.todict()
+			node_dict['condition']    = self.condition.todict()
 		if self.enterscripts:
 			node_dict['enterscripts'] = [s.todict() for s in self.enterscripts]
 		if self.exitscripts:
 			node_dict['exitscripts']  = [s.todict() for s in self.exitscripts]
 		if self.optvars:
-			node_dict['vars']      = self.optvars
+			node_dict['vars']         = self.optvars
 		if self.comment:
-			node_dict['comment']   = self.comment
+			node_dict['comment']      = self.comment
 		if self.nodebank != -1:
-			node_dict['nodebank']  = self.nodebank
+			node_dict['nodebank']     = self.nodebank
 		if self.persistence:
-			node_dict['persistence']    = self.persistence
+			node_dict['persistence']  = self.persistence
+		if self.randweight:
+			node_dict['randweight']   = self.randweight
 		return node_dict
 
 class TextNode (ChartNode):
