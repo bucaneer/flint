@@ -86,14 +86,15 @@ class ChartNode (object):
 		else:
 			self.exitscripts = []
 		
-		self.nodebank    = self.fromdict(node_dict, "nodebank",    -1)
-		self.text        = self.fromdict(node_dict, "text",        "")
-		self.speaker     = self.fromdict(node_dict, "speaker",     "")
-		self.listener	 = self.fromdict(node_dict, "listener",	   "")
-		self.optvars     = self.fromdict(node_dict, "vars",    dict())
-		self.comment     = self.fromdict(node_dict, "comment",     "")
-		self.persistence = self.fromdict(node_dict, "persistence", "")
-		self.subnodes    = self.fromdict(node_dict, "subnodes",    [])
+		self.nodebank    = self.fromdict(node_dict, "nodebank",      -1)
+		self.text        = self.fromdict(node_dict, "text",          "")
+		self.speaker     = self.fromdict(node_dict, "speaker",       "")
+		self.listener	 = self.fromdict(node_dict, "listener",      "")
+		self.optvars     = self.fromdict(node_dict, "vars",      dict())
+		self.comment     = self.fromdict(node_dict, "comment",       "")
+		self.persistence = self.fromdict(node_dict, "persistence",   "")
+		self.subnodes    = self.fromdict(node_dict, "subnodes",      [])
+		self.banktype	 = self.fromdict(node_dict, "banktype", "First")
 	
 	def fromdict (self, nodedict, key, default=False):
 		return nodedict[key] if key in nodedict else default
@@ -149,8 +150,12 @@ class ChartNode (object):
 class TextNode (ChartNode):
 	def todict (self):
 		node_dict = super().todict()
-		node_dict.update({ "text": self.text, "speaker": self.speaker,
-			"listener": self.listener })
+		if self.text:
+			node_dict["text"]     = self.text
+		if self.speaker:
+			node_dict["speaker"]  = self.speaker
+		if self.listener:
+			node_dict["listener"] = self.listener
 		return node_dict
 
 class TalkNode (TextNode):
@@ -173,7 +178,10 @@ class ResponseNode (TextNode):
 class BankNode (ChartNode):
 	def todict (self):
 		node_dict = super().todict()
-		node_dict.update({"subnodes": self.subnodes})
+		if self.subnodes:
+			node_dict["subnodes"] = self.subnodes
+		if self.banktype != "First":
+			node_dict["banktype"] = self.banktype
 		return node_dict
 
 class NodesContainer (object):

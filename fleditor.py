@@ -335,28 +335,33 @@ class NodeItem(QGraphicsItem):
         self.nodelabel.setPos(self.style.itemmargin, self.style.itemmargin)
         self.fggroup.addToGroup(self.nodelabel)
         
+        self.iconx = self.style.nodetextwidth
         condpix = QPixmap("images/key.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
         self.condicon = QGraphicsPixmapItemCond(condpix, self,
             lambda s,w: w is self.view.viewport() and self.nodeobj.hascond() and not self.iscollapsed())
-        self.condicon.setPos(self.style.nodetextwidth-condpix.width(), self.style.itemmargin)
+        self.condicon.setPos(self.iconx-condpix.width(), self.style.itemmargin)
+        self.iconx = self.condicon.x()
         self.fggroup.addToGroup(self.condicon)
         
         exitpix = QPixmap("images/script-exit.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
         self.exiticon = QGraphicsPixmapItemCond(exitpix, self,
             lambda s,w: w is self.view.viewport() and self.nodeobj.hasexitscripts() and not self.iscollapsed())
-        self.exiticon.setPos(self.condicon.x()-self.style.itemmargin-exitpix.width(), self.style.itemmargin)
+        self.exiticon.setPos(self.iconx-self.style.itemmargin-exitpix.width(), self.style.itemmargin)
+        self.iconx = self.exiticon.x()
         self.fggroup.addToGroup(self.exiticon)
         
         enterpix = QPixmap("images/script-enter.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
         self.entericon = QGraphicsPixmapItemCond(enterpix, self,
             lambda s,w: w is self.view.viewport() and self.nodeobj.hasenterscripts() and not self.iscollapsed())
-        self.entericon.setPos(self.exiticon.x()-self.style.itemmargin-enterpix.width(), self.style.itemmargin)
+        self.entericon.setPos(self.iconx-self.style.itemmargin-enterpix.width(), self.style.itemmargin)
+        self.iconx = self.entericon.x()
         self.fggroup.addToGroup(self.entericon)
         
         blankpix = QPixmap("images/blank.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
         self.persisticon = QGraphicsPixmapItemCond(blankpix, self,
             lambda s,w: w is self.view.viewport() and not self.iscollapsed())
-        self.persisticon.setPos(self.entericon.x()-self.style.itemmargin-blankpix.width(), self.style.itemmargin)
+        self.persisticon.setPos(self.iconx-self.style.itemmargin-blankpix.width(), self.style.itemmargin)
+        self.iconx = self.persisticon.x()
         self.fggroup.addToGroup(self.persisticon)
         
         self.comment = QGraphicsTextItemCond(self,
@@ -544,12 +549,20 @@ class BankNodeItem (NodeItem):
             self.subnodes.append(subnode)
             subnode.setX(self.x())
         self.updatecomment()
+        self.updatebanktype()
         self.updatecenterbox()
     
     def graphicsetup (self):
         super().graphicsetup()
         darkbrush = QBrush(FlPalette.bg)
         nopen = QPen(0)
+        
+        firstpix = QPixmap("images/bank-first.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
+        self.btypeicon = QGraphicsPixmapItemCond(firstpix, self,
+            lambda s,w: w is self.view.viewport() and not self.iscollapsed())
+        self.btypeicon.setPos(self.iconx-self.style.itemmargin-firstpix.width(), self.style.itemmargin)
+        self.iconx = self.btypeicon.x()
+        self.fggroup.addToGroup(self.btypeicon)
         
         self.centerbox = QGraphicsRectItemCond(self, 
             lambda s,w: w is self.view.viewport() and not self.iscollapsed())
@@ -558,6 +571,11 @@ class BankNodeItem (NodeItem):
         self.centerbox.setPen(nopen)
         self.centerbox.setPos(0, self.nodelabel.y()+self.nodelabel.boundingRect().height()+self.style.itemmargin*2)
         self.fggroup.addToGroup(self.centerbox)
+    
+    def updatebanktype (self):
+        icons = {"First": "bank-first", "All": "bank-all", "Append": "bank-append"}
+        pixmap = QPixmap("images/%s.png" % icons[self.nodeobj.banktype]).scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
+        self.btypeicon.setPixmap(pixmap)
     
     def updatecenterbox (self):
         verticalpos = self.centerbox.y()
@@ -1159,17 +1177,26 @@ class PropertiesEditWidget (QWidget):
         persistence = QComboBox(self)
         persvals = ["", "Mark", "OnceEver", "OncePerConv"]
         persistence.insertItems(len(persvals), persvals)
-        persistence.currentTextChanged.connect(self.propertychanged)
+        persistence.currentTextChanged.connect(self.persistencechanged)
         l_persistence.setBuddy(persistence)
         self.persistence = persistence
         
+        l_banktype = QLabel("Bank play type", self)
+        banktype = QComboBox(self)
+        banktypes = ["First", "All", "Append"]
+        banktype.insertItems(len(banktypes), banktypes)
+        banktype.currentTextChanged.connect(self.banktypechanged)
+        l_banktype.setBuddy(banktype)
+        self.banktype = banktype
+        
         l_comment = QLabel("Comment", self)
         comment = ParagraphEdit(self)
-        comment.textChanged.connect(self.propertychanged)
+        comment.textChanged.connect(self.commentchanged)
         self.comment = comment
         l_comment.setBuddy(comment)
         
         layout.addRow(l_persistence, persistence)
+        layout.addRow(l_banktype, banktype)
         layout.addRow(l_comment, comment)
     
     @pyqtSlot(str)
@@ -1177,24 +1204,39 @@ class PropertiesEditWidget (QWidget):
         view = FlGlob.mainwindow.activeview
         nodeobj = view.nodecontainer.nodes[nodeID]
         self.nodeobj = nodeobj
-        self.persistence.setCurrentText(str(nodeobj.persistence))
+        self.persistence.setCurrentText(nodeobj.persistence)
+        if nodeobj.typename == "bank":
+            self.banktype.setCurrentText(nodeobj.banktype)
+            self.banktype.setEnabled(True)
+        else:
+            self.banktype.setEnabled(False)
         
         commentdoc = view.nodedocs[nodeID]["comment"]
         self.comment.setDocument(commentdoc)
         self.comment.moveCursor(QTextCursor.End)
     
     @pyqtSlot()
-    def propertychanged (self):
+    def persistencechanged (self):
         persistence = self.persistence.currentText()
-        comment = self.comment.toPlainText()
-        
         self.nodeobj.persistence = persistence
-        self.nodeobj.comment = comment
-        
         view = FlGlob.mainwindow.activeview
         if self.nodeobj.ID in view.itemindex:
             for nodeitem in view.itemindex[self.nodeobj.ID]:
                 nodeitem.updatepersistence()
+    
+    @pyqtSlot()
+    def banktypechanged (self):
+        banktype = self.banktype.currentText()
+        self.nodeobj.banktype = banktype
+        view = FlGlob.mainwindow.activeview
+        if self.nodeobj.ID in view.itemindex:
+            for nodeitem in view.itemindex[self.nodeobj.ID]:
+                nodeitem.updatebanktype()
+    
+    @pyqtSlot()
+    def commentchanged (self):
+        comment = self.comment.toPlainText()
+        self.nodeobj.comment = comment
 
 class SearchWidget (QWidget):
     searched = pyqtSignal()
