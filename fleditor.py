@@ -1924,27 +1924,27 @@ class EditorWindow (QMainWindow):
         self.filteractions()
     
     def initactions (self):
-        self.actions["openfile"] = self.createaction("Open", self.selectopenfile,
+        self.actions["openfile"] = self.createaction("&Open", self.selectopenfile,
             [QKeySequence.Open], ["document-open"], "Open dialogue file")
-        self.actions["save"] = self.createaction("Save", self.save,
+        self.actions["save"] = self.createaction("&Save", self.save,
             [QKeySequence.Save], ["document-save"], "Save dialogue file")
-        self.actions["saveas"] = self.createaction("Save As", self.saveas,
+        self.actions["saveas"] = self.createaction("Save &As", self.saveas,
             [QKeySequence.SaveAs], ["document-save-as"], "Save dialogue file as")
-        self.actions["newtree"] = self.createaction("New", self.newtree,
+        self.actions["newtree"] = self.createaction("&New", self.newtree,
             [QKeySequence.New], ["document-new"], "New dialogue tree")
         self.actions["close"] = self.createaction("Close", self.closefile,
             None, ["window-close"], "Close file")
         
-        self.actions["zoomin"] = self.createaction("Zoom In", self.zoomin, 
+        self.actions["zoomin"] = self.createaction("Zoom &In", self.zoomin, 
             [QKeySequence.ZoomIn, QKeySequence(Qt.ControlModifier + Qt.KeypadModifier + Qt.Key_Plus)], 
             ["gtk-zoom-in", "zoom-in"], "Zoom in")
-        self.actions["zoomout"] = self.createaction("Zoom Out", self.zoomout, 
+        self.actions["zoomout"] = self.createaction("Zoom &Out", self.zoomout, 
             [QKeySequence.ZoomOut, QKeySequence(Qt.ControlModifier + Qt.KeypadModifier + Qt.Key_Minus)], 
             ["gtk-zoom-out", "zoom-out"], "Zoom out")
-        self.actions["zoomorig"] = self.createaction("Zoom Original", self.zoomorig, 
+        self.actions["zoomorig"] = self.createaction("Zoom O&riginal", self.zoomorig, 
             [QKeySequence(Qt.ControlModifier + Qt.Key_0), QKeySequence(Qt.ControlModifier + Qt.KeypadModifier + Qt.Key_0)], 
             ["gtk-zoom-100", "zoom-original"], "Zoom to original size")
-        self.actions["gotoactive"] = self.createaction("Go To Active", self.gotoactive, 
+        self.actions["gotoactive"] = self.createaction("Go To &Active", self.gotoactive, 
             None, ["go-jump"], "Center on active node")
         
         self.actions["newtalk"] = self.createaction("New &Talk Node", self.newtalk,
@@ -2106,6 +2106,14 @@ class EditorWindow (QMainWindow):
         viewmenu.addAction(self.actions["zoomorig"])
         viewmenu.addAction(self.actions["gotoactive"])
         viewmenu.addAction(self.actions["collapse"])
+        
+        windowmenu = menubar.addMenu("&Window")
+        def generatemenu ():
+            windowmenu.clear()
+            menu = self.createPopupMenu()
+            menu.setTitle("Tools")
+            windowmenu.addMenu(menu)
+        windowmenu.aboutToShow.connect(generatemenu)
     
     def inittoolbars (self):
         filetoolbar = QToolBar("File actions")
