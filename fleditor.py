@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import sys
 from PyQt5.QtGui import *
@@ -18,7 +18,7 @@ class FlPalette (object):
     """Palette of custom colors for quick reference."""
     dark    = QColor( 38,  39,  41)
     light   = QColor(250, 250, 250)
-    hl1     = QColor(200,  60,  19) # QColor(224,  70,  19)
+    hl1     = QColor(200,  60,  19)
     hl1var  = QColor(224, 111,  19)
     hl2     = QColor( 39, 118, 153)
     hl2var  = QColor(108, 158, 171)
@@ -66,29 +66,29 @@ class FlNodeStyle (object):
         self.rowgap = rowgap
 
 class QGraphicsRectItemCond (QGraphicsRectItem):
-    def __init__(self, parent=0, cond=None):
+    def __init__ (self, parent=0, cond=None):
         super().__init__(parent)
         self.cond = cond
     
-    def paint(self, painter, style, widget):
+    def paint (self, painter, style, widget):
         if widget is self.cond:
             super().paint(painter, style, widget)
 
 class QGraphicsSimpleTextItemCond (QGraphicsSimpleTextItem):
-    def __init__(self, parent=0, cond=None):
+    def __init__ (self, parent=0, cond=None):
         super().__init__(parent)
         self.cond = cond
     
-    def paint(self, painter, style, widget):
+    def paint (self, painter, style, widget):
         if widget is self.cond:
             super().paint(painter, style, widget)
 
 class QGraphicsTextItemCond (QGraphicsTextItem):
-    def __init__(self, parent=0, cond=None):
+    def __init__ (self, parent=0, cond=None):
         super().__init__(parent)
         self.cond = cond
     
-    def paint(self, painter, style, widget):
+    def paint (self, painter, style, widget):
         if widget is self.cond:
             super().paint(painter, style, widget)
 
@@ -97,12 +97,12 @@ class QGraphicsPixmapItemCond (QGraphicsPixmapItem):
         super().__init__(pixmap, parent)
         self.cond = cond
     
-    def paint(self, painter, style, widget):
+    def paint (self, painter, style, widget):
         if widget is self.cond:
             super().paint(painter, style, widget)
 
 class NodeItem(QGraphicsItem):
-    def __init__(self, nodeobj, parent=None, view=None, ghost=False):
+    def __init__ (self, nodeobj, parent=None, view=None, ghost=False):
         super().__init__()
         self.nodeobj = nodeobj
         self.children = []
@@ -286,14 +286,11 @@ class NodeItem(QGraphicsItem):
             ymax = self.y_bottom()
         return ymin, ymax, maxdepth
         
-    def boundingRect(self):
+    def boundingRect (self):
         return self.rect
-        
-    def paint(self, painter, style, widget):
-        """if self.nodeobj in self.view.hits:
-            self.textbox.setBrush(QBrush(QColor(255, 255, 100)))
-        else:
-            self.textbox.setBrush(QBrush(QColor(FlPalette.light)))"""
+    
+    def paint (self, painter, style, widget):
+        pass
     
     def graphicsetup (self):
         lightbrush = QBrush(FlPalette.light)
@@ -450,13 +447,13 @@ class NodeItem(QGraphicsItem):
         if event.button() == Qt.LeftButton:
             self.view.setactivenode(self)
     
-    def mousePressEvent(self, event):
+    def mousePressEvent (self, event):
         super().mousePressEvent(event)
         if event.button() & (Qt.LeftButton | Qt.RightButton) :
             self.view.setselectednode(self)
             event.accept()
     
-    def __repr__(self):
+    def __repr__ (self):
         return "<%s %s>" % (type(self).__name__, self.id())
 
 
@@ -480,7 +477,7 @@ class RootNodeItem (NodeItem):
 
 
 class TextNodeItem (NodeItem):
-    def __init__(self, nodeobj, parent=None, view=None, ghost=False):
+    def __init__ (self, nodeobj, parent=None, view=None, ghost=False):
         self.textheight = 0
         self.collapselayout = False
         super().__init__(nodeobj, parent, view, ghost)
@@ -560,7 +557,7 @@ class TextNodeItem (NodeItem):
         if not menu.isEmpty():
             menu.exec_(event.screenPos())
 
-class TalkNodeItem(TextNodeItem):
+class TalkNodeItem (TextNodeItem):
     maincolor = FlPalette.hl1var
     altcolor = FlPalette.hl1
     label = "%s Talk"
@@ -589,7 +586,7 @@ class TalkNodeItem(TextNodeItem):
         else:
             self.qhubicon.hide()
 
-class ResponseNodeItem(TextNodeItem):
+class ResponseNodeItem (TextNodeItem):
     maincolor = FlPalette.hl2var
     altcolor = FlPalette.hl2
     label = "%s Response"
@@ -718,10 +715,10 @@ class BankNodeItem (NodeItem):
             menu.exec_(event.screenPos())
 
 
-class EdgeItem(QGraphicsItem):
+class EdgeItem (QGraphicsItem):
     arrowsize = 10
     
-    def __init__(self, source, view):
+    def __init__ (self, source, view):
         super().__init__()
         self.source = source
         source.setedge(self)
@@ -743,7 +740,7 @@ class EdgeItem(QGraphicsItem):
         
         self.nopen = QPen(0)
     
-    def boundingRect(self):
+    def boundingRect (self):
         xmin = self.source.x()
         xmax = xmin + self.style.rankwidth
         children = self.source.childlist()
@@ -757,7 +754,7 @@ class EdgeItem(QGraphicsItem):
             ymax = y + halfarrow
         return QRectF(xmin, ymin, abs(xmax-xmin), abs(ymax-ymin))
     
-    def paint(self, painter, style, widget, off=0, main=True):
+    def paint (self, painter, style, widget, off=0, main=True):
         children = self.source.childlist()
         if not children:
             return
@@ -908,11 +905,11 @@ class ScriptParamWidget (QWidget):
             if default == "":
                 default = 0
             editor.setValue(int(default))
-        else: #elif annot is str:
+        else:
             editor = QLineEdit(self)
             signal = editor.textEdited
             value = editor.text
-            editor.setText(default)
+            editor.setText(str(default))
         
         layout.addWidget(label)
         layout.addWidget(editor)
@@ -1036,7 +1033,6 @@ class CallCreateWidget (QWidget):
         addbutton.clicked.connect(self.newscriptcall)
         
         layout = QHBoxLayout(self)
-        #layout.setContentsMargins(*[0]*4)
         layout.addWidget(combobox)
         layout.addWidget(addbutton)
     
@@ -1073,7 +1069,6 @@ class ConditionCallWidget (CallWidget):
         operatorcombo.setCurrentText(callobj.operatorname)
         operatorcombo.currentTextChanged.connect(self.setoperator)
         operatorlayout = QHBoxLayout(operatorwidget)
-        #operatorlayout.setContentsMargins(*[0]*4)
         operatorlayout.addWidget(operatorlabel)
         operatorlayout.addWidget(operatorcombo)
         
@@ -1173,7 +1168,6 @@ class CallEditWidget (QWidget):
         self.callsarea.setWidget(callswidget)
         
         layout = QVBoxLayout(self)
-        #layout.setContentsMargins(*[0]*4)
         layout.setAlignment(Qt.AlignTop)
 
 class ConditionEditWidget (CallEditWidget):
@@ -1434,7 +1428,7 @@ class NodeListWidget (QWidget):
             self.selectbyID(self.view.selectednode.realid())
     
     @pyqtSlot(str)
-    def selectbyID(self, nodeID):
+    def selectbyID (self, nodeID):
         if not self.active:
             return
         if nodeID in self.index:
@@ -1857,7 +1851,7 @@ class TreeView (QGraphicsView):
         else:
             super().wheelEvent(event)
     
-    def keyPressEvent(self, event):
+    def keyPressEvent (self, event):
         key = event.key()
         mod = event.modifiers()
         node = self.selectednode
@@ -1964,7 +1958,6 @@ class EditorWindow (QMainWindow):
         self.selectedChanged.connect(nodelist.selectbyID)
         listdock = QDockWidget("Node &List", self)
         listdock.setWidget(nodelist)
-        #listdock.hide()
         self.listdock = listdock
         
         self.setCentralWidget(tabs)
@@ -2135,7 +2128,7 @@ class EditorWindow (QMainWindow):
         addmenu.addAction(self.actions["newtalk"])
         addmenu.addAction(self.actions["newresponse"])
         addmenu.addAction(self.actions["newbank"])
-        #addmenu.setIcon(QIcon.fromTheme("insert-object"))
+        addmenu.setIcon(QIcon.fromTheme("insert-object"))
         self.addmenu = addmenu
         
         subnodemenu = QMenu("Add &subnode...")
@@ -2143,6 +2136,7 @@ class EditorWindow (QMainWindow):
         subnodemenu.addSeparator()
         subnodemenu.addAction(self.actions["newtalksub"])
         subnodemenu.addAction(self.actions["newresponsesub"])
+        subnodemenu.setIcon(QIcon.fromTheme("insert-object"))
         self.subnodemenu = subnodemenu
         
         editmenu = menubar.addMenu("&Edit")
@@ -2189,7 +2183,6 @@ class EditorWindow (QMainWindow):
         self.addToolBar(viewtoolbar)
         
         edittoolbar = QToolBar("Tree editing")
-        #edittoolbar.addAction(self.addmenu.menuAction())
         edittoolbar.addAction(self.actions["copynode"])
         edittoolbar.addAction(self.actions["pasteclone"])
         edittoolbar.addAction(self.actions["pastelink"])
@@ -2241,7 +2234,7 @@ class EditorWindow (QMainWindow):
         self.resetdocks()
         if nodeID == "-1":
             return
-        view = self.activeview #()
+        view = self.activeview
         nodeobj = view.nodecontainer.nodes[nodeID]
         if nodeobj.typename in ["talk", "response"]:
             self.textdock.widget().setEnabled(True)
@@ -2280,7 +2273,7 @@ class EditorWindow (QMainWindow):
     
     @pyqtSlot()
     def save (self, newfile=False):
-        view = self.activeview #()
+        view = self.activeview
         if view is None:
             return
         nodecont = view.nodecontainer
@@ -2297,7 +2290,7 @@ class EditorWindow (QMainWindow):
     
     @pyqtSlot()
     def closefile (self):
-        view = self.activeview #()
+        view = self.activeview
         if view is None:
             return
         index = self.tabs.indexOf(view)

@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import fl_scripts
 import json
 
