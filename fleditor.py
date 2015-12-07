@@ -1439,7 +1439,7 @@ class NodeListWidget (QWidget):
         if   typename == "root":
             descr = ""
         elif typename == "bank":
-            descr = ""
+            descr = "(%s) %s" % (nodeobj.banktype, ", ".join(nodeobj.subnodes))
         elif typename == "talk":
             descr = "[%s]" % elidestring(nodeobj.text, 30)
         elif typename == "response":
