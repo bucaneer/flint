@@ -37,6 +37,7 @@ class FlNodeStyle (object):
         self.boldfont = boldfont
         
         basemetrics = QFontMetrics(basefont)
+        self.basemetrics = basemetrics
         baseem = basemetrics.height()
         baseen = baseem // 2
         
@@ -516,8 +517,9 @@ class TextNodeItem (NodeItem):
         if not self.iscollapsed():
             speaker = self.nodeobj.speaker
             listener = self.nodeobj.listener
-            self.nodespeaker.setText("%s -> %s" % 
-                (elidestring(speaker, 15), elidestring(listener, 15)) )
+            label = "%s -> %s" % (elidestring(speaker, 15), elidestring(listener, 15))
+            fixedwidth = self.style.basemetrics.elidedText(label, Qt.ElideRight, self.style.nodetextwidth)
+            self.nodespeaker.setText(fixedwidth)
             self.nodespeaker.show()
         else:
             self.nodespeaker.hide()
