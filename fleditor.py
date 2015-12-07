@@ -64,6 +64,10 @@ class FlNodeStyle (object):
         
         rowgap = 3*activemargin
         self.rowgap = rowgap
+        
+        # Edge style
+        self.pensize = self.shadowoffset
+        self.arrowsize = self.pensize * 5
 
 class QGraphicsRectItemCond (QGraphicsRectItem):
     def __init__ (self, parent=0, cond=None):
@@ -716,16 +720,16 @@ class BankNodeItem (NodeItem):
 
 
 class EdgeItem (QGraphicsItem):
-    arrowsize = 10
-    
     def __init__ (self, source, view):
         super().__init__()
         self.source = source
         source.setedge(self)
         self.view = weakref.proxy(view)
         self.style = FlGlob.mainwindow.style
+        self.arrowsize = self.style.arrowsize
+        self.pensize = self.style.pensize
         
-        pen = QPen(FlPalette.light, 2, cap = Qt.FlatCap, join=Qt.MiterJoin)
+        pen = QPen(FlPalette.light, self.pensize, cap = Qt.FlatCap, join=Qt.MiterJoin)
         pen.setCosmetic(True)
         brush = QBrush(FlPalette.light)
         
@@ -768,7 +772,7 @@ class EdgeItem (QGraphicsItem):
             pen.setWidth(1)
             pen.setCosmetic(True)
         elif self.view.zoomscale >= 1:
-            pen.setWidth(2)
+            pen.setWidth(self.pensize)
             pen.setCosmetic(False)
         
         painter.setPen(pen)
