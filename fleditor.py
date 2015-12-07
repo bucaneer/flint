@@ -1991,31 +1991,32 @@ class EditorWindow (QMainWindow):
                 else:
                     action.setEnabled(True)
         else:
-            nodes = view.nodecontainer.nodes
-            if not self.selectednode or self.selectednode not in nodes:
-                return
-            nodeobj = view.nodecontainer.nodes[self.selectednode]
             genericactions = ["zoomin", "zoomout", "zoomorig", "gotoactive",
                 "collapse", "openfile", "save", "saveas", "newtree", "close"]
-            if self.selectednode not in self.activeview.itemindex:
-                if nodeobj.typename != "root":
-                    actions = ["copynode", "settemplate"]
-                else:
-                    actions = []
-            elif nodeobj.typename in ["talk", "response"]:
-                actions = ["copynode", "moveup", "movedown", "unlinknode", 
-                    "unlinkstree", "settemplate"]
-                if nodeobj.nodebank == -1:
-                    actions.extend(["newtalk", "newresponse", "newbank", 
-                        "pasteclone", "pastelink", "parentswap"])
-            elif nodeobj.typename == "bank":
-                actions = ["copynode", "moveup", "movedown", "unlinknode", 
-                    "newtalk", "newresponse", "newbank", "pasteclone", "pastelink",
-                    "unlinkstree", "newtalksub", "newresponsesub", "pastesubnode",
-                    "parentswap", "settemplate"]
-            elif nodeobj.typename == "root":
-                actions = ["newtalk", "newresponse", "newbank", "pasteclone",
-                    "pastelink"]
+            nodes = view.nodecontainer.nodes
+            if not self.selectednode or self.selectednode not in nodes:
+                actions = []
+            else:
+                nodeobj = nodes[self.selectednode]
+                if self.selectednode not in view.itemindex:
+                    if nodeobj.typename != "root":
+                        actions = ["copynode", "settemplate"]
+                    else:
+                        actions = []
+                elif nodeobj.typename in ["talk", "response"]:
+                    actions = ["copynode", "moveup", "movedown", "unlinknode", 
+                        "unlinkstree", "settemplate"]
+                    if nodeobj.nodebank == -1:
+                        actions.extend(["newtalk", "newresponse", "newbank", 
+                            "pasteclone", "pastelink", "parentswap"])
+                elif nodeobj.typename == "bank":
+                    actions = ["copynode", "moveup", "movedown", "unlinknode", 
+                        "newtalk", "newresponse", "newbank", "pasteclone", "pastelink",
+                        "unlinkstree", "newtalksub", "newresponsesub", "pastesubnode",
+                        "parentswap", "settemplate"]
+                elif nodeobj.typename == "root":
+                    actions = ["newtalk", "newresponse", "newbank", "pasteclone",
+                        "pastelink"]
             
             actions.extend(genericactions)
             for name, action in self.actions.items():
@@ -2026,7 +2027,7 @@ class EditorWindow (QMainWindow):
                         else:
                             action.setEnabled(False)
                     elif name == "pastelink":
-                        if self.copiednode[0] is not None and self.copiednode[1] is self.activeview:
+                        if self.copiednode[0] is not None and self.copiednode[1] is view:
                             action.setEnabled(True)
                         else:
                             action.setEnabled(False)
@@ -2148,6 +2149,8 @@ class EditorWindow (QMainWindow):
                 self.setactivenode(view, "-1")
             if view.selectednode is not None:
                 self.setselectednode(view, view.selectednode.realid())
+            else:
+                self.setselectednode(view, "-1")
         self.viewChanged.emit()
     
     def setactivenode (self, view, nodeID):
@@ -2293,6 +2296,8 @@ class EditorWindow (QMainWindow):
     @pyqtSlot()
     def copynode (self):
         view = self.activeview
+        if self.selectednode not in view.nodecontainer.nodes:
+            return
         nodeobj = view.nodecontainer.nodes[self.selectednode]
         nodedict = nodeobj.todict()
         nodedict["links"] = []
@@ -2312,6 +2317,8 @@ class EditorWindow (QMainWindow):
     @pyqtSlot()
     def settemplate (self):
         view = self.activeview
+        if self.selectednode not in view.nodecontainer.nodes:
+            return
         nodeobj = view.nodecontainer.nodes[self.selectednode].copy()
         nodeobj.linkIDs = []
         nodeobj.subnodes = []
