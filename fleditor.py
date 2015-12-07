@@ -1873,31 +1873,31 @@ class EditorWindow (QMainWindow):
         textdock = QDockWidget("Text", self)
         textdock.newWidget = lambda: TextEditWidget(self)
         textdock.setWidget(TextEditWidget(self))
-        textdock.setEnabled(False)
+        textdock.widget().setEnabled(False)
         self.textdock = textdock
         
         conddock = QDockWidget("Condition", self)
         conddock.newWidget = lambda: ConditionEditWidget(self)
         conddock.setWidget(ConditionEditWidget(self))
-        conddock.setEnabled(False)
+        conddock.widget().setEnabled(False)
         self.conddock = conddock
         
         onenterdock = QDockWidget("On Enter", self)
         onenterdock.newWidget = lambda: ScriptEditWidget(self, slot="enter")
         onenterdock.setWidget(ScriptEditWidget(self, slot="enter"))
-        onenterdock.setEnabled(False)
+        onenterdock.widget().setEnabled(False)
         self.onenterdock = onenterdock
         
         onexitdock = QDockWidget("On Exit", self)
         onexitdock.newWidget = lambda: ScriptEditWidget(self, slot="exit")
         onexitdock.setWidget(ScriptEditWidget(self, slot="exit"))
-        onexitdock.setEnabled(False)
+        onexitdock.widget().setEnabled(False)
         self.onexitdock = onexitdock
         
         propdock = QDockWidget("Properties", self)
         propdock.newWidget = lambda: PropertiesEditWidget(self)
         propdock.setWidget(PropertiesEditWidget(self))
-        propdock.setEnabled(False)
+        propdock.widget().setEnabled(False)
         self.propdock = propdock
         
         nodelist = NodeListWidget(self)
@@ -2162,9 +2162,9 @@ class EditorWindow (QMainWindow):
     
     def resetdocks (self):
         for dock in (self.textdock, self.onenterdock, self.onexitdock, self.conddock, self.propdock):
-            dock.setEnabled(False)
             olddock = dock.widget()
             dock.setWidget(dock.newWidget())
+            dock.widget().setEnabled(False)
             olddock.deleteLater()
     
     @pyqtSlot(str)
@@ -2175,19 +2175,14 @@ class EditorWindow (QMainWindow):
         view = self.activeview #()
         nodeobj = view.nodecontainer.nodes[nodeID]
         if nodeobj.typename in ["talk", "response"]:
-            self.textdock.setEnabled(True)
+            self.textdock.widget().setEnabled(True)
             self.textdock.widget().loadnode(nodeID)
         else:
-            self.textdock.setEnabled(False)
+            self.textdock.widget().setEnabled(False)
         
-        self.onenterdock.setEnabled(True)
-        self.onenterdock.widget().loadnode(nodeID)
-        self.onexitdock.setEnabled(True)
-        self.onexitdock.widget().loadnode(nodeID)
-        self.conddock.setEnabled(True)
-        self.conddock.widget().loadnode(nodeID)
-        self.propdock.setEnabled(True)
-        self.propdock.widget().loadnode(nodeID)
+        for dock in (self.onenterdock, self.onexitdock, self.conddock, self.propdock):
+            dock.widget().setEnabled(True)
+            dock.widget().loadnode(nodeID)
     
     @pyqtSlot()
     def selectopenfile (self):
