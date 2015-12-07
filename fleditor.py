@@ -1855,6 +1855,7 @@ class TreeView (QGraphicsView):
     
     def keyPressEvent(self, event):
         key = event.key()
+        mod = event.modifiers()
         node = self.selectednode
         if key == Qt.Key_Left:
             if node.parent:
@@ -1868,10 +1869,15 @@ class TreeView (QGraphicsView):
             if sib:
                 self.setselectednode(sib)
         elif key == Qt.Key_Right:
-            children = node.childlist()
-            count = len(children)-1
-            if children:
-                self.setselectednode(children[count//2])
+            if mod & Qt.ControlModifier and isinstance(node, BankNodeItem):
+                if node.subnodes:
+                    subnode = node.subnodes[0]
+                    self.setselectednode(subnode)
+            else:
+                children = node.childlist()
+                count = len(children)-1
+                if children:
+                    self.setselectednode(children[count//2])
         elif key == Qt.Key_Enter or key == Qt.Key_Return:
             if self.selectednode:
                 self.setactivenode(self.selectednode)
