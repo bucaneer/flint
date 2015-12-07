@@ -96,6 +96,7 @@ class ChartNode (object):
 		self.persistence = self.fromdict(node_dict, "persistence",   "")
 		self.subnodes    = self.fromdict(node_dict, "subnodes",      [])
 		self.banktype	 = self.fromdict(node_dict, "banktype", "First")
+		self.questionhub = self.fromdict(node_dict, "questionhub",   "")
 	
 	def fromdict (self, nodedict, key, default=False):
 		return nodedict[key] if key in nodedict else default
@@ -174,6 +175,12 @@ class TalkNode (TextNode):
 				todisplay.append(nodeid)
 				if nodeobj.typename == "response":
 					break
+	
+	def todict (self):
+		node_dict = super().todict()
+		if self.questionhub:
+			node_dict["questionhub"] = self.questionhub
+		return node_dict
 
 class ResponseNode (TextNode):
 	pass

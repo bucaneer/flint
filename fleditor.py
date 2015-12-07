@@ -381,7 +381,8 @@ class NodeItem(QGraphicsItem):
         self.updateexitscripts()
         self.updaterandweight()
         self.updatepersistence()
-        # Never call updatelayout() from here!
+        
+        # Never call updatelayout() from here (or any inheritable reimplementation)!
     
     def updatecondition (self):
         if self.nodeobj.hascond() and not self.iscollapsed():
@@ -509,9 +510,6 @@ class TextNodeItem (NodeItem):
         self.fggroup.addToGroup(self.nodetext)
         
         self.view.nodedocs[self.realid()]["text"].contentsChanged.connect(self.updatetext)
-        self.updatespeaker()
-        self.updatecomment()
-        self.updatetext()
     
     def updatespeaker (self):
         if not self.iscollapsed():
@@ -566,11 +564,41 @@ class TalkNodeItem(TextNodeItem):
     maincolor = FlPalette.hl1var
     altcolor = FlPalette.hl1
     label = "%s Talk"
+    
+    def graphicsetup (self):
+        super().graphicsetup()
+        viewport = self.view.viewport()
+        
+        blankpix = QPixmap("images/blank.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
+        self.qhubicon = QGraphicsPixmapItemCond(blankpix, self, viewport)
+        self.qhubicon.setPos(self.iconx-self.style.itemmargin-blankpix.width(), self.style.itemmargin)
+        self.iconx = self.qhubicon.x()
+        self.fggroup.addToGroup(self.qhubicon)
+        
+        self.updatespeaker()
+        self.updatecomment()
+        self.updatetext()
+        self.updatequestionhub()
+    
+    def updatequestionhub (self):
+        icons = {"ShowOnce": "question-once", "ShowNever": "question-never"}
+        if not self.iscollapsed() and self.nodeobj.questionhub in icons:
+            pixmap = QPixmap("images/%s.png" % icons[self.nodeobj.questionhub]).scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
+            self.qhubicon.setPixmap(pixmap)
+            self.qhubicon.show()
+        else:
+            self.qhubicon.hide()
 
 class ResponseNodeItem(TextNodeItem):
     maincolor = FlPalette.hl2var
     altcolor = FlPalette.hl2
     label = "%s Response"
+    
+    def graphicsetup (self):
+        super().graphicsetup()
+        self.updatespeaker()
+        self.updatecomment()
+        self.updatetext()
 
 class BankNodeItem (NodeItem):
     maincolor = FlPalette.bank
@@ -809,15 +837,15 @@ class TextEditWidget (QWidget):
     def __init__ (self, parent):
         super().__init__(parent)
         layout = QFormLayout(self)
-        l_speaker = QLabel("Speaker")
+        l_speaker = QLabel("&Speaker")
         self.speaker = QLineEdit(self)
         l_speaker.setBuddy(self.speaker)
         
-        l_listener = QLabel("Listener")
+        l_listener = QLabel("&Listener")
         self.listener = QLineEdit(self)
         l_listener.setBuddy(self.listener)
         
-        l_nodetext = QLabel("Text")
+        l_nodetext = QLabel("&Text")
         self.nodetext = ParagraphEdit(self)
         l_nodetext.setBuddy(self.nodetext)
         
@@ -840,7 +868,6 @@ class TextEditWidget (QWidget):
         self.speaker.setText(self.nodeobj.speaker)
         self.listener.setText(self.nodeobj.listener)
         self.nodetext.setDocument(nodetextdoc)
-        self.nodetext.setFocus()
         self.nodetext.moveCursor(QTextCursor.End)
     
     @pyqtSlot()
@@ -1220,7 +1247,7 @@ class PropertiesEditWidget (QWidget):
         super().__init__(parent)
         layout = QFormLayout(self)
         
-        l_persistence = QLabel("Persistence", self)
+        l_persistence = QLabel("&Persistence", self)
         persistence = QComboBox(self)
         persvals = ["", "Mark", "OnceEver", "OncePerConv"]
         persistence.insertItems(len(persvals), persvals)
@@ -1228,7 +1255,7 @@ class PropertiesEditWidget (QWidget):
         l_persistence.setBuddy(persistence)
         self.persistence = persistence
         
-        l_banktype = QLabel("Bank play type", self)
+        l_banktype = QLabel("&Bank play type", self)
         banktype = QComboBox(self)
         banktypes = ["First", "All", "Append"]
         banktype.insertItems(len(banktypes), banktypes)
@@ -1236,7 +1263,15 @@ class PropertiesEditWidget (QWidget):
         l_banktype.setBuddy(banktype)
         self.banktype = banktype
         
-        l_randweight = QLabel("Random weight", self)
+        l_questionhub = QLabel("&Question hub", self)
+        questionhub = QComboBox(self)
+        qhubtypes = ["", "ShowOnce", "ShowNever"]
+        questionhub.insertItems(len(qhubtypes), qhubtypes)
+        questionhub.currentTextChanged.connect(self.questionhubchanged)
+        l_questionhub.setBuddy(questionhub)
+        self.questionhub = questionhub
+        
+        l_randweight = QLabel("&Random weight", self)
         randweight = QLineEdit(self)
         rwvalidator = QDoubleValidator(self)
         rwvalidator.setBottom(0)
@@ -1246,7 +1281,7 @@ class PropertiesEditWidget (QWidget):
         l_randweight.setBuddy(randweight)
         self.randweight = randweight
         
-        l_comment = QLabel("Comment", self)
+        l_comment = QLabel("&Comment", self)
         comment = ParagraphEdit(self)
         comment.textChanged.connect(self.commentchanged)
         self.comment = comment
@@ -1254,6 +1289,7 @@ class PropertiesEditWidget (QWidget):
         
         layout.addRow(l_persistence, persistence)
         layout.addRow(l_banktype, banktype)
+        layout.addRow(l_questionhub, questionhub)
         layout.addRow(l_randweight, randweight)
         layout.addRow(l_comment, comment)
     
@@ -1270,6 +1306,12 @@ class PropertiesEditWidget (QWidget):
             self.banktype.setEnabled(True)
         else:
             self.banktype.setEnabled(False)
+        
+        if nodeobj.typename == "talk":
+            self.questionhub.setCurrentText(nodeobj.questionhub)
+            self.questionhub.setEnabled(True)
+        else:
+            self.questionhub.setEnabled(False)
         
         self.randweight.setText(str(nodeobj.randweight))
         
@@ -1290,6 +1332,13 @@ class PropertiesEditWidget (QWidget):
         self.nodeobj.banktype = banktype
         view = FlGlob.mainwindow.activeview
         view.callupdates(self.nodeobj.ID, "updatebanktype")
+    
+    @pyqtSlot()
+    def questionhubchanged (self):
+        questionhub = self.questionhub.currentText()
+        self.nodeobj.questionhub = questionhub
+        view = FlGlob.mainwindow.activeview
+        view.callupdates(self.nodeobj.ID, "updatequestionhub")
     
     @pyqtSlot()
     def randweightchanged (self):
@@ -1869,31 +1918,31 @@ class EditorWindow (QMainWindow):
         mapdock = QDockWidget("Map view", self)
         mapdock.setWidget(mapview)
         
-        textdock = QDockWidget("Text", self)
+        textdock = QDockWidget("&Text", self)
         textdock.newWidget = lambda: TextEditWidget(self)
         textdock.setWidget(TextEditWidget(self))
         textdock.widget().setEnabled(False)
         self.textdock = textdock
         
-        conddock = QDockWidget("Condition", self)
+        conddock = QDockWidget("&Condition", self)
         conddock.newWidget = lambda: ConditionEditWidget(self)
         conddock.setWidget(ConditionEditWidget(self))
         conddock.widget().setEnabled(False)
         self.conddock = conddock
         
-        onenterdock = QDockWidget("On Enter", self)
+        onenterdock = QDockWidget("On E&nter", self)
         onenterdock.newWidget = lambda: ScriptEditWidget(self, slot="enter")
         onenterdock.setWidget(ScriptEditWidget(self, slot="enter"))
         onenterdock.widget().setEnabled(False)
         self.onenterdock = onenterdock
         
-        onexitdock = QDockWidget("On Exit", self)
+        onexitdock = QDockWidget("On E&xit", self)
         onexitdock.newWidget = lambda: ScriptEditWidget(self, slot="exit")
         onexitdock.setWidget(ScriptEditWidget(self, slot="exit"))
         onexitdock.widget().setEnabled(False)
         self.onexitdock = onexitdock
         
-        propdock = QDockWidget("Properties", self)
+        propdock = QDockWidget("&Properties", self)
         propdock.newWidget = lambda: PropertiesEditWidget(self)
         propdock.setWidget(PropertiesEditWidget(self))
         propdock.widget().setEnabled(False)
@@ -1903,7 +1952,7 @@ class EditorWindow (QMainWindow):
         self.viewChanged.connect(nodelist.setview)
         self.viewUpdated.connect(nodelist.populatelist)
         self.selectedChanged.connect(nodelist.selectbyID)
-        listdock = QDockWidget("Node List", self)
+        listdock = QDockWidget("Node &List", self)
         listdock.setWidget(nodelist)
         #listdock.hide()
         self.listdock = listdock
