@@ -1862,7 +1862,6 @@ class EditorWindow (QMainWindow):
         self.tabs = tabs                        
         
         mapview = MapView(self)
-        mapview.setMinimumSize(200, 200)
         maptimer = QTimer(self)
         maptimer.timeout.connect(mapview.update)
         maptimer.start(100) # OPTION: mapview frame rate
