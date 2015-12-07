@@ -7,9 +7,9 @@ class ScriptCall (fl_scripts.ScriptCalls):
 	def __init__ (self, sc_dict):
 		self.typename = sc_dict['type']
 		self.funcname = sc_dict['command']
-		if self.funcname[:3] != "sc_":
-			raise RuntimeError("Attempted to bind non-custom function")
-		self.funccall = getattr(self, self.funcname)
+		if self.funcname not in self.scripts:
+			raise RuntimeError("Unknown script: %s" % self.funcname)
+		self.funccall = self.scripts[self.funcname]
 		self.funcparams = sc_dict['params'] if 'params' in sc_dict else []
 		self._not = bool(sc_dict['not']) if 'not' in sc_dict else False
 	

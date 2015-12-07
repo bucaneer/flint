@@ -1,21 +1,27 @@
-#!/usr/bin/env python
-
 from time import sleep
 
 class ScriptCalls (object):
-	def sc_print (self, words):
-		print(" ".join(words))
-		return True
+	scripts = dict()
 	
-	def sc_wait (self, seconds: int):
-		sleep(seconds)
-		return True
-	
-	def sc_quick (self):
-		return True
-	
-	def sc_false (self):
-		return False
-	
-	def sc_bool (self, var: bool):
-		return var
+	def __init__ (self, func):
+		self.scripts[func.__name__] = func
+
+@ScriptCalls
+def printwords (words):
+	print(" ".join(words))
+
+@ScriptCalls
+def wait (seconds: int):
+	sleep(seconds)
+
+@ScriptCalls
+def rettrue () -> bool:
+	return True
+
+@ScriptCalls
+def retfalse () -> bool:
+	return False
+
+@ScriptCalls
+def retbool (var: bool) -> bool:
+	return var

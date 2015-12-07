@@ -1020,13 +1020,17 @@ class CallCreateWidget (QWidget):
     
     def __init__ (self, parent, cond=False):
         super().__init__(parent)
-        scriptcalls = [sc for sc in dir(fp.ScriptCall) if sc[:3] == "sc_"]
+        scripts = fp.ScriptCall.scripts
         if cond:
-            scriptcalls.insert(0, "( )")
-        self.scriptcalls = scriptcalls
+            names = ["( )"]
+            condcalls = [n for n, sc in scripts.items() if "return" in sc.__annotations__]
+            names.extend(sorted(condcalls))
+        else:
+            names = sorted(scripts.keys())
+        self.scriptcalls = names
         
         combobox = QComboBox(self)
-        combobox.insertItems(len(scriptcalls), scriptcalls)
+        combobox.insertItems(len(self.scriptcalls), self.scriptcalls)
         self.combobox = combobox
         addbutton = QPushButton("Add", self)
         addbutton.clicked.connect(self.newscriptcall)
@@ -1042,7 +1046,7 @@ class CallCreateWidget (QWidget):
         if name == "( )":
             callobj = fp.MetaCall({"type":"cond","operator":"and","calls":[]})
         else:
-            signature = insp.signature(getattr(fp.ScriptCall, name))
+            signature = insp.signature(fp.ScriptCall.scripts[name])
             defaults = {int: 0, bool: False}
             params = []
             for param in signature.parameters.values():
