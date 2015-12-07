@@ -1148,6 +1148,9 @@ class ConditionCallWidget (CallWidget):
     @pyqtSlot(fp.ScriptCall)
     @pyqtSlot(fp.ConditionCall)
     def removecall (self, callobj):
+        prompt = QMessageBox.question(self, "Prompt", "Remove call?")
+        if prompt == QMessageBox.No:
+            return
         widget = self.widgets.pop(callobj)
         self.callswidget.layout().removeWidget(widget)
         widget.deleteLater()
@@ -1232,6 +1235,9 @@ class ScriptEditWidget (CallEditWidget):
     
     @pyqtSlot(fp.ScriptCall)
     def removescriptcall (self, callobj):
+        prompt = QMessageBox.question(self, "Prompt", "Remove call?")
+        if prompt == QMessageBox.No:
+            return
         callswidget = self.callsarea.widget()
         scwidget = self.widgets.pop(callobj)
         callswidget.layout().removeWidget(scwidget)
