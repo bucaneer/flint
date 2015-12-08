@@ -718,6 +718,7 @@ class BankNodeItem (NodeItem):
             menu.addAction(window.actions["parentswap"])
             menu.addAction(window.actions["unlinknode"])
             menu.addAction(window.actions["unlinkstree"])
+            menu.addMenu(window.transformmenu)
         if not menu.isEmpty():
             menu.exec_(event.screenPos())
 
@@ -1848,7 +1849,26 @@ class TreeView (QGraphicsView):
         clonedict["nodebank"] = nodeID
         
         cont.newnode(bankdict, newID=nodeID, refID=refID, force=True)
-        cont.newnode(clonedict, bankID=nodeID)
+        newobj = cont.newnode(clonedict, bankID=nodeID)
+        
+        self.nodedocs[newobj.ID] = self.nodedocs[nodeID]
+        self.updateview()
+    
+    def banktonode (self):
+        selnode = self.selectednode
+        selnode = self.selectednode
+        cont = self.nodecontainer
+        nodeID = selnode.realid()
+        refID = selnode.parent.realid()
+        subID = selnode.subnodes[0].realid()
+        nodedict = selnode.subnodes[0].nodeobj.todict()
+        
+        clonedict = nodedict.copy()
+        clonedict["nodebank"] = -1
+        
+        cont.newnode(clonedict, newID=nodeID, refID=refID, force=True)
+        
+        self.nodedocs[nodeID] = self.nodedocs[subID]
         self.updateview()
     
     def collapse (self, collapse=None):
@@ -2062,6 +2082,8 @@ class EditorWindow (QMainWindow):
         
         self.actions["nodetobank"] = self.createaction("Regular -> Bank", self.nodetobank,
             None, None, "Transform node into a Bank node")
+        self.actions["banktonode"] = self.createaction("Bank -> Regular", self.banktonode,
+            None, None, "Transform Bank node into a regular node")
     
     @pyqtSlot()
     def filteractions (self):
@@ -2097,6 +2119,8 @@ class EditorWindow (QMainWindow):
                         "newtalk", "newresponse", "newbank", "pasteclone", "pastelink",
                         "unlinkstree", "newtalksub", "newresponsesub", "pastesubnode",
                         "parentswap", "settemplate"]
+                    if len(nodeobj.subnodes) == 1:
+                        actions.extend(["banktonode"])
                 elif nodeobj.typename == "root":
                     actions = ["newtalk", "newresponse", "newbank", "pasteclone",
                         "pastelink"]
@@ -2173,6 +2197,7 @@ class EditorWindow (QMainWindow):
         
         transformmenu = QMenu("Trans&form...")
         transformmenu.addAction(self.actions["nodetobank"])
+        transformmenu.addAction(self.actions["banktonode"])
         self.transformmenu = transformmenu
         
         editmenu = menubar.addMenu("&Edit")
@@ -2472,6 +2497,10 @@ class EditorWindow (QMainWindow):
     @pyqtSlot()
     def nodetobank (self):
         self.activeview.nodetobank()
+    
+    @pyqtSlot()
+    def banktonode (self):
+        self.activeview.banktonode()
     
     @pyqtSlot()
     def collapse (self):
