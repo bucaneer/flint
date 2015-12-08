@@ -9,7 +9,7 @@ import flint_parser as fp
 import os
 import weakref
 import inspect as insp
-from collections import OrderedDict
+from collections import deque
 
 class FlGlob:
     mainwindow = None
@@ -1532,6 +1532,22 @@ class MapView (QGraphicsView):
         if change:
             self.fitInView(scenerect, Qt.KeepAspectRatio)
 
+class HistoryAction (object):
+    def __init__ (self, unfunc, unargs, refunc, reargs, descr):
+        self.unfunc = unfunc
+        self.unargs = unargs.copy()
+        self.unargs["undo"] = True
+        self.refunc = refunc
+        self.reargs = reargs.copy()
+        self.reargs["undo"] = True
+        self.descr = descr
+    
+    def undo (self):
+        self.unfunc(**self.unargs)
+    
+    def redo (self):
+        self.refunc(**self.reargs)
+
 class TreeView (QGraphicsView):
     __types = {'talk': TalkNodeItem, 'response': ResponseNodeItem, 
         'bank': BankNodeItem, 'root': RootNodeItem}
@@ -1543,6 +1559,10 @@ class TreeView (QGraphicsView):
         self.selectednode = None
         self.collapsednodes = []
         self.hits = None
+        
+        historysize = 10 # OPTION
+        self.undohistory = deque(maxlen=historysize)
+        self.redohistory = deque(maxlen=historysize)
         
         self.setOptimizationFlags(QGraphicsView.DontAdjustForAntialiasing | QGraphicsView.DontSavePainterState)
         self.setDragMode(QGraphicsView.ScrollHandDrag)
@@ -1765,11 +1785,28 @@ class TreeView (QGraphicsView):
                 if func is not None:
                     func()
     
-    def createlink (self, fromID, toID):
-        self.nodecontainer.newlink(fromID, toID)
+    def addundoable (self, hist):
+        self.undohistory.appendleft(hist)
+        self.redohistory.clear()
+    
+    def createlink (self, fromID, toID, pos=None, undo=False):
+        self.nodecontainer.newlink(fromID, toID, pos)
+        
+        if not undo:
+            hist = HistoryAction(self.unlink,
+                {"nodeID": toID, "refID": fromID, "inherit": False},
+                self.createlink,
+                {"fromID": fromID, "toID": toID, "pos": pos},
+                "Link node %s to node %s" % (toID, fromID))
+            self.addundoable(hist)
         self.updateview()
     
-    def addnode (self, nodeID, typename="", ndict=None, subnode=False):
+    def linksubnode (self, subID, nodeID, pos, undo=False):
+        """Only called as Undo action, assume sane arguments."""
+        self.nodecontainer.nodes[nodeID].subnodes.insert(pos, subID)
+        self.updateview()
+    
+    def addnode (self, nodeID, typename="", ndict=None, subnode=False, undo=False):
         if ndict is not None:
             nodedict = ndict
         elif typename and typename in self.nodecontainer.templates:
@@ -1780,21 +1817,61 @@ class TreeView (QGraphicsView):
             nodedictmod = nodedict.copy()
             nodedictmod["nodebank"] = nodeID
             newobj = self.nodecontainer.newnode(nodedictmod, bankID=nodeID)
+            desc = "Add new subnode"
         else:
             newobj = self.nodecontainer.newnode(nodedict, refID=nodeID)
+            desc = "Link new node"
         newid = newobj.ID
+        
+        if not undo:
+            hist = HistoryAction(self.unlink,
+                {"nodeID": newid, "refID": nodeID, "inherit": False},
+                self.createlink,
+                {"fromID": nodeID, "toID": newid},
+                "%s %s to node %s" % (desc, newid, nodeID))
+            self.addundoable(hist)
         self.updateview()
         self.shownode(self.itembyID(newid))
     
-    def unlink (self, nodeID, refID, inherit):
-        nodeitem = self.itembyID(nodeID)
-        if nodeitem.issubnode():
-            self.nodecontainer.removesubnode(refID, nodeID)
-        else:
-            self.nodecontainer.removelink(refID, nodeID, forceinherit=inherit)
+    def undoinherit (self, nodeID, refID, pos, inherited, undo=False):
+        """Only called as Undo action, assume sane arguments."""
+        cont = self.nodecontainer
+        ref = cont.nodes[refID]
+        for childID in inherited:
+            ref.linkIDs.remove(childID)
+        cont.newlink(refID, nodeID, pos)
         self.updateview()
     
-    def moveup (self, nodeID):
+    def unlink (self, nodeID, refID, inherit, undo=False):
+        nodeitem = self.itembyID(nodeID)
+        cont = self.nodecontainer
+        if nodeitem.issubnode():
+            pos = cont.nodes[refID].subnodes.index(nodeID)
+            cont.removesubnode(refID, nodeID)
+            hist = HistoryAction(self.linksubnode, {"subID": nodeID, "nodeID": refID, "pos": pos},
+                self.unlink, {"nodeID": nodeID, "refID": refID, "inherit": inherit},
+                "Unlink subnode %s from bank %s" % (nodeID, refID))
+        else:
+            pos = cont.nodes[refID].linkIDs.index(nodeID)
+            inherited = set(cont.nodes[nodeID].linkIDs) - set(cont.nodes[refID].linkIDs)
+            self.nodecontainer.removelink(refID, nodeID, forceinherit=inherit)
+            if inherit:
+                hist = HistoryAction(self.undoinherit,
+                    {"nodeID": nodeID, "refID": refID, "pos": pos, "inherited": inherited},
+                    self.unlink, {"nodeID": nodeID, "refID": refID, "inherit": inherit},
+                    "Unlink node %s from node %s" % (nodeID, refID))
+            else:
+                hist = HistoryAction(self.createlink, {"fromID": refID, "toID": nodeID, "pos": pos},
+                    self.unlink, {"nodeID": nodeID, "refID": refID, "inherit": inherit},
+                    "Unlink node %s with subtree from %s" % (nodeID, refID))
+        
+        if not undo:
+            self.addundoable(hist)
+        else:
+            del hist
+        self.updateview()
+    
+    def moveup (self, nodeID, undo=False):
         selnode = self.itembyID(nodeID)
         sibling = selnode.siblingabove()
         parent = selnode.parent
@@ -1807,9 +1884,14 @@ class TreeView (QGraphicsView):
             self.nodecontainer.subnodeswap(parID, selID, sibID)
         else:
             self.nodecontainer.siblingswap(parID, selID, sibID)
+        
+        if not undo:
+            hist = HistoryAction(self.movedown, {"nodeID": nodeID}, 
+                self.moveup, {"nodeID": nodeID}, "Move up node %s" % nodeID)
+            self.addundoable(hist)
         self.updateview()
     
-    def movedown (self, nodeID):
+    def movedown (self, nodeID, undo=False):
         selnode = self.itembyID(nodeID)
         sibling = selnode.siblingbelow()
         parent = selnode.parent
@@ -1822,13 +1904,26 @@ class TreeView (QGraphicsView):
             self.nodecontainer.subnodeswap(parID, selID, sibID)
         else:
             self.nodecontainer.siblingswap(parID, selID, sibID)
+        
+        if not undo:
+            hist = HistoryAction(self.moveup, {"nodeID": nodeID}, 
+                self.movedown, {"nodeID": nodeID}, "Move down node %s" % nodeID)
+            self.addundoable(hist)
         self.updateview()
     
-    def parentswap (self, gpID, parID, nodeID):
+    def parentswap (self, gpID, parID, nodeID, undo=False):
         self.nodecontainer.parentswap(gpID, parID, nodeID)
+        
+        if not undo:
+            hist = HistoryAction(self.parentswap,
+                {"gpID": gpID, "parID": nodeID, "nodeID": parID},
+                self.parentswap,
+                {"gpID": gpID, "parID": parID, "nodeID": nodeID},
+                "Swap node %s with parent %s" % (nodeID, parID))
+            self.addundoable(hist)
         self.updateview()
     
-    def nodetobank (self, nodeID):
+    def nodetobank (self, nodeID, undo=False):
         selnode = self.itembyID(nodeID)
         cont = self.nodecontainer
         refID = selnode.parent.realid()
@@ -1843,9 +1938,15 @@ class TreeView (QGraphicsView):
         newobj = cont.newnode(clonedict, bankID=nodeID)
         
         self.nodedocs[newobj.ID] = self.nodedocs[nodeID]
+        
+        if not undo:
+            hist = HistoryAction(self.banktonode, {"nodeID": nodeID},
+                self.nodetobank, {"nodeID": nodeID},
+                "Transform node %s to Bank" % nodeID)
+            self.addundoable(hist)
         self.updateview()
     
-    def banktonode (self, nodeID):
+    def banktonode (self, nodeID, undo=False):
         selnode = self.itembyID(nodeID)
         cont = self.nodecontainer
         refID = selnode.parent.realid()
@@ -1858,16 +1959,31 @@ class TreeView (QGraphicsView):
         cont.newnode(clonedict, newID=nodeID, refID=refID, force=True)
         
         self.nodedocs[nodeID] = self.nodedocs[subID]
+        
+        if not undo:
+            hist = HistoryAction(self.nodetobank, {"nodeID": nodeID}, 
+                self.banktonode, {"nodeID": nodeID},
+                "Transform node %s from Bank" % nodeID)
+            self.addundoable(hist)
         self.updateview()
     
-    def collapse (self, longid, collapse=None):
+    def collapse (self, longid, collapse=None, undo=False):
         selID = longid
         if selID in self.collapsednodes:
             if collapse is None or not collapse:
+                desc = "Uncollapse"
                 self.collapsednodes.remove(selID)
         else:
             if collapse is None or collapse:
+                desc = "Collapse"
                 self.collapsednodes.append(selID)
+        
+        if not undo:
+            nodeID = self.nodeitems[longid].realid()
+            hist = HistoryAction(self.collapse, {"longid": longid},
+                self.collapse, {"longid": longid},
+                "%s node %s" % (desc, nodeID))
+            self.addundoable(hist)
         self.updateview()
     
     def search (self, query):
@@ -2024,6 +2140,11 @@ class EditorWindow (QMainWindow):
         self.actions["close"] = self.createaction("Close", self.closefile,
             None, ["window-close"], "Close file")
         
+        self.actions["undo"] = self.createaction("&Undo", self.undofactory(1),
+            [QKeySequence.Undo], ["edit-undo"], "Undo last action")
+        self.actions["redo"] = self.createaction("&Redo", self.redofactory(1),
+            [QKeySequence.Redo], ["edit-redo"], "Redo action")
+        
         self.actions["zoomin"] = self.createaction("Zoom &In", self.zoomin, 
             [QKeySequence.ZoomIn, QKeySequence(Qt.ControlModifier + Qt.KeypadModifier + Qt.Key_Plus)], 
             ["gtk-zoom-in", "zoom-in"], "Zoom in")
@@ -2087,6 +2208,10 @@ class EditorWindow (QMainWindow):
         else:
             genericactions = ["zoomin", "zoomout", "zoomorig", "gotoactive",
                 "collapse", "openfile", "save", "saveas", "newtree", "close"]
+            if view.undohistory:
+                genericactions.extend(["undo"])
+            if view.redohistory:
+                genericactions.extend(["redo"])
             nodes = view.nodecontainer.nodes
             if not self.selectednode or self.selectednode not in nodes:
                 actions = []
@@ -2189,6 +2314,32 @@ class EditorWindow (QMainWindow):
         transformmenu.addAction(self.actions["banktonode"])
         self.transformmenu = transformmenu
         
+        undomenu = QMenu("Undo")
+        undomenu.setIcon(QIcon.fromTheme("edit-undo"))
+        def generateundo ():
+            undomenu.clear()
+            undo = self.activeview.undohistory
+            for i in range(len(undo)):
+                action = undo[i]
+                item = QAction("%s: %s" % (i+1, action.descr), self)
+                item.triggered.connect(self.undofactory(i+1))
+                undomenu.addAction(item)
+        undomenu.aboutToShow.connect(generateundo)
+        self.actions["undo"].setMenu(undomenu)
+        
+        redomenu = QMenu("Redo")
+        redomenu.setIcon(QIcon.fromTheme("edit-redo"))
+        def generateredo ():
+            redomenu.clear()
+            redo = self.activeview.redohistory
+            for i in range(len(redo)):
+                action = redo[i]
+                item = QAction("%s: %s" % (i+1, action.descr), self)
+                item.triggered.connect(self.redofactory(i+1))
+                redomenu.addAction(item)
+        redomenu.aboutToShow.connect(generateredo)
+        self.actions["redo"].setMenu(redomenu)
+        
         editmenu = menubar.addMenu("&Edit")
         editmenu.addMenu(addmenu)
         editmenu.addMenu(subnodemenu)
@@ -2201,6 +2352,8 @@ class EditorWindow (QMainWindow):
         editmenu.addSeparator()
         editmenu.addAction(self.actions["unlinknode"])
         editmenu.addAction(self.actions["unlinkstree"])
+        editmenu.addAction(self.actions["undo"])
+        editmenu.addAction(self.actions["redo"])
         self.editmenu = editmenu
         
         viewmenu = menubar.addMenu("&View")
@@ -2225,6 +2378,11 @@ class EditorWindow (QMainWindow):
         filetoolbar.addAction(self.actions["save"])
         filetoolbar.addAction(self.actions["saveas"])
         self.addToolBar(filetoolbar)
+        
+        historytoolbar = QToolBar("History")
+        historytoolbar.addAction(self.actions["undo"])
+        historytoolbar.addAction(self.actions["redo"])
+        self.addToolBar(historytoolbar)
         
         viewtoolbar = QToolBar("View control")
         viewtoolbar.addAction(self.actions["zoomorig"])
@@ -2526,6 +2684,34 @@ class EditorWindow (QMainWindow):
         view = self.activeview
         longid = view.selectednode.id()
         view.collapse(longid)
+    
+    def undofactory (self, num):
+        @pyqtSlot()
+        def undo ():
+            view = self.activeview
+            count = num
+            while count:
+                action = view.undohistory.popleft()
+                action.undo()
+                view.redohistory.appendleft(action)
+                count -= 1
+            self.filteractions()
+        
+        return undo
+    
+    def redofactory (self, num):
+        @pyqtSlot()
+        def redo ():
+            view = self.activeview
+            count = num
+            while count:
+                action = view.redohistory.popleft()
+                action.redo()
+                view.undohistory.appendleft(action)
+                count -= 1
+            self.filteractions()
+        
+        return redo
 
 def elidestring (string, length):
     if len(string) <= length:
