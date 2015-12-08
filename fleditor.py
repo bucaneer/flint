@@ -1765,45 +1765,42 @@ class TreeView (QGraphicsView):
                 if func is not None:
                     func()
     
-    def createlink (self, toID):
-        fromID = self.selectednode.realid()
+    def createlink (self, fromID, toID):
         self.nodecontainer.newlink(fromID, toID)
         self.updateview()
     
-    def addnode (self, typename="", ndict=None, subnode=False):
+    def addnode (self, nodeID, typename="", ndict=None, subnode=False):
         if ndict is not None:
             nodedict = ndict
         elif typename and typename in self.nodecontainer.templates:
             nodedict = self.nodecontainer.templates[typename]
         else:
             return
-        selectedid = self.selectednode.realid()
         if subnode:
             nodedictmod = nodedict.copy()
-            nodedictmod["nodebank"] = selectedid
-            newobj = self.nodecontainer.newnode(nodedictmod, bankID=selectedid)
+            nodedictmod["nodebank"] = nodeID
+            newobj = self.nodecontainer.newnode(nodedictmod, bankID=nodeID)
         else:
-            newobj = self.nodecontainer.newnode(nodedict, refID=selectedid)
+            newobj = self.nodecontainer.newnode(nodedict, refID=nodeID)
         newid = newobj.ID
         self.updateview()
         self.shownode(self.itembyID(newid))
     
-    def unlink (self, inherit=False):
-        selID = self.selectednode.realid()
-        refID = self.selectednode.parent.realid()
-        if self.selectednode.issubnode():
-            self.nodecontainer.removesubnode(refID, selID)
+    def unlink (self, nodeID, refID, inherit):
+        nodeitem = self.itembyID(nodeID)
+        if nodeitem.issubnode():
+            self.nodecontainer.removesubnode(refID, nodeID)
         else:
-            self.nodecontainer.removelink(refID, selID, forceinherit=inherit)
+            self.nodecontainer.removelink(refID, nodeID, forceinherit=inherit)
         self.updateview()
     
-    def moveup (self):
-        selnode = self.selectednode
+    def moveup (self, nodeID):
+        selnode = self.itembyID(nodeID)
         sibling = selnode.siblingabove()
         parent = selnode.parent
         if sibling is None or parent is None:
             return
-        selID = selnode.realid()
+        selID = nodeID
         sibID = sibling.realid()
         parID = parent.realid()
         if selnode.issubnode():
@@ -1812,13 +1809,13 @@ class TreeView (QGraphicsView):
             self.nodecontainer.siblingswap(parID, selID, sibID)
         self.updateview()
     
-    def movedown (self):
-        selnode = self.selectednode
+    def movedown (self, nodeID):
+        selnode = self.itembyID(nodeID)
         sibling = selnode.siblingbelow()
         parent = selnode.parent
         if sibling is None or parent is None:
             return
-        selID = selnode.realid()
+        selID = nodeID
         sibID = sibling.realid()
         parID = parent.realid()
         if selnode.nodebank is parent:
@@ -1827,19 +1824,13 @@ class TreeView (QGraphicsView):
             self.nodecontainer.siblingswap(parID, selID, sibID)
         self.updateview()
     
-    def parentswap (self):
-        selnode = self.selectednode
-        parent = selnode.parent
-        grandparent = parent.parent
-        if grandparent is None:
-            return
-        self.nodecontainer.parentswap(grandparent.realid(), parent.realid(), selnode.realid())
+    def parentswap (self, gpID, parID, nodeID):
+        self.nodecontainer.parentswap(gpID, parID, nodeID)
         self.updateview()
     
-    def nodetobank (self):
-        selnode = self.selectednode
+    def nodetobank (self, nodeID):
+        selnode = self.itembyID(nodeID)
         cont = self.nodecontainer
-        nodeID = selnode.realid()
         refID = selnode.parent.realid()
         nodedict = selnode.nodeobj.todict()
         
@@ -1854,11 +1845,9 @@ class TreeView (QGraphicsView):
         self.nodedocs[newobj.ID] = self.nodedocs[nodeID]
         self.updateview()
     
-    def banktonode (self):
-        selnode = self.selectednode
-        selnode = self.selectednode
+    def banktonode (self, nodeID):
+        selnode = self.itembyID(nodeID)
         cont = self.nodecontainer
-        nodeID = selnode.realid()
         refID = selnode.parent.realid()
         subID = selnode.subnodes[0].realid()
         nodedict = selnode.subnodes[0].nodeobj.todict()
@@ -1871,8 +1860,8 @@ class TreeView (QGraphicsView):
         self.nodedocs[nodeID] = self.nodedocs[subID]
         self.updateview()
     
-    def collapse (self, collapse=None):
-        selID = self.selectednode.id()
+    def collapse (self, longid, collapse=None):
+        selID = longid
         if selID in self.collapsednodes:
             if collapse is None or not collapse:
                 self.collapsednodes.remove(selID)
@@ -2396,23 +2385,33 @@ class EditorWindow (QMainWindow):
     
     @pyqtSlot()
     def newtalk (self):
-        self.activeview.addnode(typename="talk")
+        view = self.activeview
+        nodeID = view.selectednode.realid()
+        view.addnode(nodeID, typename="talk")
     
     @pyqtSlot()
     def newresponse (self):
-        self.activeview.addnode(typename="response")
+        view = self.activeview
+        nodeID = view.selectednode.realid()
+        view.addnode(nodeID, typename="response")
     
     @pyqtSlot()
     def newbank (self):
-        self.activeview.addnode(typename="bank")
+        view = self.activeview
+        nodeID = view.selectednode.realid()
+        view.addnode(nodeID, typename="bank")
     
     @pyqtSlot()
     def newtalksub (self):
-        self.activeview.addnode(typename="talk", subnode=True)
+        view = self.activeview
+        nodeID = view.selectednode.realid()
+        view.addnode(nodeID, typename="talk", subnode=True)
     
     @pyqtSlot()
     def newresponsesub (self):
-        self.activeview.addnode(typename="response", subnode=True)
+        view = self.activeview
+        nodeID = view.selectednode.realid()
+        view.addnode(nodeID, typename="response", subnode=True)
     
     @pyqtSlot()
     def copynode (self):
@@ -2450,15 +2449,21 @@ class EditorWindow (QMainWindow):
     
     @pyqtSlot()
     def pasteclone (self):
-        self.activeview.addnode(ndict=self.copiednode[2])
+        view = self.activeview
+        nodeID = view.selectednode.realid()
+        view.addnode(nodeID, ndict=self.copiednode[2])
     
     @pyqtSlot()
     def pastelink (self):
-        self.activeview.createlink(self.copiednode[0])
+        view = self.activeview
+        fromID = view.selectednode.realid()
+        view.createlink(fromID, self.copiednode[0])
     
     @pyqtSlot()
     def pastesubnode (self):
-        self.activeview.addnode(ndict=self.copiednode[2], subnode=True)
+        view = self.activeview
+        nodeID = view.selectednode.realid()
+        view.addnode(nodeID, ndict=self.copiednode[2], subnode=True)
     
     @pyqtSlot()
     def unlinkinherit (self):
@@ -2480,31 +2485,47 @@ class EditorWindow (QMainWindow):
         answer = QMessageBox.question(self, "Node removal", text)
         if answer == QMessageBox.No:
             return
-        self.activeview.unlink(inherit)
+        self.activeview.unlink(selected.realid(), selected.parent.realid(), inherit)
     
     @pyqtSlot()
     def moveup (self):
-        self.activeview.moveup()
+        view = self.activeview
+        nodeID = view.selectednode.realid()
+        view.moveup(nodeID)
     
     @pyqtSlot()
     def movedown (self):
-        self.activeview.movedown()
+        view = self.activeview
+        nodeID = view.selectednode.realid()
+        view.movedown(nodeID)
     
     @pyqtSlot()
     def parentswap (self):
-        self.activeview.parentswap()
+        view = self.activeview
+        selnode = view.selectednode
+        parent = selnode.parent
+        grandpa = parent.parent
+        if grandpa is None:
+            return
+        self.activeview.parentswap(grandpa.realid(), parent.realid(), selnode.realid())
     
     @pyqtSlot()
     def nodetobank (self):
-        self.activeview.nodetobank()
+        view = self.activeview
+        nodeID = view.selectednode.realid()
+        view.nodetobank(nodeID)
     
     @pyqtSlot()
     def banktonode (self):
-        self.activeview.banktonode()
+        view = self.activeview
+        nodeID = view.selectednode.realid()
+        view.banktonode(nodeID)
     
     @pyqtSlot()
     def collapse (self):
-        self.activeview.collapse()
+        view = self.activeview
+        longid = view.selectednode.id()
+        view.collapse(longid)
 
 def elidestring (string, length):
     if len(string) <= length:
