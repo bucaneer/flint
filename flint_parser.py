@@ -201,12 +201,12 @@ class NodesContainer (object):
 	def getnode (self, ID):
 		return self.nodes[ID]
 	
-	def newnode (self, node_dict, newID=False, refID=False, bankID=False):
+	def newnode (self, node_dict, newID=False, refID=False, bankID=False, force=False):
 		if not newID:
 			newID = self.nextID
 			self.nextID = str(int(self.nextID) + 1)
 		node = self.types[node_dict['type']](self, node_dict, newID)
-		if newID in self.nodes:
+		if newID in self.nodes and not force:
 			raise RuntimeError("Duplicate ID in nodes list")
 		self.nodes[newID] = node
 		if refID:
