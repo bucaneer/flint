@@ -1956,6 +1956,7 @@ class TreeView (QGraphicsView):
         clonedict = nodedict.copy()
         clonedict["nodebank"] = -1
         
+        cont.nodes.pop(subID)
         cont.newnode(clonedict, newID=nodeID, refID=refID, force=True)
         
         self.nodedocs[nodeID] = self.nodedocs[subID]
