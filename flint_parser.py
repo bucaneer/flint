@@ -8,8 +8,8 @@ class ScriptCall (fl_scripts.ScriptCalls):
 		if self.funcname not in self.scripts:
 			raise RuntimeError("Unknown script: %s" % self.funcname)
 		self.funccall = self.scripts[self.funcname]
-		self.funcparams = sc_dict['params'] if 'params' in sc_dict else []
-		self._not = bool(sc_dict['not']) if 'not' in sc_dict else False
+		self.funcparams = sc_dict.get('params', [])
+		self._not = sc_dict.get('not', False)
 	
 	def run (self):
 		if self._not:
@@ -63,41 +63,26 @@ class ChartNode (object):
 		self.typename = node_dict['type']
 		self.ID = str(nodeID)
 		self.linkIDs = []
-		self.realref = None
 		
-		if "links" in node_dict:
-			for link in node_dict['links']:
-				self.addlink(str(link))
+		for link in node_dict.get('links', []):
+			self.addlink(str(link))
 		
-		if 'condition' in node_dict:
-			self.condition = ConditionCall(node_dict['condition'])
-		else:
-			self.condition = ConditionCall(self.container.defaultcond)
+		self.condition = ConditionCall(node_dict.get('condition', self.container.defaultcond))
 		
-		if 'enterscripts' in node_dict:
-			self.enterscripts = [ScriptCall(s) for s in node_dict['enterscripts']]
-		else:
-			self.enterscripts = []
+		self.enterscripts = [ScriptCall(s) for s in node_dict.get('enterscripts', [])]
+		self.exitscripts  = [ScriptCall(s) for s in node_dict.get('exitscripts',  [])]
 		
-		if 'exitscripts' in node_dict:
-			self.exitscripts = [ScriptCall(s) for s in node_dict['exitscripts']]
-		else:
-			self.exitscripts = []
-		
-		self.randweight  = self.fromdict(node_dict, "randweight",     0)
-		self.nodebank    = self.fromdict(node_dict, "nodebank",      -1)
-		self.text        = self.fromdict(node_dict, "text",          "")
-		self.speaker     = self.fromdict(node_dict, "speaker",       "")
-		self.listener	 = self.fromdict(node_dict, "listener",      "")
-		self.optvars     = self.fromdict(node_dict, "vars",      dict())
-		self.comment     = self.fromdict(node_dict, "comment",       "")
-		self.persistence = self.fromdict(node_dict, "persistence",   "")
-		self.subnodes    = self.fromdict(node_dict, "subnodes",      [])
-		self.banktype	 = self.fromdict(node_dict, "banktype", "First")
-		self.questionhub = self.fromdict(node_dict, "questionhub",   "")
-	
-	def fromdict (self, nodedict, key, default=False):
-		return nodedict[key] if key in nodedict else default
+		self.randweight  = node_dict.get("randweight",        0)
+		self.nodebank    = node_dict.get("nodebank",         -1)
+		self.text        = node_dict.get("text",             "")
+		self.speaker     = node_dict.get("speaker",          "")
+		self.listener	 = node_dict.get("listener",         "")
+		self.optvars     = node_dict.get("vars",         dict())
+		self.comment     = node_dict.get("comment",          "")
+		self.persistence = node_dict.get("persistence",      "")
+		self.subnodes    = node_dict.get("subnodes",         [])
+		self.banktype	 = node_dict.get("banktype",    "First")
+		self.questionhub = node_dict.get("questionhub",      "")
 	
 	def checkcond (self):
 		return self.condition.run()
@@ -211,8 +196,7 @@ class NodesContainer (object):
 			"response":{"type": "response"}
 			}
 		self.templates = self.defaulttemplates.copy()
-		if 'templates' in nodes_dict:
-			self.templates.update(nodes_dict['templates'])
+		self.templates.update(nodes_dict.get('templates', dict()))
 	
 	def getnode (self, ID):
 		return self.nodes[ID]
