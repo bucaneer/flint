@@ -1906,35 +1906,28 @@ class TreeView (QGraphicsView):
         cont.newlink(refID, nodeID, pos)
         self.updateview()
     
-    def move (self, nodeID, up, undo=False):
-        selnode = self.itembyID(nodeID)
+    def move (self, nodeID, refID, up, undo=False):
+        cont = self.nodecontainer
+        parent = cont.nodes[refID]
+        if cont.nodes[nodeID].nodebank == -1:
+            siblings = parent.linkIDs
+        else:
+            siblings = parent.subnodes
+        
+        nodeind = siblings.index(nodeID)
         if up:
-            sibling = selnode.siblingabove()
+            sibind = nodeind-1
             desc = "up"
         else:
-            sibling = selnode.siblingbelow()
+            sibind = nodeind+1
             desc = "down"
-        parent = selnode.parent
-        if sibling is None or parent is None:
-            return
-        selID = nodeID
-        sibID = sibling.realid()
-        parID = parent.realid()
-        if selnode.issubnode():
-            subnodes = parent.nodeobj.subnodes
-            ind1 = subnodes.index(sibID)
-            ind2 = subnodes.index(selID)
-            subnodes[ind2], subnodes[ind1] = subnodes[ind1], subnodes[ind2]
-        else:
-            parlinks = parent.nodeobj.linkIDs
-            ind1 = parlinks.index(sibID)
-            ind2 = parlinks.index(selID)
-            parlinks[ind2], parlinks[ind1] = parlinks[ind1], parlinks[ind2]
+        
+        siblings[nodeind], siblings[sibind] = siblings[sibind], siblings[nodeind]
         
         if not undo:
             hist = HistoryAction(
-                self.move, {"nodeID": nodeID, "up": not up}, 
-                self.move, {"nodeID": nodeID, "up": up},
+                self.move, {"nodeID": nodeID, "refID": refID, "up": not up}, 
+                self.move, {"nodeID": nodeID, "refID": refID, "up": up},
                 "Move node %s %s" % (nodeID, desc))
             self.addundoable(hist)
         self.updateview()
@@ -1966,9 +1959,8 @@ class TreeView (QGraphicsView):
         self.updateview()
     
     def nodetobank (self, nodeID, undo=False):
-        selnode = self.itembyID(nodeID)
         cont = self.nodecontainer
-        refID = selnode.parent.realid()
+        selnode = cont.nodes[nodeID]
         nodedict = selnode.nodeobj.todict()
         
         bankdict = nodedict.copy()
@@ -1976,7 +1968,7 @@ class TreeView (QGraphicsView):
         clonedict = nodedict.copy()
         clonedict["nodebank"] = nodeID
         
-        cont.newnode(bankdict, newID=nodeID, refID=refID, force=True)
+        cont.newnode(bankdict, newID=nodeID, force=True)
         newobj = cont.newnode(clonedict, bankID=nodeID)
         
         self.nodedocs[newobj.ID] = self.nodedocs[nodeID]
@@ -1989,17 +1981,16 @@ class TreeView (QGraphicsView):
         self.updateview()
     
     def banktonode (self, nodeID, undo=False):
-        selnode = self.itembyID(nodeID)
         cont = self.nodecontainer
-        refID = selnode.parent.realid()
-        subID = selnode.subnodes[0].realid()
-        nodedict = selnode.subnodes[0].nodeobj.todict()
+        selnode = cont.nodes[nodeID]
+        subID = selnode.subnodes[0]
+        nodedict = cont.nodes[subID].todict()
         
         clonedict = nodedict.copy()
         clonedict["nodebank"] = -1
         
         cont.nodes.pop(subID)
-        cont.newnode(clonedict, newID=nodeID, refID=refID, force=True)
+        cont.newnode(clonedict, newID=nodeID, force=True)
         
         self.nodedocs[nodeID] = self.nodedocs[subID]
         
@@ -2697,14 +2688,20 @@ class EditorWindow (QMainWindow):
     @pyqtSlot()
     def moveup (self):
         view = self.activeview
-        nodeID = view.selectednode.realid()
-        view.move(nodeID, up=True)
+        selnode = view.selectednode
+        nodeID = selnode.realid()
+        refID = selnode.parent.realid()
+        if selnode.siblingabove() is not None:
+            view.move(nodeID, refID, up=True)
     
     @pyqtSlot()
     def movedown (self):
         view = self.activeview
-        nodeID = view.selectednode.realid()
-        view.move(nodeID, up=False)
+        selnode = view.selectednode
+        nodeID = selnode.realid()
+        refID = selnode.parent.realid()
+        if selnode.siblingbelow() is not None:
+            view.move(nodeID, refID, up=False)
     
     @pyqtSlot()
     def parentswap (self):
