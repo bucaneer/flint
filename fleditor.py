@@ -1825,7 +1825,7 @@ class TreeView (QGraphicsView):
         
         if not undo:
             hist = HistoryAction(self.unlink,
-                {"nodeID": newid, "refID": nodeID, "inherit": False},
+                {"nodeID": newid, "refID": nodeID},
                 self.createlink,
                 {"fromID": nodeID, "toID": newid},
                 "%s %s to node %s" % (desc, newid, nodeID))
@@ -1886,7 +1886,7 @@ class TreeView (QGraphicsView):
         
         if not undo:
             hist = HistoryAction(self.createlink, {"fromID": refID, "toID": nodeID, "pos": pos},
-                self.unlink, {"nodeID": nodeID, "refID": refID, "inherit": inherit},
+                self.unlink, {"nodeID": nodeID, "refID": refID},
                 "Unlink node %s with subtree from %s" % (nodeID, refID))
             self.addundoable(hist)
         self.updateview()
