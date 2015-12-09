@@ -553,13 +553,13 @@ class TextNodeItem (NodeItem):
             window = FlGlob.mainwindow
             menu.addAction(window.actions["collapse"])
             menu.addAction(window.actions["copynode"])
-            menu.addAction(window.actions["settemplate"])
             menu.addMenu(window.addmenu)
             menu.addAction(window.actions["moveup"])
             menu.addAction(window.actions["movedown"])
             menu.addAction(window.actions["parentswap"])
             menu.addAction(window.actions["unlinknode"])
             menu.addAction(window.actions["unlinkstree"])
+            menu.addAction(window.actions["settemplate"])
             menu.addMenu(window.transformmenu)
         if not menu.isEmpty():
             menu.exec_(event.screenPos())
@@ -710,7 +710,6 @@ class BankNodeItem (NodeItem):
             window = FlGlob.mainwindow
             menu.addAction(window.actions["collapse"])
             menu.addAction(window.actions["copynode"])
-            menu.addAction(window.actions["settemplate"])
             menu.addMenu(window.subnodemenu)
             menu.addMenu(window.addmenu)
             menu.addAction(window.actions["moveup"])
@@ -718,6 +717,7 @@ class BankNodeItem (NodeItem):
             menu.addAction(window.actions["parentswap"])
             menu.addAction(window.actions["unlinknode"])
             menu.addAction(window.actions["unlinkstree"])
+            menu.addAction(window.actions["settemplate"])
             menu.addMenu(window.transformmenu)
         if not menu.isEmpty():
             menu.exec_(event.screenPos())
@@ -2378,19 +2378,19 @@ class EditorWindow (QMainWindow):
         self.actions["redo"].setMenu(redomenu)
         
         editmenu = menubar.addMenu("&Edit")
+        editmenu.addAction(self.actions["undo"])
+        editmenu.addAction(self.actions["redo"])
         editmenu.addMenu(addmenu)
         editmenu.addMenu(subnodemenu)
         editmenu.addAction(self.actions["copynode"])
-        editmenu.addAction(self.actions["settemplate"])
         editmenu.addAction(self.actions["moveup"])
         editmenu.addAction(self.actions["movedown"])
         editmenu.addAction(self.actions["parentswap"])
+        editmenu.addAction(self.actions["settemplate"])
         editmenu.addMenu(transformmenu)
         editmenu.addSeparator()
         editmenu.addAction(self.actions["unlinknode"])
         editmenu.addAction(self.actions["unlinkstree"])
-        editmenu.addAction(self.actions["undo"])
-        editmenu.addAction(self.actions["redo"])
         self.editmenu = editmenu
         
         viewmenu = menubar.addMenu("&View")
@@ -2413,7 +2413,6 @@ class EditorWindow (QMainWindow):
         filetoolbar.addAction(self.actions["openfile"])
         filetoolbar.addAction(self.actions["newtree"])
         filetoolbar.addAction(self.actions["save"])
-        filetoolbar.addAction(self.actions["saveas"])
         self.addToolBar(filetoolbar)
         
         historytoolbar = QToolBar("History")
