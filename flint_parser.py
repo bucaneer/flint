@@ -198,9 +198,6 @@ class NodesContainer (object):
 		self.templates = self.defaulttemplates.copy()
 		self.templates.update(nodes_dict.get('templates', dict()))
 	
-	def getnode (self, ID):
-		return self.nodes[ID]
-	
 	def newnode (self, node_dict, newID=False, refID=False, bankID=False, force=False):
 		if not newID:
 			newID = self.nextID
@@ -219,37 +216,6 @@ class NodesContainer (object):
 		if fromID != toID and toID in self.nodes and toID != "0" and \
 		   fromID in self.nodes:			
 			self.nodes[fromID].addlink(toID, pos=pos)
-	
-	def siblingswap (self, parentID, childID1, childID2):
-		parlinks = self.nodes[parentID].linkIDs
-		assert childID1 in parlinks and childID2 in parlinks
-		ind1 = parlinks.index(childID1)
-		ind2 = parlinks.index(childID2)
-		parlinks[ind2], parlinks[ind1] = parlinks[ind1], parlinks[ind2]
-	
-	def subnodeswap (self, bankID, subID1, subID2):
-		assert isinstance(self.nodes[bankID], BankNode)
-		subnodes = self.nodes[bankID].subnodes
-		assert subID1 in subnodes and subID2 in subnodes
-		ind1 = subnodes.index(subID1)
-		ind2 = subnodes.index(subID2)
-		subnodes[ind2], subnodes[ind1] = subnodes[ind1], subnodes[ind2]
-	
-	def parentswap (self, grandpaID, parentID, childID):
-		parlinks = list(self.nodes[parentID].linkIDs)
-		childlinks = list(self.nodes[childID].linkIDs)
-		grandpalinks = self.nodes[grandpaID].linkIDs
-		
-		childindex = parlinks.index(childID)
-		parlinks.remove(childID)
-		parlinks.insert(childindex, parentID)
-		
-		parindex = grandpalinks.index(parentID)
-		grandpalinks.remove(parentID)
-		grandpalinks.insert(parindex, childID)
-		
-		self.nodes[parentID].linkIDs = childlinks
-		self.nodes[childID].linkIDs = parlinks
 	
 	def savetofile (self):
 		if self.filename == "":
