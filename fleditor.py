@@ -1789,15 +1789,15 @@ class TreeView (QGraphicsView):
         self.undohistory.appendleft(hist)
         self.redohistory.clear()
     
-    def createlink (self, fromID, toID, pos=None, undo=False):
-        self.nodecontainer.newlink(fromID, toID, pos)
+    def linknode (self, nodeID, refID, pos=None, undo=False):
+        self.nodecontainer.newlink(refID, nodeID, pos)
         
         if not undo:
             hist = HistoryAction(self.unlink,
-                {"nodeID": toID, "refID": fromID, "inherit": False},
-                self.createlink,
-                {"fromID": fromID, "toID": toID, "pos": pos},
-                "Link node %s to node %s" % (toID, fromID))
+                {"nodeID": nodeID, "refID": refID, "inherit": False},
+                self.linknode,
+                {"nodeID": nodeID, "refID": refID, "pos": pos},
+                "Link node %s to node %s" % (nodeID, refID))
             self.addundoable(hist)
         self.updateview()
     
@@ -1806,40 +1806,73 @@ class TreeView (QGraphicsView):
         self.nodecontainer.nodes[bankID].subnodes.insert(pos, subID)
         self.updateview()
     
-    def addnode (self, nodeID, typename="", ndict=None, subnode=False, undo=False):
+    def addnode (self, nodeID, typename="", ndict=None, undo=False):
         if ndict is not None:
             nodedict = ndict
         elif typename and typename in self.nodecontainer.templates:
             nodedict = self.nodecontainer.templates[typename]
         else:
             return
-        if subnode:
-            nodedictmod = nodedict.copy()
-            nodedictmod["nodebank"] = nodeID
-            newobj = self.nodecontainer.newnode(nodedictmod, bankID=nodeID)
-            desc = "Add new subnode"
-        else:
-            newobj = self.nodecontainer.newnode(nodedict, refID=nodeID)
-            desc = "Link new node"
+        newobj = self.nodecontainer.newnode(nodedict, refID=nodeID)
         newid = newobj.ID
         
         if not undo:
             hist = HistoryAction(self.unlink,
                 {"nodeID": newid, "refID": nodeID},
-                self.createlink,
-                {"fromID": nodeID, "toID": newid},
-                "%s %s to node %s" % (desc, newid, nodeID))
+                self.linknode,
+                {"nodeID": nodeID, "refID": newid},
+                "Link new node %s to node %s" % (newid, nodeID))
             self.addundoable(hist)
         self.updateview()
         self.shownode(self.itembyID(newid))
     
-    def undoinherit (self, nodeID, refID, pos, inherited, undo=False):
-        """Only called as Undo action, assume sane arguments."""
+    def addsubnode (self, nodeID, typename="", ndict=None, undo=False):
+        if ndict is not None:
+            nodedict = ndict
+        elif typename and typename in self.nodecontainer.templates:
+            nodedict = self.nodecontainer.templates[typename]
+        else:
+            return
+        nodedictmod = nodedict.copy()
+        nodedictmod["nodebank"] = nodeID
+        newobj = self.nodecontainer.newnode(nodedictmod, bankID=nodeID)
+        newid = newobj.ID
+        
+        if not undo:
+            hist = HistoryAction(self.unlinksubnode,
+                {"subID": newid, "bankID": nodeID},
+                self.linksubnode,
+                {"subID": newid, "bankID": nodeID},
+                "Add new subnode %s to node %s" % (newid, nodeID))
+            self.addundoable(hist)
+        self.updateview()
+        self.shownode(self.itembyID(newid))
+    
+    def unlink (self, nodeID, refID, undo=False):
+        nodeitem = self.itembyID(nodeID)
         cont = self.nodecontainer
-        ref = cont.nodes[refID]
-        for childID in inherited:
-            ref.linkIDs.remove(childID)
-        cont.newlink(refID, nodeID, pos)
+        refnode = cont.nodes[refID]
+        pos = refnode.linkIDs.index(nodeID)
+        refnode.linkIDs.remove(nodeID)
+        
+        if not undo:
+            hist = HistoryAction(self.linknode, {"nodeID": nodeID, "refID": refID, "pos": pos},
+                self.unlink, {"nodeID": nodeID, "refID": refID},
+                "Unlink node %s with subtree from %s" % (nodeID, refID))
+            self.addundoable(hist)
+        self.updateview()
+    
+    def unlinksubnode (self, subID, bankID, undo=False):
+        cont = self.nodecontainer
+        pos = cont.nodes[bankID].subnodes.index(subID)
+        cont.nodes[bankID].subnodes.remove(subID)
+        
+        if not undo:
+            hist = HistoryAction(
+                self.linksubnode,   {"subID": subID, "bankID": bankID, "pos": pos},
+                self.unlinksubnode, {"subID": subID, "bankID": bankID},
+                "Unlink subnode %s from bank %s" % (subID, bankID))
+            self.addundoable(hist)
         self.updateview()
     
     def unlink_inherit (self, nodeID, refID, undo=False):
@@ -1864,31 +1897,13 @@ class TreeView (QGraphicsView):
             self.addundoable(hist)
         self.updateview()
     
-    def unlinksubnode (self, subID, bankID, undo=False):
+    def undoinherit (self, nodeID, refID, pos, inherited, undo=False):
+        """Only called as Undo action, assume sane arguments."""
         cont = self.nodecontainer
-        pos = cont.nodes[bankID].subnodes.index(subID)
-        cont.nodes[bankID].subnodes.remove(subID)
-        
-        if not undo:
-            hist = HistoryAction(
-                self.linksubnode,   {"subID": subID, "bankID": bankID, "pos": pos},
-                self.unlinksubnode, {"subID": subID, "bankID": bankID},
-                "Unlink subnode %s from bank %s" % (subID, bankID))
-            self.addundoable(hist)
-        self.updateview()
-    
-    def unlink (self, nodeID, refID, undo=False):
-        nodeitem = self.itembyID(nodeID)
-        cont = self.nodecontainer
-        refnode = cont.nodes[refID]
-        pos = refnode.linkIDs.index(nodeID)
-        refnode.linkIDs.remove(nodeID)
-        
-        if not undo:
-            hist = HistoryAction(self.createlink, {"fromID": refID, "toID": nodeID, "pos": pos},
-                self.unlink, {"nodeID": nodeID, "refID": refID},
-                "Unlink node %s with subtree from %s" % (nodeID, refID))
-            self.addundoable(hist)
+        ref = cont.nodes[refID]
+        for childID in inherited:
+            ref.linkIDs.remove(childID)
+        cont.newlink(refID, nodeID, pos)
         self.updateview()
     
     def move (self, nodeID, up, undo=False):
@@ -2591,13 +2606,13 @@ class EditorWindow (QMainWindow):
     def newtalksub (self):
         view = self.activeview
         nodeID = view.selectednode.realid()
-        view.addnode(nodeID, typename="talk", subnode=True)
+        view.addsubnode(nodeID, typename="talk")
     
     @pyqtSlot()
     def newresponsesub (self):
         view = self.activeview
         nodeID = view.selectednode.realid()
-        view.addnode(nodeID, typename="response", subnode=True)
+        view.addsubnode(nodeID, typename="response")
     
     @pyqtSlot()
     def copynode (self):
@@ -2642,14 +2657,14 @@ class EditorWindow (QMainWindow):
     @pyqtSlot()
     def pastelink (self):
         view = self.activeview
-        fromID = view.selectednode.realid()
-        view.createlink(fromID, self.copiednode[0])
+        refID = view.selectednode.realid()
+        view.linknode(self.copiednode[0], refID)
     
     @pyqtSlot()
     def pastesubnode (self):
         view = self.activeview
         nodeID = view.selectednode.realid()
-        view.addnode(nodeID, ndict=self.copiednode[2], subnode=True)
+        view.addsubnode(nodeID, ndict=self.copiednode[2])
     
     @pyqtSlot()
     def unlinkinherit (self):
