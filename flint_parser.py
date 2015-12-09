@@ -220,36 +220,6 @@ class NodesContainer (object):
 		   fromID in self.nodes:			
 			self.nodes[fromID].addlink(toID, pos=pos)
 	
-	def removenode (self, nodeID, forceinherit=False):		
-		nodeobj = self.nodes[nodeID]
-		for refID in nodeobj.referrers:
-			try:
-				self.removelink(refID, nodeID, forceinherit)
-			except:
-				raise RuntimeError("Link removal failed") 
-		self.nodes.pop(childID)
-	
-	def removelink (self, refID, childID, forceinherit=False):
-		assert refID in self.nodes 
-		refnode = self.nodes[refID]
-		assert childID in refnode.linkIDs
-		childnode = self.nodes[childID]
-		childindex = refnode.linkIDs.index(childID)
-		for orphanID in childnode.linkIDs:
-			if forceinherit:
-				self.newlink(refID, orphanID, pos=childindex)
-				childindex += 1
-		refnode.linkIDs.remove(childID)
-		return True
-		
-	def removesubnode (self, bankID, subID):
-		banknode = self.nodes[bankID]
-		assert isinstance(banknode, BankNode)
-		assert subID in banknode.subnodes
-		subnode = self.nodes[subID]
-		banknode.subnodes.remove(subID)
-		return True
-	
 	def siblingswap (self, parentID, childID1, childID2):
 		parlinks = self.nodes[parentID].linkIDs
 		assert childID1 in parlinks and childID2 in parlinks
