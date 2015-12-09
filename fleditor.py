@@ -1951,9 +1951,9 @@ class TreeView (TreeEditor, QGraphicsView):
         self.zoomscale = totalzoom
     
     def shownode (self, nodeitem):
-        self.ensureVisible(nodeitem, 
-            self.style.rankgap/2,
-            self.style.rowgap/2)
+        if nodeitem is None:
+            return
+        self.ensureVisible(nodeitem, self.style.rankgap/2, self.style.rowgap/2)
     
     def setselectednode (self, nodeitem):
         if nodeitem is not None:
