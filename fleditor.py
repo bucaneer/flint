@@ -9,7 +9,7 @@ import flint_parser as fp
 import os
 import weakref
 import inspect as insp
-from collections import deque
+from collections import deque, OrderedDict
 
 class FlGlob:
     mainwindow = None
@@ -107,51 +107,48 @@ class QGraphicsPixmapItemCond (QGraphicsPixmapItem):
             super().paint(painter, style, widget)
 
 class NodeItem(QGraphicsItem):
-    def __init__ (self, nodeobj, parent=None, view=None, ghost=False):
+    def __init__ (self, nodeobj, parent=None, view=None, state=1):
         super().__init__()
-        self.nodeobj = nodeobj
-        self.children = []
-        self.referrers = []
-        self.style = FlGlob.mainwindow.style
-        if parent is None:
-            self.parent = None
-            self.nodebank = weakref.proxy(view)
-        elif nodeobj.nodebank == -1:
-            self.nodebank = weakref.proxy(view)
-            self.parent = parent
-            self.parent.addchild(self)
-            self.setX(parent.x()+self.style.rankwidth)
-        else:
-            self.nodebank = parent
-            self.parent = parent
-        self.setCursor(Qt.ArrowCursor)
-        self.view = weakref.proxy(view)
         self.edge = None
+        self.children = None
+        self.nodeobj = nodeobj
+        self.style = FlGlob.mainwindow.style
+        self.view = weakref.proxy(view)
+        self.refID = parent.realid() if parent is not None else None
+        self.state = state
+        self.setrank(parent)
+        self.setCursor(Qt.ArrowCursor)
         self.yoffset = 0
         self.graphicsetup()
-        self.setghost(ghost)
-        
+        self.setstate(state)
+    
     def id (self):
-        if self.parent is not None:
-            refid = self.parent.id()
-        else:
-            refid = ""
-        return "<-".join([self.nodeobj.ID, refid])
+        return (self.refID, self.nodeobj.ID)
     
     def realid (self):
         return self.nodeobj.ID
     
-    def addchild (self, nodeitem):
-        self.children.append(nodeitem)
-    
-    def childlist (self):
-        if self.iscollapsed():
-            return []
+    def childlist (self, generate=True):
+        if generate or self.children is None:
+            ID = self.nodeobj.ID
+            itemtable = self.view.itemtable
+            if self.state == 1 and ID in itemtable and not self.iscollapsed():
+                children = []
+                for child in self.nodeobj.linkIDs:
+                    if child in itemtable[ID]:
+                        item = itemtable[ID][child]
+                    else:
+                        continue
+                    children.append(item)
+                ret = children
+            else:
+                ret = []
+            if self.edge:
+                self.edge.prepareGeometryChange()
+            self.children = ret
+            return self.children
         else:
             return self.children
-    
-    def addreferrer (self, refID):
-        self.referrers.append(refID)
     
     def setedge (self, edge):
         self.edge = edge
@@ -170,21 +167,54 @@ class NodeItem(QGraphicsItem):
         else:
             self.selectbox.hide()
     
-    def setghost (self, ghost):
-        self.ghost = ghost
-        
-        if ghost:
-            self.graphgroup.setOpacity(0.7)
-            self.shadowbox.hide()
-        else:
+    def setstate (self, state):
+        self.state = state
+        if state == 1: # normal
+            self.show()
             self.graphgroup.setOpacity(1)
             self.shadowbox.show()
+        elif state == 0: # ghost
+            self.show()
+            self.graphgroup.setOpacity(0.7)
+            self.shadowbox.hide()
+        elif state == -1: # hidden
+            self.hide()
+    
+    def setY (self, y):
+        if self.edge is not None:
+            self.edge.prepareGeometryChange()
+        y += self.yoffset
+        super().setY(y)
+    
+    def setrank (self, parent):
+        if parent is None:
+            return
+        
+        if self.issubnode():
+            self.setX(parent.x())
+        else:
+            self.setX(parent.x()+self.style.rankwidth)
+            self.nudgechildren()
+    
+    def nudgechildren (self):
+        for child in self.childlist():
+            child.setrank(self)
+    
+    def hide (self):
+        super().hide()
+        if self.edge:
+            self.edge.hide()
+    
+    def show (self):
+        super().show()
+        if self.edge:
+            self.edge.show()
     
     def issubnode (self):
-        return self.nodebank is self.parent
+        return self.nodeobj.nodebank is not -1
     
     def isghost (self):
-        return self.ghost
+        return not self.state
     
     def realnode (self):
         return self.view.itembyID(self.nodeobj.ID)
@@ -197,11 +227,6 @@ class NodeItem(QGraphicsItem):
     
     def iscollapsed (self):
         return self.id() in self.view.collapsednodes
-    
-    def setY (self, y):
-        self.edge.prepareGeometryChange()
-        y += self.yoffset
-        super().setY(y)    
     
     def y_top (self):
         return self.y() - self.boundingRect().height()//2
@@ -240,32 +265,33 @@ class NodeItem(QGraphicsItem):
         return ranks
     
     def siblings (self):
-        parent = self.parent
-        if parent:
-            if self.nodebank is self.view:
-                return parent.childlist()
-            else:
-                return parent.subnodes
-        else:
+        if self.refID is None:
             return None
+        parent = self.view.nodecontainer.nodes[self.refID]
+        if self.issubnode():
+            return parent.subnodes
+        else:
+            return parent.linkIDs
     
     def siblingabove (self):
         sibs = self.siblings()
-        if sibs is None:
+        if sibs is None or self.nodeobj.ID not in sibs:
             return None
-        myindex = sibs.index(self)
+        myindex = sibs.index(self.nodeobj.ID)
         if myindex:
-            return sibs[myindex-1]
+            sibID = (self.refID, sibs[myindex-1])
+            return self.view.itembyfullID(sibID)
         else:
             return None
     
     def siblingbelow (self):
         sibs = self.siblings()
-        if sibs is None:
+        if sibs is None or self.nodeobj.ID not in sibs:
             return None
-        myindex = sibs.index(self)
+        myindex = sibs.index(self.nodeobj.ID)
         if len(sibs) > myindex+1:
-            return sibs[myindex+1]
+            sibID = (self.refID, sibs[myindex+1])
+            return self.view.itembyfullID(sibID)
         else:
             return None
     
@@ -296,6 +322,9 @@ class NodeItem(QGraphicsItem):
     
     def paint (self, painter, style, widget):
         pass
+    
+    def pixmap (self, path):
+        return QPixmap(path).scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
     
     def graphicsetup (self):
         lightbrush = QBrush(FlPalette.light)
@@ -337,35 +366,32 @@ class NodeItem(QGraphicsItem):
         self.nodelabel.setPos(self.style.itemmargin, self.style.itemmargin)
         self.fggroup.addToGroup(self.nodelabel)
         
+        self.icon = self.pixmap("images/blank.png")
+        self.iwidth = self.icon.width()
         self.iconx = self.style.nodetextwidth
         
-        condpix = QPixmap("images/key.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
-        self.condicon = QGraphicsPixmapItemCond(condpix, self, viewport)
-        self.condicon.setPos(self.iconx-condpix.width(), self.style.itemmargin)
+        self.condicon = QGraphicsPixmapItemCond(self.icon, self, viewport)
+        self.condicon.setPos(self.iconx-self.iwidth, self.style.itemmargin)
         self.iconx = self.condicon.x()
         self.fggroup.addToGroup(self.condicon)
         
-        randpix = QPixmap("images/dice.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
-        self.randicon = QGraphicsPixmapItemCond(randpix, self, viewport)
-        self.randicon.setPos(self.iconx-self.style.itemmargin-randpix.width(), self.style.itemmargin)
+        self.randicon = QGraphicsPixmapItemCond(self.icon, self, viewport)
+        self.randicon.setPos(self.iconx-self.style.itemmargin-self.iwidth, self.style.itemmargin)
         self.iconx = self.randicon.x()
         self.fggroup.addToGroup(self.randicon)
         
-        exitpix = QPixmap("images/script-exit.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
-        self.exiticon = QGraphicsPixmapItemCond(exitpix, self, viewport)
-        self.exiticon.setPos(self.iconx-self.style.itemmargin-exitpix.width(), self.style.itemmargin)
+        self.exiticon = QGraphicsPixmapItemCond(self.icon, self, viewport)
+        self.exiticon.setPos(self.iconx-self.style.itemmargin-self.iwidth, self.style.itemmargin)
         self.iconx = self.exiticon.x()
         self.fggroup.addToGroup(self.exiticon)
         
-        enterpix = QPixmap("images/script-enter.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
-        self.entericon = QGraphicsPixmapItemCond(enterpix, self, viewport)
-        self.entericon.setPos(self.iconx-self.style.itemmargin-enterpix.width(), self.style.itemmargin)
+        self.entericon = QGraphicsPixmapItemCond(self.icon, self, viewport)
+        self.entericon.setPos(self.iconx-self.style.itemmargin-self.iwidth, self.style.itemmargin)
         self.iconx = self.entericon.x()
         self.fggroup.addToGroup(self.entericon)
         
-        blankpix = QPixmap("images/blank.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
-        self.persisticon = QGraphicsPixmapItemCond(blankpix, self, viewport)
-        self.persisticon.setPos(self.iconx-self.style.itemmargin-blankpix.width(), self.style.itemmargin)
+        self.persisticon = QGraphicsPixmapItemCond(self.icon, self, viewport)
+        self.persisticon.setPos(self.iconx-self.style.itemmargin-self.iwidth, self.style.itemmargin)
         self.iconx = self.persisticon.x()
         self.fggroup.addToGroup(self.persisticon)
         
@@ -386,43 +412,44 @@ class NodeItem(QGraphicsItem):
         
         # Never call updatelayout() from here (or any inheritable reimplementation)!
     
+    def collapse (self, collapse):
+        for item in self.fggroup.childItems():
+            if item is not self.nodelabel:
+                if collapse:
+                    item.hide()
+                else:
+                    item.show()
+        self.updatelayout()
+    
     def updatecondition (self):
-        if self.nodeobj.hascond() and not self.iscollapsed():
-            self.condicon.show()
-        else:
-            self.condicon.hide()
+        icons = {True: "key", False: "blank"}
+        pixmap = self.pixmap("images/%s.png" % icons[self.nodeobj.hascond()])
+        self.condicon.setPixmap(pixmap)
     
     def updateenterscripts (self):
-        if self.nodeobj.hasenterscripts() and not self.iscollapsed():
-            self.entericon.show()
-        else:
-            self.entericon.hide()
+        icons = {True: "script-enter", False: "blank"}
+        pixmap = self.pixmap("images/%s.png" % icons[self.nodeobj.hasenterscripts()])
+        self.entericon.setPixmap(pixmap)
     
     def updateexitscripts (self):
-        if self.nodeobj.hasexitscripts() and not self.iscollapsed():
-            self.exiticon.show()
-        else:
-            self.exiticon.hide()
+        icons = {True: "script-exit", False: "blank"}
+        pixmap = self.pixmap("images/%s.png" % icons[self.nodeobj.hasexitscripts()])
+        self.exiticon.setPixmap(pixmap)
     
     def updaterandweight (self):
-        if self.nodeobj.randweight and not self.iscollapsed():
-            self.randicon.show()
-        else:
-            self.randicon.hide()
+        icons = {True: "dice", False: "blank"}
+        pixmap = self.pixmap("images/%s.png" % icons[bool(self.nodeobj.randweight)])
+        self.randicon.setPixmap(pixmap)
     
     def updatepersistence (self):
         icons = {"Mark": "mark", "OncePerConv": "once", "OnceEver": "onceever", "": "blank"}
-        if self.nodeobj.persistence in icons and not self.iscollapsed():
-            pixmap = QPixmap("images/%s.png" % icons[self.nodeobj.persistence]).scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
-            self.persisticon.setPixmap(pixmap)
-            self.persisticon.show()
-        else:
-            self.persisticon.hide()
+        pixmap = self.pixmap("images/%s.png" % icons[self.nodeobj.persistence])
+        self.persisticon.setPixmap(pixmap)
     
     def updatecomment (self):
         self.fggroup.removeFromGroup(self.comment)
         contents = self.view.nodedocs[self.realid()]["comment"].toPlainText()
-        if not contents or self.iscollapsed():
+        if not contents:
             self.comment.hide()
         else:
             self.comment.show()
@@ -444,7 +471,7 @@ class NodeItem(QGraphicsItem):
         self.graphgroup.setPos(-activerect.width()//2-activerect.x(), -activerect.height()//2-activerect.y())
         self.prepareGeometryChange()
         self.rect = self.graphgroup.mapRectToParent(self.activebox.boundingRect())
-        self.nodebank.updatelayout()
+        self.view.updatelayout()
     
     def mouseDoubleClickEvent (self, event):
         super().mouseDoubleClickEvent(event)
@@ -482,10 +509,10 @@ class RootNodeItem (NodeItem):
 
 
 class TextNodeItem (NodeItem):
-    def __init__ (self, nodeobj, parent=None, view=None, ghost=False):
+    def __init__ (self, nodeobj, parent=None, view=None, state=1):
         self.textheight = 0
         self.collapselayout = False
-        super().__init__(nodeobj, parent, view, ghost)
+        super().__init__(nodeobj, parent, view, state)
     
     def graphicsetup (self):
         super().graphicsetup()
@@ -514,38 +541,28 @@ class TextNodeItem (NodeItem):
         self.view.nodedocs[self.realid()]["text"].contentsChanged.connect(self.updatetext)
     
     def updatespeaker (self):
-        if not self.iscollapsed():
-            speaker = self.nodeobj.speaker
-            listener = self.nodeobj.listener
-            label = "%s -> %s" % (elidestring(speaker, 15), elidestring(listener, 15))
-            fixedwidth = self.style.basemetrics.elidedText(label, Qt.ElideRight, self.style.nodetextwidth)
-            self.nodespeaker.setText(fixedwidth)
-            self.nodespeaker.show()
-        else:
-            self.nodespeaker.hide()
+        speaker = self.nodeobj.speaker
+        listener = self.nodeobj.listener
+        label = "%s -> %s" % (elidestring(speaker, 15), elidestring(listener, 15))
+        fixedwidth = self.style.basemetrics.elidedText(label, Qt.ElideRight, self.style.nodetextwidth)
+        self.nodespeaker.setText(fixedwidth)
     
     def updatetext (self):
-        if not self.iscollapsed():
-            ndtxt = self.nodetext
-            ndtxt.setPlainText(self.view.nodedocs[self.realid()]["text"].toPlainText())
-            textrect = ndtxt.mapRectToParent(ndtxt.boundingRect())
-            self.textbox.setRect(textrect)
-            self.comment.setY(textrect.bottom()+self.style.itemmargin)
-            self.fggroup.removeFromGroup(self.textbox)
-            self.fggroup.addToGroup(self.textbox)
-            self.fggroup.removeFromGroup(ndtxt)
-            self.fggroup.addToGroup(ndtxt)
-            
-            textheight = textrect.height()
-            if textheight == self.textheight:
-                return
-            self.textheight = textheight
-            self.updatelayout()
-            self.nodetext.show()
-            self.textbox.show()
-        else:
-            self.nodetext.hide()
-            self.textbox.hide()
+        ndtxt = self.nodetext
+        ndtxt.setPlainText(self.view.nodedocs[self.realid()]["text"].toPlainText())
+        textrect = ndtxt.mapRectToParent(ndtxt.boundingRect())
+        self.textbox.setRect(textrect)
+        self.comment.setY(textrect.bottom()+self.style.itemmargin)
+        self.fggroup.removeFromGroup(self.textbox)
+        self.fggroup.addToGroup(self.textbox)
+        self.fggroup.removeFromGroup(ndtxt)
+        self.fggroup.addToGroup(ndtxt)
+        
+        textheight = textrect.height()
+        if textheight == self.textheight:
+            return
+        self.textheight = textheight
+        self.updatelayout()
     
     def contextMenuEvent (self, event):
         menu = QMenu()
@@ -573,9 +590,8 @@ class TalkNodeItem (TextNodeItem):
         super().graphicsetup()
         viewport = self.view.viewport()
         
-        blankpix = QPixmap("images/blank.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
-        self.qhubicon = QGraphicsPixmapItemCond(blankpix, self, viewport)
-        self.qhubicon.setPos(self.iconx-self.style.itemmargin-blankpix.width(), self.style.itemmargin)
+        self.qhubicon = QGraphicsPixmapItemCond(self.icon, self, viewport)
+        self.qhubicon.setPos(self.iconx-self.style.itemmargin-self.iwidth, self.style.itemmargin)
         self.iconx = self.qhubicon.x()
         self.fggroup.addToGroup(self.qhubicon)
         
@@ -585,13 +601,9 @@ class TalkNodeItem (TextNodeItem):
         self.updatequestionhub()
     
     def updatequestionhub (self):
-        icons = {"ShowOnce": "question-once", "ShowNever": "question-never"}
-        if not self.iscollapsed() and self.nodeobj.questionhub in icons:
-            pixmap = QPixmap("images/%s.png" % icons[self.nodeobj.questionhub]).scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
-            self.qhubicon.setPixmap(pixmap)
-            self.qhubicon.show()
-        else:
-            self.qhubicon.hide()
+        icons = {"ShowOnce": "question-once", "ShowNever": "question-never", "": "blank"}
+        pixmap = self.pixmap("images/%s.png" % icons[self.nodeobj.questionhub])
+        self.qhubicon.setPixmap(pixmap)
 
 class ResponseNodeItem (TextNodeItem):
     maincolor = FlPalette.hl2var
@@ -609,17 +621,37 @@ class BankNodeItem (NodeItem):
     altcolor = FlPalette.bankvar
     label = "%s Bank"
     
-    def __init__ (self, nodeobj, parent=None, view=None, ghost=False):
-        super().__init__(nodeobj, parent, view, ghost)
-        self.subnodes = []
+    def __init__ (self, nodeobj, parent=None, view=None, state=1):
+        super().__init__(nodeobj, parent, view, state)
+        self.rect = QRectF()
         self.setZValue(-1)
-        for subnodeID in nodeobj.subnodes:
-            subnode = view.newitem(view.nodecontainer.nodes[subnodeID], self, ghost)
-            self.subnodes.append(subnode)
-            subnode.setX(self.x())
         self.updatecomment()
         self.updatebanktype()
-        self.updatecenterbox()
+    
+    def nudgechildren(self):
+        super().nudgechildren()
+        for sub in self.sublist():
+            sub.setrank(self)
+    
+    def sublist (self):
+        ID = self.nodeobj.ID
+        itemtable = self.view.itemtable
+        if self.state == 1 and ID in itemtable and not self.iscollapsed():
+            children = []
+            for child in self.nodeobj.subnodes:
+                if child in itemtable[ID]:
+                    item = itemtable[ID][child]
+                else:
+                    continue
+                if item.state > -1:
+                    children.append(item)
+            return children
+        else:
+            return []
+    
+    def treeposition (self, ranks=None):
+        self.updatelayout(external=True)
+        return super().treeposition(ranks)
     
     def graphicsetup (self):
         super().graphicsetup()
@@ -627,9 +659,8 @@ class BankNodeItem (NodeItem):
         nopen = QPen(0)
         viewport = self.view.viewport()
         
-        firstpix = QPixmap("images/bank-first.png").scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
-        self.btypeicon = QGraphicsPixmapItemCond(firstpix, self, viewport)
-        self.btypeicon.setPos(self.iconx-self.style.itemmargin-firstpix.width(), self.style.itemmargin)
+        self.btypeicon = QGraphicsPixmapItemCond(self.icon, self, viewport)
+        self.btypeicon.setPos(self.iconx-self.style.itemmargin-self.iwidth, self.style.itemmargin)
         self.iconx = self.btypeicon.x()
         self.fggroup.addToGroup(self.btypeicon)
         
@@ -641,44 +672,36 @@ class BankNodeItem (NodeItem):
         self.fggroup.addToGroup(self.centerbox)
     
     def updatebanktype (self):
-        icons = {"First": "bank-first", "All": "bank-all", "Append": "bank-append"}
-        if not self.iscollapsed() and self.nodeobj.banktype in icons:
-            pixmap = QPixmap("images/%s.png" % icons[self.nodeobj.banktype]).scaledToWidth(self.style.boldheight, Qt.SmoothTransformation)
-            self.btypeicon.setPixmap(pixmap)
-            self.btypeicon.show()
-        else:
-            self.btypeicon.hide()
+        icons = {"First": "bank-first", "All": "bank-all", "Append": "bank-append", "": "blank"}
+        pixmap = self.pixmap("images/%s.png" % icons[self.nodeobj.banktype])
+        self.btypeicon.setPixmap(pixmap)
     
     def updatecenterbox (self):
-        if not self.iscollapsed():
-            verticalpos = self.centerbox.y()
-            maxwidth = 0
-            for subnode in self.subnodes:
-                noderect = subnode.boundingRect()
-                nodeheight = noderect.height()
-                nodewidth = noderect.width()
-                subnode.show()
-                subnode.yoffset = self.mapToScene(0,verticalpos + nodeheight/2+self.style.activemargin).y()-self.y_bottom()
-                verticalpos += nodeheight
-                maxwidth = max(maxwidth, nodewidth)
-            centerrect = self.centerbox.rect()
-            centerrect.setWidth(maxwidth)
-            centerrect.setHeight(verticalpos-self.centerbox.y())
-            self.centerbox.setRect(centerrect)
-            centerrect = self.centerbox.mapRectToParent(centerrect)
-            
-            self.comment.setY(centerrect.bottom()+self.style.itemmargin)
-            
-            self.fggroup.removeFromGroup(self.centerbox)
-            self.fggroup.addToGroup(self.centerbox)
-            self.centerbox.show()
-        else:
-            self.centerbox.hide()
+        verticalpos = self.centerbox.y()
+        maxwidth = 0
+        subnodes = self.sublist()
+        for subnode in subnodes:
+            noderect = subnode.boundingRect()
+            nodeheight = noderect.height()
+            nodewidth = noderect.width()
+            subnode.show()
+            subnode.yoffset = self.mapToScene(0,verticalpos + nodeheight/2+self.style.activemargin).y()-self.y_bottom()
+            verticalpos += nodeheight
+            maxwidth = max(maxwidth, nodewidth)
+        centerrect = self.centerbox.rect()
+        centerrect.setWidth(maxwidth)
+        centerrect.setHeight(verticalpos-self.centerbox.y())
+        self.centerbox.setRect(centerrect)
+        centerrect = self.centerbox.mapRectToParent(centerrect)
+        
+        self.comment.setY(centerrect.bottom()+self.style.itemmargin)
+        
+        self.fggroup.removeFromGroup(self.centerbox)
+        self.fggroup.addToGroup(self.centerbox)
     
-    def updatelayout (self):
+    def updatelayout (self, external=False):
+        subnodes = self.sublist()
         if self.iscollapsed():
-            for subnode in self.subnodes:
-                subnode.hide()
             rect = self.nodelabel.mapRectToParent(self.nodelabel.boundingRect())
         else:
             self.updatecenterbox()
@@ -692,16 +715,17 @@ class BankNodeItem (NodeItem):
         oldypos = self.centerbox.mapToScene(self.centerbox.pos()).y()
         self.graphgroup.setPos(-activerect.width()//2-activerect.x(), -activerect.height()//2-activerect.y())
         newypos = self.centerbox.mapToScene(self.centerbox.pos()).y()
-        for subnode in self.subnodes:
+        for subnode in subnodes:
             subnode.yoffset += newypos - oldypos
             subnode.setY(self.y())
         self.prepareGeometryChange()
         self.rect = self.graphgroup.mapRectToParent(self.activebox.boundingRect())
-        self.nodebank.updatelayout()
+        if not external:
+            self.view.updatelayout()
     
     def setY (self, y):
         super().setY(y)
-        for subnode in self.subnodes:
+        for subnode in self.sublist():
             subnode.setY(y)
     
     def contextMenuEvent (self, event):
@@ -751,11 +775,12 @@ class EdgeItem (QGraphicsItem):
     def boundingRect (self):
         xmin = self.source.x()
         xmax = xmin + self.style.rankwidth
-        children = self.source.childlist()
+        children = self.source.childlist(generate=False)
+        self.children = [(t.x()+t.boundingRect().left(), t.y()) for t in children]
         halfarrow = self.arrowsize/2
         if children:
-            ymin = children[0].y() - halfarrow
-            ymax = children[-1].y() + halfarrow
+            ymin = self.children[0][1] - halfarrow
+            ymax = self.children[-1][1] + halfarrow + self.style.shadowoffset
         else:
             y = self.source.y()
             ymin = y - halfarrow
@@ -763,7 +788,9 @@ class EdgeItem (QGraphicsItem):
         return QRectF(xmin, ymin, abs(xmax-xmin), abs(ymax-ymin))
     
     def paint (self, painter, style, widget, off=0, main=True):
-        children = self.source.childlist()
+        if not self.source:
+            return
+        children = self.children
         if not children:
             return
         treeview = widget is self.view.viewport()
@@ -789,9 +816,9 @@ class EdgeItem (QGraphicsItem):
         
         arrow = self.arrowsize
         corr = pen.width()/2
-        for target in children:
-            tx = target.x() + target.boundingRect().left() + off
-            ty = target.y() + off
+        for tx, ty in children:
+            tx += off
+            ty += off
             painter.drawLine(vert_x-corr, ty, tx-arrow, ty)
             arrowtip = [QPointF(tx, ty),
                         QPointF(tx-arrow, ty-(arrow/2)),
@@ -801,8 +828,8 @@ class EdgeItem (QGraphicsItem):
             painter.setPen(pen)
         
         if len(children) > 1:
-            vert_top = children[0].y() + off
-            vert_bottom = children[-1].y() + off
+            vert_top = children[0][1] + off
+            vert_bottom = children[-1][1] + off
             painter.drawLine(vert_x, vert_top, vert_x, vert_bottom)
 
 class FrameItem (QGraphicsItem):
@@ -1462,7 +1489,7 @@ class NodeListWidget (QWidget):
             descr = ""
         
         label = "%s: %s %s" % (nodeID, typename, descr) 
-        if nodeID not in view.itemindex:
+        if nodeID in view.trash:
             icon = QIcon.fromTheme("user-trash")
         else:
             icon = QIcon.fromTheme("text-x-generic")
@@ -1553,10 +1580,88 @@ class TreeEditor (object):
     
     def __init__ (self, nodecontainer):
         self.nodecontainer = nodecontainer
+        self.nodeorder = OrderedDict()
+        self.collapsed = []
         
         historysize = 10 # OPTION
         self.undohistory = deque(maxlen=historysize)
         self.redohistory = deque(maxlen=historysize)
+    
+    def traverse (self):
+        queue = deque()
+        # queue element: (fromID, toID, state)
+        # state:         None: auto, 1: normal, 0: ghost, -1: hidden
+        queue.append((None, "0", None))
+        nodes = self.nodecontainer.nodes
+        visitlog = dict()
+        neworder = OrderedDict()
+        
+        def follow (ID, state, sub=False):
+            if sub:
+                links = nodes[ID].subnodes
+            else:
+                links = nodes[ID].linkIDs
+            
+            for nextID in links:
+                queue.append((ID, nextID, state))
+        
+        while queue:
+            refID, curID, state = queue.popleft()
+            fullID = (refID, curID)
+            if fullID in neworder:
+                continue
+            visited = curID in visitlog
+            skipped = visitlog.get(curID, False)
+            collapsed = fullID in self.collapsednodes
+            
+            prefstate = 0
+            if collapsed:
+                if not visited:
+                    visitlog[curID] = fullID # skip
+            elif (visited and skipped) or not visited:
+                visitlog[curID] = False # proceed
+                prefstate = 1
+            
+            neworder[fullID] = prefstate if state is None else state
+            
+            if prefstate or state is not None:
+                follow(curID, state, sub=True)
+                follow(curID, state)
+            
+            if not queue: 
+                for refID, fullID in visitlog.items():
+                    if fullID:
+                        # dead end: all instances of this node are collapsed
+                        fromID, toID = fullID
+                        if neworder[fullID] == 0:
+                            neworder[fullID] = 1 # un-ghost last instance
+                        follow(curID, -1, sub=True)
+                        follow(toID, -1)
+                        visitlog[refID] = False
+        
+        missing = [ID for ID in self.nodeorder if ID not in neworder]
+        misskeys = [ID[1] for ID in missing]
+        changes = []
+        for fullID, state in neworder.items():
+            fromID, toID = fullID
+            if fullID not in self.nodeorder or self.nodeorder[fullID] is None:
+                if toID in misskeys:
+                    index = misskeys.index(toID)
+                    misskeys.pop(index)
+                    oldID = missing.pop(index)
+                    self.reparent(oldID, fullID)
+                    if self.nodeorder[oldID] != neworder[fullID]:
+                        self.setstate(fullID, state)
+                else:
+                    self.newitem(fullID, state)
+            elif state != self.nodeorder[fullID]:
+                self.setstate(fullID, state)
+        for fullID in missing:
+            self.removeitem(fullID)
+        
+        self.trash = nodes - visitlog.keys()
+        self.nodeorder = neworder
+        return True
     
     def updateview (self):
         pass
@@ -1614,10 +1719,11 @@ class TreeEditor (object):
         newid = newobj.ID
         
         if not undo:
+            pos = self.nodecontainer.nodes[nodeID].subnodes.index(newid)
             hist = HistoryAction(self.unlinksubnode,
                 {"subID": newid, "bankID": nodeID},
                 self.linksubnode,
-                {"subID": newid, "bankID": nodeID},
+                {"subID": newid, "bankID": nodeID, "pos": pos},
                 "Add new subnode %s to node %s" % (newid, nodeID))
             self.addundoable(hist)
             self.updateview()
@@ -1741,6 +1847,7 @@ class TreeEditor (object):
         bankdict = nodedict.copy()
         bankdict["type"] = "bank"
         clonedict = nodedict.copy()
+        clonedict["links"] = []
         clonedict["nodebank"] = nodeID
         
         cont.newnode(bankdict, newID=nodeID, force=True)
@@ -1763,6 +1870,7 @@ class TreeEditor (object):
         
         clonedict = nodedict.copy()
         clonedict["nodebank"] = -1
+        clonedict["links"] = selnode.linkIDs
         
         cont.nodes.pop(subID)
         cont.newnode(clonedict, newID=nodeID, force=True)
@@ -1807,6 +1915,10 @@ class TreeView (TreeEditor, QGraphicsView):
         
         self.nodecontainer = nodecontainer
         self.nodedocs = dict()
+        self.itemtable = dict()
+        self.itemindex = dict()
+        self.viewframe = FrameItem(view=self)
+        self.scene().addItem(self.viewframe)
         self.updateview()
         self.setselectednode(self.treeroot())
     
@@ -1829,96 +1941,95 @@ class TreeView (TreeEditor, QGraphicsView):
         self.nodedocs = newnodedocs
     
     def updateview (self):
-        selectedID = activeID = selparentID = None
-        if self.activenode is not None:
-            activeID = self.activenode.realid()
-        if self.selectednode is not None:
-            selectedID = self.selectednode.id()
-        self.activenode = self.selectednode = None
-        
         self.constructed = False
         self.updatedocs()
-        self.scene().clear()
-        self.nodeitems = dict()
-        self.itemindex = dict()
-        self.viewframe = FrameItem(view=self)
-        self.scene().addItem(self.viewframe)
-        self.constructed = self.constructgraph()
+        self.constructed = self.traverse()
         self.updatelayout()
         FlGlob.mainwindow.viewUpdated.emit()
         
-        if activeID and activeID in self.itemindex:
-            self.setactivenode(self.itembyID(activeID))
-        else:
-            self.setactivenode(None)
-        
-        baseID = ""
-        while selectedID:
-            swappedID = "<-".join([baseID, selectedID])
-            if baseID and swappedID in self.nodeitems:
-                self.setselectednode(self.nodeitems[swappedID])
-                break
-            elif selectedID in self.nodeitems:
-                self.setselectednode(self.nodeitems[selectedID])
-                break
-            split = selectedID.split("<-", 1)
-            selectedID = split[1]
-            if not baseID:
-                baseID = split[0]
+        self.setactivenode(self.activenode)
+        self.setselectednode(self.selectednode)
     
-    def constructgraph (self):
-        queue = []
-        queue.append(("0", None))
-        nodesdict = self.nodecontainer.nodes
-        visited = {"0": False}
-        
-        while queue:
-            curID, ref = queue.pop(0)
-            isghost = visited[curID]
-            curnodeobj = nodesdict[curID]
-            nodeitem = self.newitem(curnodeobj, ref, isghost)
-            visited[curID] = visited[curID] or nodeitem.id() not in self.collapsednodes
-            if not (isghost or nodeitem.iscollapsed()):
-                for nextID in curnodeobj.linkIDs:
-                    queue.append((nextID, nodeitem))
-                    visited[nextID] = nextID in visited and visited[nextID]
-        return True
-    
-    def newitem (self, nodeobj, parent, isghost=False):
-        if parent is None:
-            refid = ""
-        else:
-            refid = parent.id()
-        nodeitem = self.__types[nodeobj.typename](nodeobj, parent=parent, view=self, ghost=isghost)
+    def newitem (self, fullID, state):
+        fromID, toID = fullID
+        parent = self.itembyID(fromID)
+        nodeobj = self.nodecontainer.nodes[toID]
+        nodeitem = self.__types[nodeobj.typename](nodeobj, parent=parent, view=self, state=state)
         edgeitem = EdgeItem(nodeitem, view=self)
-        self.scene().addItem(edgeitem)
-        self.scene().addItem(nodeitem)
+        scene = self.scene()
+        scene.addItem(edgeitem)
+        scene.addItem(nodeitem)
         
-        if nodeobj.ID in self.itemindex:
-            if not isghost:
-                oldnode = self.itemindex[nodeobj.ID][0]
-                oldnode.setghost(True)
-                nodeitem.referrers = oldnode.referrers
-                oldnode.referrers = []
-                self.itemindex[nodeobj.ID].insert(0, nodeitem)
+        if toID in self.itemindex:
+            if state == 1:
+                self.itemindex[toID].insert(0, nodeitem)
             else:
-                self.itemindex[nodeobj.ID].append(nodeitem)
+                self.itemindex[toID].append(nodeitem)
         else:
-            self.itemindex[nodeobj.ID] = [nodeitem]
+            self.itemindex[toID] = [nodeitem]
         
-        idstring = "<-".join([nodeobj.ID, refid])
-        self.nodeitems[idstring] = nodeitem
-        
-        if refid:
-            self.itembyID(nodeobj.ID).addreferrer(refid)
-        
-        return nodeitem
+        if self.itembyfullID(fullID):
+            self.removeitem(fullID)
+        self.tableitem(fullID, nodeitem)
+    
+    def reparent (self, oldID, newID):
+        fromID, toID = newID
+        oldref = oldID[0]
+        newparent = self.itembyID(fromID)
+        nodeitem = self.itemtable[oldref].pop(toID)
+        self.tableitem(newID, nodeitem)
+        nodeitem.refID = fromID
+        nodeitem.setrank(newparent)
+    
+    def removeitem (self, fullID):
+        fromID, toID = fullID
+        nodeitem = self.itemtable[fromID].pop(toID)
+        edgeitem = nodeitem.edge
+        self.itemindex[toID].remove(nodeitem)
+        if not self.itemindex[toID]:
+            self.itemindex.pop(toID)
+        scene = self.scene()
+        scene.removeItem(nodeitem)
+        scene.removeItem(edgeitem)
+        edgeitem.source = None
+        nodeitem.edge = None
+        if self.activenode is nodeitem:
+            self.activenode = None
+        if self.selectednode is nodeitem:
+            self.selectednode = None
+        nodeitem = None
+        edgeitem = None
+    
+    def setstate (self, fullID, state):
+        fromID, toID = fullID
+        nodeitem = self.itemtable[fromID][toID]
+        if state == 1:
+            index = self.itemindex[toID]
+            i = self.itemindex[toID].index(nodeitem)
+            index[0], index[i] = index[i], index[0]
+        nodeitem.setstate(state)
+        if state != -1:
+            nodeitem.setrank(self.itembyID(fromID))
+    
+    def tableitem (self, fullID, nodeitem):
+        fromID, toID = fullID
+        table = self.itemtable
+        if fromID not in table:
+            table[fromID] = dict()
+        table[fromID][toID] = nodeitem
     
     def itembyID (self, nodeID):
         if nodeID in self.itemindex:
             return self.itemindex[nodeID][0]
         else:
-            return #EXCEPTION
+            return None #EXCEPTION
+    
+    def itembyfullID (self, fullID):
+        fromID, toID = fullID
+        if fromID in self.itemtable and toID in self.itemtable[fromID]:
+            return self.itemtable[fromID][toID]
+        else:
+            return None
     
     def treeroot (self):
         return self.itembyID("0")
@@ -1961,15 +2072,19 @@ class TreeView (TreeEditor, QGraphicsView):
                 self.selectednode.setselected(False)
             self.selectednode = nodeitem
             self.selectednode.setselected(True)
-            self.shownode(self.selectednode)
-            FlGlob.mainwindow.setselectednode(self, nodeitem.realid())
+            nodeID = nodeitem.realid()
+        else:
+            nodeID = "-1"
+        FlGlob.mainwindow.setselectednode(self, nodeID)
     
     @pyqtSlot(str)
     def selectbyID (self, nodeID):
         if FlGlob.mainwindow.activeview is not self:
             return
         if self.selectednode is not None and self.selectednode.realid() == nodeID:
+            self.shownode(self.selectednode)
             return
+        
         if nodeID in self.itemindex:
             nodeitem = self.itembyID(nodeID)
             if self.selectednode:
@@ -2011,16 +2126,30 @@ class TreeView (TreeEditor, QGraphicsView):
                 if func is not None:
                     func()
     
-    def collapse (self, longid, collapse=None):
-        selID = longid
-        if selID in self.collapsednodes:
+    def nodetobank (self, nodeID, undo=False):
+        for item in self.itemindex[nodeID]:
+            fullID = item.id()
+            self.nodeorder[fullID] = None
+        super().nodetobank(nodeID, undo)
+    
+    def banktonode (self, nodeID, undo=False):
+        for item in self.itemindex[nodeID]:
+            fullID = item.id()
+            self.nodeorder[fullID] = None
+        super().banktonode(nodeID, undo)
+    
+    def collapse (self, fullID, collapse=None):
+        if fullID in self.collapsednodes:
             if collapse is None or not collapse:
                 desc = "Uncollapse"
-                self.collapsednodes.remove(selID)
+                self.collapsednodes.remove(fullID)
+                col = False
         else:
             if collapse is None or collapse:
                 desc = "Collapse"
-                self.collapsednodes.append(selID)
+                self.collapsednodes.append(fullID)
+                col = True
+        self.itembyfullID(fullID).collapse(col)
         self.updateview()
     
     def search (self, query):
@@ -2046,9 +2175,11 @@ class TreeView (TreeEditor, QGraphicsView):
         key = event.key()
         mod = event.modifiers()
         node = self.selectednode
+        if node is None:
+            return
         if key == Qt.Key_Left:
-            if node.parent:
-                self.setselectednode(node.parent)
+            if node.refID:
+                self.setselectednode(self.itembyID(node.refID))
         elif key == Qt.Key_Up:
             sib = node.siblingabove()
             if sib:
@@ -2059,8 +2190,9 @@ class TreeView (TreeEditor, QGraphicsView):
                 self.setselectednode(sib)
         elif key == Qt.Key_Right:
             if mod & Qt.ControlModifier and isinstance(node, BankNodeItem):
-                if node.subnodes:
-                    subnode = node.subnodes[0]
+                sublist = node.sublist()
+                if sublist:
+                    subnode = sublist[0]
                     self.setselectednode(subnode)
             else:
                 children = node.childlist()
@@ -2667,32 +2799,33 @@ class EditorWindow (QMainWindow):
     def unlink (self, inherit=False):
         view = self.activeview
         selected = view.selectednode
-        if selected.parent is None:
+        selID = selected.realid()
+        if selected.refID is None:
             return
-        if len(selected.realnode().referrers) == 1:
-            if inherit or len(selected.childlist()) == 0:
-                text = "This will remove the only instance of node %s.\n\nContinue?" % selected.realid()
+        if len(view.itemindex[selID]) == 1:
+            if inherit or len(selected.nodeobj.linkIDs) == 0:
+                text = "This will remove the only instance of node %s.\n\nContinue?" % selID
             else:
-                text = "This will remove the only instance of node %s and all unique nodes in its subtree.\n\nContinue?" % selected.realid()
+                text = "This will remove the only instance of node %s and all unique nodes in its subtree.\n\nContinue?" % selID
         else:
-            text = "Unlink node %s from node %s?" % (selected.realid(), selected.parent.realid())
+            text = "Unlink node %s from node %s?" % (selID, selected.refID)
         answer = QMessageBox.question(self, "Node removal", text)
         if answer == QMessageBox.No:
             return
         
         if selected.issubnode():
-            view.unlinksubnode(selected.realid(), selected.parent.realid())
+            view.unlinksubnode(selID, selected.refID)
         elif inherit:
-            view.unlink_inherit(selected.realid(), selected.parent.realid())
+            view.unlink_inherit(selID, selected.refID)
         else:
-            view.unlink(selected.realid(), selected.parent.realid())
+            view.unlink(selID, selected.refID)
     
     @pyqtSlot()
     def moveup (self):
         view = self.activeview
         selnode = view.selectednode
         nodeID = selnode.realid()
-        refID = selnode.parent.realid()
+        refID = selnode.refID
         if selnode.siblingabove() is not None:
             view.move(nodeID, refID, up=True)
     
@@ -2701,7 +2834,7 @@ class EditorWindow (QMainWindow):
         view = self.activeview
         selnode = view.selectednode
         nodeID = selnode.realid()
-        refID = selnode.parent.realid()
+        refID = selnode.refID
         if selnode.siblingbelow() is not None:
             view.move(nodeID, refID, up=False)
     
@@ -2709,11 +2842,14 @@ class EditorWindow (QMainWindow):
     def parentswap (self):
         view = self.activeview
         selnode = view.selectednode
-        parent = selnode.parent
-        grandpa = parent.parent
-        if grandpa is None:
+        nodeID = selnode.realid()
+        parID = selnode.refID
+        if parID is None:
             return
-        view.parentswap(grandpa.realid(), parent.realid(), selnode.realid())
+        gpID = view.itembyID(parID).refID
+        if gpID is None:
+            return
+        view.parentswap(gpID, parID, nodeID)
     
     @pyqtSlot()
     def nodetobank (self):
@@ -2730,8 +2866,8 @@ class EditorWindow (QMainWindow):
     @pyqtSlot()
     def collapse (self):
         view = self.activeview
-        longid = view.selectednode.id()
-        view.collapse(longid)
+        fullID = view.selectednode.id()
+        view.collapse(fullID)
     
     def undofactory (self, num):
         @pyqtSlot()
