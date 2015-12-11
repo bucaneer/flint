@@ -1686,6 +1686,7 @@ class TreeEditor (object):
         for fullID in toremove:
             changes.append(("removeitem", (fullID,)))
         
+        log("debug", "CHANGES %s" % changes)
         self.trash = nodes - visitlog.keys()
         self.changes.extend(changes)
         self.nodeorder = neworder
@@ -1829,7 +1830,8 @@ class TreeEditor (object):
                 "Move node %s %s" % (nodeID, desc))
             self.addundoable(hist)
     
-    def parentswap (self, gpID, parID, nodeID, undo=False):
+    def parentswap (self, gpID, parID, nodeID, pos=None, undo=False):
+        log("debug", "PARENSTSWAP %s" % str((gpID, parID, nodeID, pos, undo)))
         nodes = self.nodecontainer.nodes
         parlinks = nodes[parID].linkIDs
         childlinks = nodes[nodeID].linkIDs
@@ -1839,19 +1841,28 @@ class TreeEditor (object):
         parlinks.remove(nodeID)
         parlinks.insert(childindex, parID)
         
-        parindex = grandpalinks.index(parID)
-        grandpalinks.remove(parID)
+        if pos is not None:
+            log("debug", "- duplicate -> pos: %s; gplinks: %s" % (pos, grandpalinks))
+            parindex = pos
+            grandpalinks.insert(pos, parID)
+        else:
+            parindex = grandpalinks.index(parID)
+        grandpalinks.pop(parindex)
+        
         if nodeID not in grandpalinks:
             grandpalinks.insert(parindex, nodeID)
+            dupepos = None
+        else:
+            dupepos = parindex
         
         nodes[parID].linkIDs = childlinks
         nodes[nodeID].linkIDs = parlinks
         
         if not undo:
             hist = HistoryAction(self.parentswap,
-                {"gpID": gpID, "parID": nodeID, "nodeID": parID},
+                {"gpID": gpID, "parID": nodeID, "nodeID": parID, "pos": dupepos},
                 self.parentswap,
-                {"gpID": gpID, "parID": parID, "nodeID": nodeID},
+                {"gpID": gpID, "parID": parID, "nodeID": nodeID, "pos": None},
                 "Swap node %s with parent %s" % (nodeID, parID))
             self.addundoable(hist)
     
@@ -2206,8 +2217,8 @@ class TreeView (TreeEditor, QGraphicsView):
         if not undo:
             self.updateview()
     
-    def parentswap (self, gpID, parID, nodeID, undo=False):
-        super().parentswap(gpID, parID, nodeID, undo)
+    def parentswap (self, gpID, parID, nodeID, pos=None, undo=False):
+        super().parentswap(gpID, parID, nodeID, pos, undo)
         if not undo:
             self.updateview()
     
