@@ -1675,7 +1675,7 @@ class TreeEditor (object):
         
         if not undo:
             hist = HistoryAction(self.unlink,
-                {"nodeID": nodeID, "refID": refID, "inherit": False},
+                {"nodeID": nodeID, "refID": refID},
                 self.linknode,
                 {"nodeID": nodeID, "refID": refID, "pos": pos},
                 "Link node %s to node %s" % (nodeID, refID))
