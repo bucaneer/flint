@@ -11,7 +11,16 @@ import weakref
 import inspect as insp
 from collections import deque, OrderedDict
 
+def log (level, text):
+    if level in FlGlob.loglevels:
+        if FlGlob.loglevels[level] <= FlGlob.loglevel:
+            print("[%s] %s" % (level, text))
+    else:
+        log("warn", "Unknown loglevel: %s" % level)
+
 class FlGlob:
+    loglevels = {"quiet": 0, "error": 1, "warn": 2, "info": 3, "debug": 4, "verbose": 5}
+    loglevel = 3
     mainwindow = None
 
 class FlPalette (object):
@@ -1575,9 +1584,11 @@ class HistoryAction (object):
         self.descr = descr
     
     def undo (self):
+        log("debug", "UNDO %s(%s)" % (self.unfunc.__name__, self.unargs))
         self.unfunc(**self.unargs)
     
     def redo (self):
+        log("debug", "REDO %s(%s)" % (self.refunc.__name__, self.reargs))
         self.refunc(**self.reargs)
 
 class TreeEditor (object):
@@ -2976,6 +2987,16 @@ def elidestring (string, length):
         return string[:length-1]+"…"
 
 if __name__ == '__main__':
+    for arg in sys.argv[1:]:
+        split = arg.split("=", maxsplit=1)
+        argname = split[0]
+        param = split[1] if len(split)>1 else None
+        if argname == "--loglevel":
+            if param in FlGlob.loglevels:
+                FlGlob.loglevel = FlGlob.loglevels[param]
+                log("info", "Loglevel: %s" % param)
+            else:
+                log("warn", "Unknown loglevel: %s" % param)
     app = QApplication(sys.argv)
     window = EditorWindow()
     window.show()
