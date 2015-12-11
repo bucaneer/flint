@@ -195,7 +195,7 @@ class NodeItem(QGraphicsItem):
         parent = self.view.itembyID(self.refID)
         if parent and parent.edge is not None:
             parent.edge.prepareGeometryChange()
-        y += self.yoffset
+        y += self.getyoffset()
         super().setY(y)
     
     def setrank (self, parent):
@@ -213,6 +213,12 @@ class NodeItem(QGraphicsItem):
     def nudgechildren (self):
         for child in self.childlist():
             child.setrank(self)
+    
+    def getyoffset (self):
+        if self.nodeobj.nodebank == -1:
+            return self.yoffset
+        else:
+            return self.view.itembyID(self.refID).getyoffset() + self.yoffset
     
     def hide (self):
         super().hide()
@@ -357,14 +363,14 @@ class NodeItem(QGraphicsItem):
         self.graphgroup.addToGroup(self.shadowbox)
         
         self.activebox = QGraphicsRectItem(self)
-        self.activebox.setBrush(mainbrush)
-        self.activebox.setPen(nopen)
+        activepen = QPen(self.altcolor, self.style.activemargin, join=Qt.MiterJoin)
+        self.activebox.setPen(activepen)
         self.activebox.hide()
         self.graphgroup.addToGroup(self.activebox)
         
         self.selectbox = QGraphicsRectItem(self)
-        self.selectbox.setBrush(lightbrush)
-        self.selectbox.setPen(nopen)
+        selectpen = QPen(FlPalette.light, self.style.selectmargin, join=Qt.MiterJoin)
+        self.selectbox.setPen(selectpen)
         self.selectbox.hide()
         self.graphgroup.addToGroup(self.selectbox)
         
@@ -479,12 +485,12 @@ class NodeItem(QGraphicsItem):
         mainrect = rect.marginsAdded(QMarginsF(*[self.style.nodemargin]*4))
         self.mainbox.setRect(mainrect)
         self.shadowbox.setRect(mainrect)
-        self.selectbox.setRect(mainrect.marginsAdded(QMarginsF(*[self.style.selectmargin]*4)))
-        activerect = mainrect.marginsAdded(QMarginsF(*[self.style.activemargin]*4))
+        self.selectbox.setRect(mainrect.marginsAdded(QMarginsF(*[self.style.selectmargin//2]*4)))
+        activerect = mainrect.marginsAdded(QMarginsF(*[self.style.activemargin//2]*4))
         self.activebox.setRect(activerect)
         self.graphgroup.setPos(-activerect.width()//2-activerect.x(), -activerect.height()//2-activerect.y())
         self.prepareGeometryChange()
-        self.rect = self.graphgroup.mapRectToParent(self.activebox.boundingRect())
+        self.rect = self.graphgroup.mapRectToParent(mainrect)
         self.view.updatelayout()
     
     def mouseDoubleClickEvent (self, event):
@@ -638,7 +644,6 @@ class BankNodeItem (NodeItem):
     def __init__ (self, nodeobj, parent=None, view=None, state=1):
         super().__init__(nodeobj, parent, view, state)
         self.rect = QRectF()
-        self.setZValue(-1)
         self.updatecomment()
         self.updatebanktype()
     
@@ -678,7 +683,7 @@ class BankNodeItem (NodeItem):
         self.iconx = self.btypeicon.x()
         self.fggroup.addToGroup(self.btypeicon)
         
-        self.centerbox = QGraphicsRectItemCond(self, viewport)
+        self.centerbox = QGraphicsRectItem(self)
         self.centerbox.setRect(QRectF())
         self.centerbox.setBrush(darkbrush)
         self.centerbox.setPen(nopen)
@@ -695,15 +700,17 @@ class BankNodeItem (NodeItem):
         maxwidth = 0
         subnodes = self.sublist()
         for subnode in subnodes:
+            if isinstance(subnode, BankNodeItem):
+                subnode.updatelayout(external=True)
             noderect = subnode.boundingRect()
             nodeheight = noderect.height()
             nodewidth = noderect.width()
             subnode.show()
             subnode.yoffset = self.mapToScene(0,verticalpos + nodeheight/2+self.style.activemargin).y()-self.y_bottom()
-            verticalpos += nodeheight
+            verticalpos += nodeheight+self.style.activemargin*2
             maxwidth = max(maxwidth, nodewidth)
         centerrect = self.centerbox.rect()
-        centerrect.setWidth(maxwidth)
+        centerrect.setWidth(maxwidth+self.style.selectmargin*2)
         centerrect.setHeight(verticalpos-self.centerbox.y())
         self.centerbox.setRect(centerrect)
         centerrect = self.centerbox.mapRectToParent(centerrect)
@@ -720,11 +727,11 @@ class BankNodeItem (NodeItem):
         else:
             self.updatecenterbox()
             rect = self.fggroup.boundingRect()
-        mainrect = rect.marginsAdded(QMarginsF(*[self.style.nodemargin]*4))
+        mainrect = rect.marginsAdded(QMarginsF(*[self.style.nodemargin//2]*4))
         self.mainbox.setRect(mainrect)
         self.shadowbox.setRect(mainrect)
-        self.selectbox.setRect(mainrect.marginsAdded(QMarginsF(*[self.style.selectmargin]*4)))
-        activerect = mainrect.marginsAdded(QMarginsF(*[self.style.activemargin]*4))
+        self.selectbox.setRect(mainrect.marginsAdded(QMarginsF(*[self.style.selectmargin//2]*4)))
+        activerect = mainrect.marginsAdded(QMarginsF(*[self.style.activemargin//2]*4))
         self.activebox.setRect(activerect)
         oldypos = self.centerbox.mapToScene(self.centerbox.pos()).y()
         self.graphgroup.setPos(-activerect.width()//2-activerect.x(), -activerect.height()//2-activerect.y())
@@ -733,7 +740,7 @@ class BankNodeItem (NodeItem):
             subnode.yoffset += newypos - oldypos
             subnode.setY(self.y())
         self.prepareGeometryChange()
-        self.rect = self.graphgroup.mapRectToParent(self.activebox.boundingRect())
+        self.rect = self.graphgroup.mapRectToParent(mainrect)
         if not external:
             self.view.updatelayout()
     
@@ -790,7 +797,7 @@ class EdgeItem (QGraphicsItem):
         xmin = self.source.x()
         xmax = xmin + self.style.rankwidth
         children = self.source.childlist(generate=False)
-        self.children = [(t.x()+t.boundingRect().left(), t.y()) for t in children]
+        self.children = [(t.x()+t.boundingRect().left()-self.style.activemargin, t.y()) for t in children]
         halfarrow = self.arrowsize/2
         if children:
             ymin = self.children[0][1] - halfarrow
@@ -833,7 +840,7 @@ class EdgeItem (QGraphicsItem):
         for tx, ty in children:
             tx += off
             ty += off
-            painter.drawLine(vert_x-corr, ty, tx-arrow, ty)
+            painter.drawLine(vert_x-corr, ty, tx-arrow+1, ty)
             arrowtip = [QPointF(tx, ty),
                         QPointF(tx-arrow, ty-(arrow/2)),
                         QPointF(tx-arrow, ty+(arrow/2))]
@@ -1895,7 +1902,7 @@ class TreeEditor (object):
         nodedict = cont.nodes[subID].todict()
         
         clonedict = nodedict.copy()
-        clonedict["nodebank"] = -1
+        clonedict["nodebank"] = selnode.nodebank
         clonedict["links"] = selnode.linkIDs
         
         cont.nodes.pop(subID)
@@ -2442,10 +2449,12 @@ class EditorWindow (QMainWindow):
             [QKeySequence(Qt.ControlModifier+Qt.Key_Space)], None, "(Un)Collapse subtree")
         self.actions["newtalksub"] = self.createaction("New &Talk Subnode", self.newtalksub,
             [QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_T)], ["insert-object"], "Add new Talk subnode")
+        self.actions["newbanksub"] = self.createaction("New &Bank Subnode", self.newbanksub,
+            [QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_B)], ["insert-object"], "Add new Bank subnode")
         self.actions["newresponsesub"] = self.createaction("New &Response Subnode", self.newresponsesub,
             [QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_R)], ["insert-object"], "Add new Response subnode")
         self.actions["pastesubnode"] = self.createaction("&Paste Subnode", self.pastesubnode,
-            [QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_B)], ["edit-paste"], "Paste cloned node as subnode")
+            [QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_C)], ["edit-paste"], "Paste cloned node as subnode")
         self.actions["parentswap"] = self.createaction("S&wap with Parent", self.parentswap,
             [QKeySequence(Qt.ShiftModifier+Qt.Key_Left)], ["go-left"], "Swap places with parent node")
         self.actions["settemplate"] = self.createaction("Set as Te&mplate", self.settemplate,
@@ -2485,15 +2494,17 @@ class EditorWindow (QMainWindow):
                         actions = []
                 elif nodeobj.typename in ["talk", "response"]:
                     actions = ["copynode", "moveup", "movedown", "unlinknode", 
-                        "unlinkstree", "settemplate"]
+                        "unlinkstree", "settemplate", "nodetobank"]
                     if nodeobj.nodebank == -1:
                         actions.extend(["newtalk", "newresponse", "newbank", 
-                            "pasteclone", "pastelink", "parentswap", "nodetobank"])
+                            "pasteclone", "pastelink", "parentswap"])
                 elif nodeobj.typename == "bank":
-                    actions = ["copynode", "moveup", "movedown", "unlinknode", 
-                        "newtalk", "newresponse", "newbank", "pasteclone", "pastelink",
+                    actions = ["copynode", "moveup", "movedown", "unlinknode",
                         "unlinkstree", "newtalksub", "newresponsesub", "pastesubnode",
-                        "parentswap", "settemplate"]
+                        "newbanksub", "settemplate"]
+                    if nodeobj.nodebank == -1:
+                        actions.extend(["newtalk", "newresponse", "newbank", 
+                            "pasteclone", "pastelink", "parentswap"])
                     if len(nodeobj.subnodes) == 1:
                         actions.extend(["banktonode"])
                 elif nodeobj.typename == "root":
@@ -2567,6 +2578,7 @@ class EditorWindow (QMainWindow):
         subnodemenu.addSeparator()
         subnodemenu.addAction(self.actions["newtalksub"])
         subnodemenu.addAction(self.actions["newresponsesub"])
+        subnodemenu.addAction(self.actions["newbanksub"])
         subnodemenu.setIcon(QIcon.fromTheme("insert-object"))
         self.subnodemenu = subnodemenu
         
@@ -2830,6 +2842,12 @@ class EditorWindow (QMainWindow):
         view = self.activeview
         nodeID = view.selectednode.realid()
         view.addsubnode(nodeID, typename="response")
+    
+    @pyqtSlot()
+    def newbanksub (self):
+        view = self.activeview
+        nodeID = view.selectednode.realid()
+        view.addsubnode(nodeID, typename="bank")
     
     @pyqtSlot()
     def copynode (self):
