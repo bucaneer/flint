@@ -2201,16 +2201,18 @@ class TreeView (TreeEditor, QGraphicsView):
             self.updateview()
     
     def nodetobank (self, nodeID, undo=False):
-        for item in self.itemindex[nodeID]:
-            fullID = item.id()
-            self.nodeorder[fullID] = None
+        if nodeID in self.itemindex:
+            for item in self.itemindex[nodeID]:
+                fullID = item.id()
+                self.nodeorder[fullID] = None
         super().nodetobank(nodeID, undo)
         self.updateview()
     
     def banktonode (self, nodeID, undo=False):
-        for item in self.itemindex[nodeID]:
-            fullID = item.id()
-            self.nodeorder[fullID] = None
+        if nodeID in self.itemindex:
+            for item in self.itemindex[nodeID]:
+                fullID = item.id()
+                self.nodeorder[fullID] = None
         super().banktonode(nodeID, undo)
         self.updateview()
     
