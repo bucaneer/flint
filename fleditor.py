@@ -143,9 +143,9 @@ class NodeItem(QGraphicsItem):
                 ret = children
             else:
                 ret = []
+            self.children = ret
             if self.edge:
                 self.edge.prepareGeometryChange()
-            self.children = ret
             return self.children
         else:
             return self.children
@@ -183,10 +183,15 @@ class NodeItem(QGraphicsItem):
     def setY (self, y):
         if self.edge is not None:
             self.edge.prepareGeometryChange()
+        parent = self.view.itembyID(self.refID)
+        if parent and parent.edge is not None:
+            parent.edge.prepareGeometryChange()
         y += self.yoffset
         super().setY(y)
     
     def setrank (self, parent):
+        if self.edge is not None:
+            self.edge.prepareGeometryChange()
         if parent is None:
             return
         
