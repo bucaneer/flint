@@ -1644,12 +1644,22 @@ class TreeEditor (object):
                         follow(toID, -1)
                         visitlog[refID] = False
         
-        missing = [ID for ID in self.nodeorder if ID not in neworder]
-        misskeys = [ID[1] for ID in missing]
+        missingraw = [(ID, s) for ID, s in self.nodeorder.items() if ID not in neworder]
+        missing = []
+        misskeys = []
+        toremove = []
+        for ID, state in missingraw:
+            if state is None: # marked for removal
+                toremove.append(ID)
+            else:
+                missing.append(ID)
+                misskeys.append(ID[1])
         changes = []
         for fullID, state in neworder.items():
             fromID, toID = fullID
-            if fullID not in self.nodeorder or self.nodeorder[fullID] is None:
+            if fullID in self.nodeorder and self.nodeorder[fullID] is None:
+                changes.append(("newitem", (fullID, state)))
+            elif fullID not in self.nodeorder:
                 if toID in misskeys:
                     index = misskeys.index(toID)
                     misskeys.pop(index)
@@ -1661,7 +1671,8 @@ class TreeEditor (object):
                     changes.append(("newitem", (fullID, state)))
             elif state != self.nodeorder[fullID]:
                 changes.append(("setstate", (fullID, state)))
-        for fullID in missing:
+        toremove.extend(missing)
+        for fullID in toremove:
             changes.append(("removeitem", (fullID,)))
         
         self.trash = nodes - visitlog.keys()
