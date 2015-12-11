@@ -1604,6 +1604,7 @@ class TreeEditor (object):
         self.nodeorder = OrderedDict()
         self.changes = deque()
         self.collapsednodes = []
+        self.nodedocs = dict()
         self.hits = None
         
         historysize = 10 # OPTION
@@ -1697,6 +1698,24 @@ class TreeEditor (object):
         self.trash = nodes - visitlog.keys()
         self.changes.extend(changes)
         self.nodeorder = neworder
+    
+    def updatedocs (self):
+        newnodedocs = dict()
+        for nodeID, nodeobj in self.nodecontainer.nodes.items():
+            if nodeID in self.nodedocs:
+                newnodedocs[nodeID] = self.nodedocs[nodeID]
+            else:
+                newnodedocs[nodeID] = dict()
+                if isinstance(nodeobj, fp.TextNode):
+                    textdoc = QTextDocument(self)
+                    textdoc.setDocumentLayout(QPlainTextDocumentLayout(textdoc))
+                    textdoc.setPlainText(nodeobj.text)
+                    newnodedocs[nodeID]["text"] = textdoc
+                commentdoc = QTextDocument(self)
+                commentdoc.setDocumentLayout(QPlainTextDocumentLayout(commentdoc))
+                commentdoc.setPlainText(nodeobj.comment)
+                newnodedocs[nodeID]["comment"] = commentdoc
+        self.nodedocs = newnodedocs
     
     def addundoable (self, hist):
         self.undohistory.appendleft(hist)
@@ -1888,6 +1907,7 @@ class TreeEditor (object):
         newobj = cont.newnode(clonedict, bankID=nodeID)
         
         self.nodedocs[newobj.ID] = self.nodedocs[nodeID]
+        self.nodedocs.pop(nodeID)
         
         if not undo:
             hist = HistoryAction(self.banktonode, {"nodeID": nodeID},
@@ -1965,32 +1985,12 @@ class TreeView (TreeEditor, QGraphicsView):
         
         self.style = FlGlob.mainwindow.style
         
-        self.nodecontainer = nodecontainer
-        self.nodedocs = dict()
         self.itemtable = dict()
         self.itemindex = dict()
         self.viewframe = FrameItem(view=self)
         self.scene().addItem(self.viewframe)
         self.updateview()
         self.setselectednode(self.treeroot())
-    
-    def updatedocs (self):
-        newnodedocs = dict()
-        for nodeID, nodeobj in self.nodecontainer.nodes.items():
-            if nodeID in self.nodedocs:
-                newnodedocs[nodeID] = self.nodedocs[nodeID]
-            else:
-                newnodedocs[nodeID] = dict()
-                if isinstance(nodeobj, fp.TextNode):
-                    textdoc = QTextDocument(self)
-                    textdoc.setDocumentLayout(QPlainTextDocumentLayout(textdoc))
-                    textdoc.setPlainText(nodeobj.text)
-                    newnodedocs[nodeID]["text"] = textdoc
-                commentdoc = QTextDocument(self)
-                commentdoc.setDocumentLayout(QPlainTextDocumentLayout(commentdoc))
-                commentdoc.setPlainText(nodeobj.comment)
-                newnodedocs[nodeID]["comment"] = commentdoc
-        self.nodedocs = newnodedocs
     
     def updateview (self):
         self.constructed = False
