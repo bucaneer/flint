@@ -1576,12 +1576,12 @@ class HistoryAction (object):
         self.refunc(**self.reargs)
 
 class TreeEditor (object):
-    """Abstract class, only useful when inherited by TreeView"""
-    
     def __init__ (self, nodecontainer):
         self.nodecontainer = nodecontainer
         self.nodeorder = OrderedDict()
-        self.collapsed = []
+        self.changes = deque()
+        self.collapsednodes = []
+        self.hits = None
         
         historysize = 10 # OPTION
         self.undohistory = deque(maxlen=historysize)
@@ -1649,22 +1649,19 @@ class TreeEditor (object):
                     index = misskeys.index(toID)
                     misskeys.pop(index)
                     oldID = missing.pop(index)
-                    self.reparent(oldID, fullID)
+                    changes.append(("reparent", (oldID, fullID)))
                     if self.nodeorder[oldID] != neworder[fullID]:
-                        self.setstate(fullID, state)
+                        changes.append(("setstate", (fullID, state)))
                 else:
-                    self.newitem(fullID, state)
+                    changes.append(("newitem", (fullID, state)))
             elif state != self.nodeorder[fullID]:
-                self.setstate(fullID, state)
+                changes.append(("setstate", (fullID, state)))
         for fullID in missing:
-            self.removeitem(fullID)
+            changes.append(("removeitem", (fullID,)))
         
         self.trash = nodes - visitlog.keys()
+        self.changes.extend(changes)
         self.nodeorder = neworder
-        return True
-    
-    def updateview (self):
-        pass
     
     def addundoable (self, hist):
         self.undohistory.appendleft(hist)
@@ -1680,7 +1677,6 @@ class TreeEditor (object):
                 {"nodeID": nodeID, "refID": refID, "pos": pos},
                 "Link node %s to node %s" % (nodeID, refID))
             self.addundoable(hist)
-            self.updateview()
     
     def linksubnode (self, subID, bankID, pos, undo=False):
         """Only called as Undo action, assume sane arguments."""
@@ -1703,8 +1699,7 @@ class TreeEditor (object):
                 {"nodeID": newid, "refID": nodeID},
                 "Link new node %s to node %s" % (newid, nodeID))
             self.addundoable(hist)
-            self.updateview()
-            self.shownode(self.itembyID(newid))
+        return newid
     
     def addsubnode (self, nodeID, typename="", ndict=None, undo=False):
         if ndict is not None:
@@ -1726,8 +1721,7 @@ class TreeEditor (object):
                 {"subID": newid, "bankID": nodeID, "pos": pos},
                 "Add new subnode %s to node %s" % (newid, nodeID))
             self.addundoable(hist)
-            self.updateview()
-            self.shownode(self.itembyID(newid))
+        return newid
     
     def unlink (self, nodeID, refID, undo=False):
         nodeitem = self.itembyID(nodeID)
@@ -1741,7 +1735,6 @@ class TreeEditor (object):
                 self.unlink, {"nodeID": nodeID, "refID": refID},
                 "Unlink node %s with subtree from %s" % (nodeID, refID))
             self.addundoable(hist)
-            self.updateview()
     
     def unlinksubnode (self, subID, bankID, undo=False):
         cont = self.nodecontainer
@@ -1754,7 +1747,6 @@ class TreeEditor (object):
                 self.unlinksubnode, {"subID": subID, "bankID": bankID},
                 "Unlink subnode %s from bank %s" % (subID, bankID))
             self.addundoable(hist)
-            self.updateview()
     
     def unlink_inherit (self, nodeID, refID, undo=False):
         cont = self.nodecontainer
@@ -1776,7 +1768,6 @@ class TreeEditor (object):
                 self.unlink_inherit, {"nodeID": nodeID, "refID": refID},
                 "Unlink node %s from node %s" % (nodeID, refID))
             self.addundoable(hist)
-            self.updateview()
     
     def undoinherit (self, nodeID, refID, pos, inherited, undo=False):
         """Only called as Undo action, assume sane arguments."""
@@ -1810,7 +1801,6 @@ class TreeEditor (object):
                 self.move, {"nodeID": nodeID, "refID": refID, "up": up},
                 "Move node %s %s" % (nodeID, desc))
             self.addundoable(hist)
-            self.updateview()
     
     def parentswap (self, gpID, parID, nodeID, undo=False):
         nodes = self.nodecontainer.nodes
@@ -1837,7 +1827,6 @@ class TreeEditor (object):
                 {"gpID": gpID, "parID": parID, "nodeID": nodeID},
                 "Swap node %s with parent %s" % (nodeID, parID))
             self.addundoable(hist)
-            self.updateview()
     
     def nodetobank (self, nodeID, undo=False):
         cont = self.nodecontainer
@@ -1860,7 +1849,6 @@ class TreeEditor (object):
                 self.nodetobank, {"nodeID": nodeID},
                 "Transform node %s to Bank" % nodeID)
             self.addundoable(hist)
-            self.updateview()
     
     def banktonode (self, nodeID, undo=False):
         cont = self.nodecontainer
@@ -1882,8 +1870,29 @@ class TreeEditor (object):
                 self.banktonode, {"nodeID": nodeID},
                 "Transform node %s from Bank" % nodeID)
             self.addundoable(hist)
-            self.updateview()
-        
+    
+    def collapse (self, fullID, collapse=None):
+        if fullID in self.collapsednodes:
+            if collapse is None or not collapse:
+                desc = "Uncollapse"
+                self.collapsednodes.remove(fullID)
+                col = False
+        else:
+            if collapse is None or collapse:
+                desc = "Collapse"
+                self.collapsednodes.append(fullID)
+                col = True
+        self.itembyfullID(fullID).collapse(col)
+    
+    def search (self, query):
+        if not query:
+            self.hits = None
+        else:
+            hits = []
+            for nodeID, nodeobj in self.nodecontainer.nodes.items():
+                if query in nodeobj.text.casefold():
+                    hits.append(nodeID)
+            self.hits = hits
 
 class TreeView (TreeEditor, QGraphicsView):
     __types = {'talk': TalkNodeItem, 'response': ResponseNodeItem, 
@@ -1895,8 +1904,6 @@ class TreeView (TreeEditor, QGraphicsView):
         self.zoomscale = 1
         self.activenode = None
         self.selectednode = None
-        self.collapsednodes = []
-        self.hits = None
         
         self.setOptimizationFlags(QGraphicsView.DontAdjustForAntialiasing | QGraphicsView.DontSavePainterState)
         self.setDragMode(QGraphicsView.ScrollHandDrag)
@@ -1943,12 +1950,21 @@ class TreeView (TreeEditor, QGraphicsView):
     def updateview (self):
         self.constructed = False
         self.updatedocs()
-        self.constructed = self.traverse()
+        self.traverse()
+        self.constructed = self.applychanges()
         self.updatelayout()
         FlGlob.mainwindow.viewUpdated.emit()
         
         self.setactivenode(self.activenode)
         self.setselectednode(self.selectednode)
+    
+    def applychanges (self):
+        funcs = {"newitem": self.newitem, "reparent": self.reparent, 
+            "removeitem": self.removeitem, "setstate": self.setstate}
+        while self.changes:
+            change = self.changes.popleft()
+            funcs[change[0]](*change[1])
+        return True
     
     def newitem (self, fullID, state):
         fromID, toID = fullID
@@ -2126,41 +2142,65 @@ class TreeView (TreeEditor, QGraphicsView):
                 if func is not None:
                     func()
     
+    def linknode (self, nodeID, refID, pos=None, undo=False):
+        super().linknode(nodeID, refID, pos, undo)
+        if not undo:
+            self.updateview()
+    
+    def addnode (self, nodeID, typename="", ndict=None, undo=False):
+        newid = super().addnode(nodeID, typename, ndict, undo)
+        if not undo:
+            self.updateview()
+            self.shownode(self.itembyID(newid))
+    
+    def addsubnode (self, nodeID, typename="", ndict=None, undo=False):
+        newid = super().addsubnode(nodeID, typename, ndict, undo)
+        if not undo:
+            self.updateview()
+            self.shownode(self.itembyID(newid))
+    
+    def unlink (self, nodeID, refID, undo=False):
+        super().unlink(nodeID, refID, undo)
+        if not undo:
+            self.updateview()
+    
+    def unlinksubnode (self, subID, bankID, undo=False):
+        super().unlinksubnode(subID, bankID, undo)
+        if not undo:
+            self.updateview()
+    
+    def unlink_inherit (self, nodeID, refID, undo=False):
+        super().unlink_inherit(nodeID, refID, undo)
+        if not undo:
+            self.updateview()
+    
+    def move (self, nodeID, refID, up, undo=False):
+        super().move(nodeID, refID, up, undo)
+        if not undo:
+            self.updateview()
+    
+    def parentswap (self, gpID, parID, nodeID, undo=False):
+        super().parentswap(gpID, parID, nodeID, undo)
+        if not undo:
+            self.updateview()
+    
     def nodetobank (self, nodeID, undo=False):
         for item in self.itemindex[nodeID]:
             fullID = item.id()
             self.nodeorder[fullID] = None
         super().nodetobank(nodeID, undo)
+        self.updateview()
     
     def banktonode (self, nodeID, undo=False):
         for item in self.itemindex[nodeID]:
             fullID = item.id()
             self.nodeorder[fullID] = None
         super().banktonode(nodeID, undo)
-    
-    def collapse (self, fullID, collapse=None):
-        if fullID in self.collapsednodes:
-            if collapse is None or not collapse:
-                desc = "Uncollapse"
-                self.collapsednodes.remove(fullID)
-                col = False
-        else:
-            if collapse is None or collapse:
-                desc = "Collapse"
-                self.collapsednodes.append(fullID)
-                col = True
-        self.itembyfullID(fullID).collapse(col)
         self.updateview()
     
-    def search (self, query):
-        if not query:
-            self.hits = None
-        else:
-            hits = []
-            for nodeID, nodeobj in self.nodecontainer.nodes.items():
-                if query in nodeobj.text.casefold():
-                    hits.append(nodeID)
-            self.hits = hits
+    def collapse (self, fullID, collapse=None):
+        super().collapse(fullID, collapse)
+        self.updateview()
     
     def wheelEvent (self, event):
         mod = event.modifiers()
