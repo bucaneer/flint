@@ -2205,8 +2205,20 @@ class TreeView (TreeEditor, QGraphicsView):
         else:
             super().keyPressEvent(event)
 
+class NodeCopy (object):
+    def __init__ (self, ID=None, view=None, ndict=None):
+        self.ID = ID
+        if view is None:
+            self.view = self.blank # self.view needs to be callable
+        else:
+            self.view = weakref.ref(view)
+        self.ndict = ndict
+    
+    def blank (self):
+        return None
+
 class EditorWindow (QMainWindow):
-    copiednode = (None, None, None)
+    copiednode = NodeCopy()
     actions = dict()
     activeview = None
     activenode = ""
@@ -2412,12 +2424,12 @@ class EditorWindow (QMainWindow):
             for name, action in self.actions.items():
                 if name in actions:
                     if name == "pasteclone" or name == "pastesubnode":
-                        if self.copiednode[2] is not None:
+                        if self.copiednode.ndict is not None:
                             action.setEnabled(True)
                         else:
                             action.setEnabled(False)
                     elif name == "pastelink":
-                        if self.copiednode[0] is not None and self.copiednode[1] is view:
+                        if self.copiednode.view() is view and self.copiednode.ID in view.nodecontainer.nodes: 
                             action.setEnabled(True)
                         else:
                             action.setEnabled(False)
@@ -2751,9 +2763,9 @@ class EditorWindow (QMainWindow):
         nodedict["subnodes"] = []
         
         if nodeobj.nodebank != -1:
-            self.copiednode = (None, None, nodedict)
+            self.copiednode = NodeCopy(ID=None, view=None, ndict=nodedict)
         else:
-            self.copiednode = (nodeobj.ID, view, nodedict)
+            self.copiednode = NodeCopy(ID=nodeobj.ID, view=view, ndict=nodedict)
         
         self.actions["pasteclone"].setText("Paste &Clone (node %s)" % nodeobj.ID)
         self.actions["pastelink"].setText("Paste &Link (node %s)" % nodeobj.ID)
@@ -2777,19 +2789,19 @@ class EditorWindow (QMainWindow):
     def pasteclone (self):
         view = self.activeview
         nodeID = view.selectednode.realid()
-        view.addnode(nodeID, ndict=self.copiednode[2])
+        view.addnode(nodeID, ndict=self.copiednode.ndict)
     
     @pyqtSlot()
     def pastelink (self):
         view = self.activeview
         refID = view.selectednode.realid()
-        view.linknode(self.copiednode[0], refID)
+        view.linknode(self.copiednode.ID, refID)
     
     @pyqtSlot()
     def pastesubnode (self):
         view = self.activeview
         nodeID = view.selectednode.realid()
-        view.addsubnode(nodeID, ndict=self.copiednode[2])
+        view.addsubnode(nodeID, ndict=self.copiednode.ndict)
     
     @pyqtSlot()
     def unlinkinherit (self):
