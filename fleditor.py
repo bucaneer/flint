@@ -1969,6 +1969,8 @@ class TreeView (TreeEditor, QGraphicsView):
         self.zoomscale = 1
         self.activenode = None
         self.selectednode = None
+        self.itemtable = dict()
+        self.itemindex = dict()
         
         self.setOptimizationFlags(QGraphicsView.DontAdjustForAntialiasing | QGraphicsView.DontSavePainterState)
         self.setDragMode(QGraphicsView.ScrollHandDrag)
@@ -1981,18 +1983,19 @@ class TreeView (TreeEditor, QGraphicsView):
         
         scene = QGraphicsScene(self)
         scene.setBackgroundBrush(FlPalette.bg)
+        self.viewframe = FrameItem(view=self)
+        scene.addItem(self.viewframe)
         self.setScene(scene)
         
         self.style = FlGlob.mainwindow.style
         
-        self.itemtable = dict()
-        self.itemindex = dict()
-        self.viewframe = FrameItem(view=self)
-        self.scene().addItem(self.viewframe)
-        self.updateview()
+        self.updateview(refresh=True)
         self.setselectednode(self.treeroot())
     
-    def updateview (self):
+    def updateview (self, refresh=False):
+        if refresh:
+            for ID in self.nodeorder:
+                self.nodeorder[ID] = None
         self.constructed = False
         self.updatedocs()
         self.traverse()
@@ -2012,6 +2015,7 @@ class TreeView (TreeEditor, QGraphicsView):
         return True
     
     def newitem (self, fullID, state):
+        log("verbose", "%s.newitem(%s, %s)" % (self, fullID, state))
         fromID, toID = fullID
         parent = self.itembyID(fromID)
         nodeobj = self.nodecontainer.nodes[toID]
@@ -2034,6 +2038,7 @@ class TreeView (TreeEditor, QGraphicsView):
         self.tableitem(fullID, nodeitem)
     
     def reparent (self, oldID, newID):
+        log("verbose", "%s.reparent(%s, %s)" % (self, oldID, newID))
         fromID, toID = newID
         oldref = oldID[0]
         newparent = self.itembyID(fromID)
@@ -2043,6 +2048,7 @@ class TreeView (TreeEditor, QGraphicsView):
         nodeitem.setrank(newparent)
     
     def removeitem (self, fullID):
+        log("verbose", "%s.removeitem(%s)" % (self, fullID))
         fromID, toID = fullID
         nodeitem = self.itemtable[fromID].pop(toID)
         edgeitem = nodeitem.edge
@@ -2062,6 +2068,7 @@ class TreeView (TreeEditor, QGraphicsView):
         edgeitem = None
     
     def setstate (self, fullID, state):
+        log("verbose", "%s.stestate(%s, %s)" % (self, fullID, state))
         fromID, toID = fullID
         nodeitem = self.itemtable[fromID][toID]
         if state == 1:
@@ -2128,6 +2135,7 @@ class TreeView (TreeEditor, QGraphicsView):
         self.ensureVisible(nodeitem, self.style.rankgap/2, self.style.rowgap/2)
     
     def setselectednode (self, nodeitem):
+        log("debug", "%s.setselectednode(%s)" % (self, nodeitem))
         if nodeitem is not None:
             if self.selectednode:
                 self.selectednode.setselected(False)
@@ -2140,6 +2148,7 @@ class TreeView (TreeEditor, QGraphicsView):
     
     @pyqtSlot(str)
     def selectbyID (self, nodeID):
+        log("debug", "%s.selectbyID(%s)" % (self, nodeID))
         if FlGlob.mainwindow.activeview is not self:
             return
         if self.selectednode is not None and self.selectednode.realid() == nodeID:
@@ -2159,6 +2168,7 @@ class TreeView (TreeEditor, QGraphicsView):
                 self.selectednode = None
     
     def setactivenode (self, nodeitem):
+        log("debug", "%s.setactivenode(%s)" % (self, nodeitem))
         if nodeitem is not None:
             nodeID = nodeitem.realid()
         else:
@@ -2167,6 +2177,7 @@ class TreeView (TreeEditor, QGraphicsView):
     
     @pyqtSlot(str)
     def activatebyID (self, nodeID):
+        log("debug", "%s.activatebyID(%s)" % (self, nodeID))
         if FlGlob.mainwindow.activeview is not self:
             return
         if nodeID in self.itemindex:
@@ -2291,6 +2302,11 @@ class TreeView (TreeEditor, QGraphicsView):
                 self.setactivenode(self.selectednode)
         else:
             super().keyPressEvent(event)
+    
+    def __repr__ (self):
+        return "<%s %s>" % (type(self).__name__, 
+            os.path.basename(self.nodecontainer.filename) or
+            self.nodecontainer.name)
 
 class NodeCopy (object):
     def __init__ (self, ID=None, view=None, ndict=None):
@@ -2424,6 +2440,8 @@ class EditorWindow (QMainWindow):
             ["gtk-zoom-100", "zoom-original"], "Zoom to original size")
         self.actions["gotoactive"] = self.createaction("Go To &Active", self.gotoactive, 
             None, ["go-jump"], "Center on active node")
+        self.actions["refresh"] = self.createaction("Refresh", self.refresh,
+            [QKeySequence.Refresh], ["view-refresh"], "Refresh view")
         
         self.actions["newtalk"] = self.createaction("New &Talk Node", self.newtalk,
             [QKeySequence(Qt.ControlModifier+Qt.Key_T)], ["insert-object"], "Add new Talk node")
@@ -2477,7 +2495,7 @@ class EditorWindow (QMainWindow):
                     action.setEnabled(True)
         else:
             genericactions = ["zoomin", "zoomout", "zoomorig", "gotoactive",
-                "collapse", "openfile", "save", "saveas", "newtree", "close"]
+                "collapse", "openfile", "save", "saveas", "newtree", "close", "refresh"]
             if view.undohistory:
                 genericactions.extend(["undo"])
             if view.redohistory:
@@ -2635,6 +2653,7 @@ class EditorWindow (QMainWindow):
         viewmenu.addAction(self.actions["zoomorig"])
         viewmenu.addAction(self.actions["gotoactive"])
         viewmenu.addAction(self.actions["collapse"])
+        viewmenu.addAction(self.actions["refresh"])
         
         windowmenu = menubar.addMenu("&Window")
         def generatemenu ():
@@ -2812,6 +2831,11 @@ class EditorWindow (QMainWindow):
     def gotoactive (self):
         view = self.activeview
         view.centerOn(view.activenode)
+    
+    @pyqtSlot()
+    def refresh (self):
+        view = self.activeview
+        view.updateview(refresh=True)
     
     @pyqtSlot()
     def newtalk (self):
