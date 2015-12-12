@@ -717,7 +717,7 @@ class BankNodeItem (NodeItem):
     
     def updatecenterbox (self):
         verticalpos = self.centerbox.y()
-        maxwidth = 0
+        maxwidth = self.style.nodetextwidth
         subnodes = self.sublist()
         for subnode in subnodes:
             if subnode.nodeobj.typename == "bank":
