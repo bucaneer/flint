@@ -1980,7 +1980,7 @@ class TreeEditor (object):
                 "Swap node %s with parent %s" % (nodeID, parID))
             self.addundoable(hist)
     
-    def nodetobank (self, nodeID, undo=False):
+    def nodetobank (self, nodeID, subID=None, undo=False):
         cont = self.nodecontainer
         selnode = cont.nodes[nodeID]
         nodedict = selnode.todict()
@@ -1992,14 +1992,18 @@ class TreeEditor (object):
         clonedict["nodebank"] = nodeID
         
         cont.newnode(bankdict, newID=nodeID, force=True)
-        newobj = cont.newnode(clonedict, bankID=nodeID)
+        if subID is None:
+            newobj = cont.newnode(clonedict, bankID=nodeID)
+            subID = newobj.ID
+        else:
+            cont.nodes[nodeID].subnodes.insert(0, subID)
         
-        self.nodedocs[newobj.ID] = self.nodedocs[nodeID]
+        self.nodedocs[subID] = self.nodedocs[nodeID]
         self.nodedocs.pop(nodeID)
         
         if not undo:
             hist = HistoryAction(self.banktonode, {"nodeID": nodeID},
-                self.nodetobank, {"nodeID": nodeID},
+                self.nodetobank, {"nodeID": nodeID, "subID": subID},
                 "Transform node %s to Bank" % nodeID)
             self.addundoable(hist)
     
@@ -2013,13 +2017,12 @@ class TreeEditor (object):
         clonedict["nodebank"] = selnode.nodebank
         clonedict["links"] = selnode.linkIDs
         
-        cont.nodes.pop(subID)
         cont.newnode(clonedict, newID=nodeID, force=True)
         
         self.nodedocs[nodeID] = self.nodedocs[subID]
         
         if not undo:
-            hist = HistoryAction(self.nodetobank, {"nodeID": nodeID}, 
+            hist = HistoryAction(self.nodetobank, {"nodeID": nodeID, "subID": subID}, 
                 self.banktonode, {"nodeID": nodeID},
                 "Transform node %s from Bank" % nodeID)
             self.addundoable(hist)
@@ -2348,12 +2351,12 @@ class TreeView (TreeEditor, QGraphicsView):
         if not undo:
             self.updateview()
     
-    def nodetobank (self, nodeID, undo=False):
+    def nodetobank (self, nodeID, subID=None, undo=False):
         if nodeID in self.itemindex:
             for item in self.itemindex[nodeID]:
                 fullID = item.id()
                 self.nodeorder[fullID] = None
-        super().nodetobank(nodeID, undo)
+        super().nodetobank(nodeID, subID, undo)
         if not undo:
             self.updateview()
     
