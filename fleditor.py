@@ -3152,7 +3152,7 @@ class EditorWindow (QMainWindow):
         if parID is None:
             return
         gpID = view.itembyID(parID).refID
-        if gpID is None:
+        if gpID is None or gpID == nodeID:
             return
         view.parentswap(gpID, parID, nodeID)
     
