@@ -125,7 +125,7 @@ class NodeItem(QGraphicsItem):
     def __init__ (self, nodeobj, parent=None, view=None, state=1):
         super().__init__()
         self.edge = None
-        self.children = None
+        self.childpos = None
         self.nodeobj = nodeobj
         self.style = FlGlob.mainwindow.style
         self.view = weakref.proxy(view)
@@ -143,30 +143,32 @@ class NodeItem(QGraphicsItem):
     def realid (self):
         return self.nodeobj.ID
     
-    def childlist (self, generate=True):
-        if generate or self.children is None:
-            ID = self.nodeobj.ID
-            itemtable = self.view.itemtable
-            if self.state == 1 and ID in itemtable and not self.iscollapsed():
-                children = []
-                for child in self.nodeobj.linkIDs:
-                    if child in itemtable[ID]:
-                        item = itemtable[ID][child]
-                    else:
-                        continue
-                    children.append(item)
-                ret = children
-            else:
-                ret = []
-            self.children = ret
+    def childlist (self, generate=False):
+        ID = self.nodeobj.ID
+        itemtable = self.view.itemtable
+        if self.state == 1 and ID in itemtable and not self.iscollapsed():
+            children = []
+            for child in self.nodeobj.linkIDs:
+                if child in itemtable[ID]:
+                    item = itemtable[ID][child]
+                else:
+                    continue
+                children.append(item)
+            ret = children
+        else:
+            ret = []
+        if generate:
             if self.edge:
                 self.edge.prepareGeometryChange()
-            return self.children
-        else:
-            return self.children
+                self.edge.sourceright = self.boundingRect().right()
+            x = self.x()
+            y = self.y()
+            self.childpos = [(t.x()+t.boundingRect().left()-self.style.activemargin-x, t.y()-y) for t in ret]
+        return ret
     
     def setedge (self, edge):
         self.edge = edge
+        edge.setX(self.x())
     
     def setactive (self, active):
         if active:
@@ -196,25 +198,24 @@ class NodeItem(QGraphicsItem):
             self.hide()
     
     def setY (self, y):
-        if self.edge is not None:
-            self.edge.prepareGeometryChange()
         parent = self.view.itembyID(self.refID)
-        if parent and parent.edge is not None:
-            parent.edge.prepareGeometryChange()
         y += self.getyoffset()
+        if self.edge is not None:
+            self.edge.setY(y)
         super().setY(y)
     
     def setrank (self, parent):
-        if self.edge is not None:
-            self.edge.prepareGeometryChange()
         if parent is None:
             return
-        
         if self.issubnode():
-            self.setX(parent.x())
+            x = parent.x()
+            self.setX(x)
         else:
-            self.setX(parent.x()+self.style.rankwidth)
+            x = parent.x()+self.style.rankwidth
+            self.setX(x)
             self.nudgechildren()
+        if self.edge is not None:
+            self.edge.setX(x)
     
     def nudgechildren (self):
         for child in self.childlist():
@@ -327,7 +328,13 @@ class NodeItem(QGraphicsItem):
         Returns min/max y coordinates up to given depth (negative depth means
         whole subtree)."""
 
-        children = self.childlist()
+        # calculate child positions for EgdeItem only once when calculating scenerect
+        if depth<0:
+            generate = True
+        else:
+            generate = False
+        
+        children = self.childlist(generate=generate)
         maxdepth = abs(depth)
         if children and depth:
             nextdepth = depth-1
@@ -782,6 +789,7 @@ class EdgeItem (QGraphicsItem):
     def __init__ (self, source, view):
         super().__init__()
         self.source = source
+        self.sourceright = 0
         source.setedge(self)
         self.view = weakref.proxy(view)
         self.style = FlGlob.mainwindow.style
@@ -804,16 +812,15 @@ class EdgeItem (QGraphicsItem):
         self.nopen = QPen(0)
     
     def boundingRect (self):
-        xmin = self.source.x()
+        xmin = 0
         xmax = xmin + self.style.rankwidth
-        children = self.source.childlist(generate=False)
-        self.children = [(t.x()+t.boundingRect().left()-self.style.activemargin, t.y()) for t in children]
+        self.children = self.source.childpos
         halfarrow = self.arrowsize/2
-        if children:
+        if self.children:
             ymin = self.children[0][1] - halfarrow
             ymax = self.children[-1][1] + halfarrow + self.style.shadowoffset
         else:
-            y = self.source.y()
+            y = 0
             ymin = y - halfarrow
             ymax = y + halfarrow
         return QRectF(xmin, ymin, abs(xmax-xmin), abs(ymax-ymin))
@@ -840,9 +847,9 @@ class EdgeItem (QGraphicsItem):
         painter.setPen(pen)
         painter.setBrush(brush)
         
-        x0 = self.source.x() + self.source.boundingRect().right() + off
-        y0 = self.source.y() + off
-        vert_x = self.source.x() + self.style.rankwidth/2 + off
+        x0 = self.sourceright + off
+        y0 = off
+        vert_x = self.style.rankwidth/2 + off
         painter.drawLine(x0, y0, vert_x, y0)
         
         arrow = self.arrowsize
