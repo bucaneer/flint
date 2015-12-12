@@ -370,24 +370,28 @@ class NodeItem(QGraphicsItem):
         self.fggroup = QGraphicsItemGroup(self)
         
         self.shadowbox = QGraphicsRectItem(self)
+        self.shadowbox.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
         self.shadowbox.setBrush(FlPalette.dark)
         self.shadowbox.setPen(nopen)
         self.shadowbox.setPos(*[self.style.shadowoffset]*2)
         self.graphgroup.addToGroup(self.shadowbox)
         
         self.activebox = QGraphicsRectItem(self)
+        self.activebox.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
         activepen = QPen(self.maincolor, self.style.selectmargin, join=Qt.MiterJoin)
         self.activebox.setPen(activepen)
         self.activebox.hide()
         self.graphgroup.addToGroup(self.activebox)
         
         self.selectbox = QGraphicsRectItem(self)
+        self.selectbox.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
         selectpen = QPen(FlPalette.light, self.style.selectmargin, join=Qt.MiterJoin)
         self.selectbox.setPen(selectpen)
         self.selectbox.hide()
         self.graphgroup.addToGroup(self.selectbox)
         
         self.mainbox = QGraphicsRectItem(self)
+        self.mainbox.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
         self.mainbox.setBrush(mainbrush)
         self.mainbox.setPen(nopen)
         self.graphgroup.addToGroup(self.mainbox)
@@ -699,6 +703,7 @@ class BankNodeItem (NodeItem):
         self.fggroup.addToGroup(self.btypeicon)
         
         self.centerbox = QGraphicsRectItem(self)
+        self.centerbox.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
         self.centerbox.setRect(QRectF())
         self.centerbox.setBrush(darkbrush)
         self.centerbox.setPen(nopen)
@@ -786,18 +791,18 @@ class BankNodeItem (NodeItem):
 
 
 class EdgeItem (QGraphicsItem):
-    def __init__ (self, source, view):
+    def __init__ (self, source):
         super().__init__()
+        self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
         self.source = source
         self.sourceright = 0
         source.setedge(self)
-        self.view = weakref.proxy(view)
         self.style = FlGlob.mainwindow.style
         self.arrowsize = self.style.arrowsize
         self.pensize = self.style.pensize
         
         pen = QPen(FlPalette.light, self.pensize, cap = Qt.FlatCap, join=Qt.MiterJoin)
-        pen.setCosmetic(True)
+        pen.setCosmetic(False)
         brush = QBrush(FlPalette.light)
         
         pen2 = QPen(pen)
@@ -831,19 +836,11 @@ class EdgeItem (QGraphicsItem):
         children = self.children
         if not children:
             return
-        treeview = widget is self.view.viewport()
         
-        if main and treeview:
+        if main:
             self.paint(painter, style, widget, off=self.style.shadowoffset, main=False)
         
         pen, brush = self.visuals[main]
-        if not treeview:
-            pen.setWidth(1)
-            pen.setCosmetic(True)
-        elif self.view.zoomscale >= 1:
-            pen.setWidth(self.pensize)
-            pen.setCosmetic(False)
-        
         painter.setPen(pen)
         painter.setBrush(brush)
         
@@ -2184,7 +2181,7 @@ class TreeView (TreeEditor, QGraphicsView):
         parent = self.itembyID(fromID)
         nodeobj = self.nodecontainer.nodes[toID]
         nodeitem = self.__types[nodeobj.typename](nodeobj, parent=parent, view=self, state=state)
-        edgeitem = EdgeItem(nodeitem, view=self)
+        edgeitem = EdgeItem(nodeitem)
         scene = self.scene()
         scene.addItem(edgeitem)
         scene.addItem(nodeitem)
