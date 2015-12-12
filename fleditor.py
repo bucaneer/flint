@@ -1526,6 +1526,7 @@ class SearchWidget (QWidget):
 
 class NodeListItem (QListWidgetItem):
     IDRole = Qt.UserRole + 1
+    TrashRole = Qt.UserRole + 2
     
     def __lt__ (self, other):
         return self.data(self.IDRole) < other.data(self.IDRole)
@@ -1543,9 +1544,23 @@ class NodeListWidget (QWidget):
         self.nodelist.itemActivated.connect(self.activatenode)
         self.nodelist.setSelectionMode(QAbstractItemView.ExtendedSelection)
         
+        remwidget = QWidget(self)
+        remlayout = QHBoxLayout(remwidget)
+        remselected = QPushButton("Remove selected")
+        remselected.setIcon(QIcon.fromTheme("edit-delete"))
+        remselected.clicked.connect(self.remselected)
+        self.selbutton = remselected
+        remtrash = QPushButton("Remove trash")
+        remtrash.setIcon(QIcon.fromTheme("edit-clear"))
+        remtrash.clicked.connect(self.remtrash)
+        self.trashbutton = remtrash
+        remlayout.addWidget(remselected)
+        remlayout.addWidget(remtrash)
+        
         layout = QVBoxLayout(self)
         layout.addWidget(self.search)
         layout.addWidget(self.nodelist)
+        layout.addWidget(remwidget)
         self.view = None
         self.active = False
         self.setEnabled(False)
@@ -1574,8 +1589,7 @@ class NodeListWidget (QWidget):
             listitem = self.listitem(self.view, nodeobj, nodeID)
             self.nodelist.addItem(listitem)
             self.index[nodeID] = listitem
-        if self.view.selectednode is not None:
-            self.selectbyID(self.view.selectednode.realid())
+        self.trashbutton.setEnabled(bool(self.view.trash))
     
     @pyqtSlot(str)
     def selectbyID (self, nodeID):
@@ -1599,11 +1613,14 @@ class NodeListWidget (QWidget):
         
         label = "%s: %s %s" % (nodeID, typename, descr) 
         if nodeID in view.trash:
+            trash = True
             icon = QIcon.fromTheme("user-trash")
         else:
+            trash = False
             icon = QIcon.fromTheme("text-x-generic")
         item = NodeListItem(icon, label)
-        item.setData(NodeListItem.IDRole, int(nodeID))        
+        item.setData(item.IDRole, int(nodeID))
+        item.setData(item.TrashRole, trash)
         return item
     
     @pyqtSlot(NodeListItem, NodeListItem)
@@ -1613,6 +1630,8 @@ class NodeListWidget (QWidget):
         window = FlGlob.mainwindow
         view = window.activeview
         nodeID = str(listitem.data(listitem.IDRole))
+        trash = listitem.data(listitem.TrashRole)
+        self.selbutton.setEnabled(trash)
         window.setselectednode(view, nodeID)
     
     @pyqtSlot(NodeListItem)
@@ -1621,6 +1640,27 @@ class NodeListWidget (QWidget):
         view = window.activeview
         nodeID = str(listitem.data(listitem.IDRole))
         window.setactivenode(view, nodeID)
+    
+    @pyqtSlot()
+    def remselected (self):
+        listitem = self.nodelist.currentItem()
+        nodeID = str(listitem.data(listitem.IDRole))
+        answer = QMessageBox.question(self, "Node removal", 
+            "Permanently remove node %s?\n\nThis will also clear the undo action list." % nodeID)
+        if answer == QMessageBox.No:
+            return
+        self.selbutton.setEnabled(False)
+        self.view.removenode(nodeID)
+    
+    @pyqtSlot()
+    def remtrash (self):
+        count = len(self.view.trash)
+        answer = QMessageBox.question(self, "Node removal", 
+            "Permanently remove all (%s) trash nodes?\n\nThis will also clear the undo action list." % count)
+        if answer == QMessageBox.No:
+            return
+        self.trashbutton.setEnabled(False)
+        self.view.removetrash()
 
 class MapView (QGraphicsView):
     def __init__ (self, parent):
@@ -2069,6 +2109,19 @@ class TreeEditor (object):
                 if query in nodeobj.text.casefold():
                     hits.append(nodeID)
             self.hits = hits
+    
+    def removenode (self, nodeID):
+        self.nodecontainer.nodes.pop(nodeID)
+        self.nodedocs.pop(nodeID)
+        self.undohistory.clear()
+        self.redohistory.clear()
+    
+    def removetrash (self):
+        for nodeID in self.trash:
+            self.nodecontainer.nodes.pop(nodeID)
+            self.nodedocs.pop(nodeID)
+        self.undohistory.clear()
+        self.redohistory.clear()
 
 class TreeView (TreeEditor, QGraphicsView):
     __types = {'talk': TalkNodeItem, 'response': ResponseNodeItem, 
@@ -2376,6 +2429,14 @@ class TreeView (TreeEditor, QGraphicsView):
     
     def collapse (self, fullID, collapse=None):
         super().collapse(fullID, collapse)
+        self.updateview()
+    
+    def removenode (self, nodeID):
+        super().removenode(nodeID)
+        self.updateview()
+    
+    def removetrash (self):
+        super().removetrash()
         self.updateview()
     
     def wheelEvent (self, event):
