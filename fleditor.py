@@ -2564,7 +2564,7 @@ class EditorWindow (QMainWindow):
         self.actions["selectreal"] = self.createaction("Select &Real", self.selectreal, 
             None, ["go-jump"], "Select real node")
         self.actions["refresh"] = self.createaction("Refresh", self.refresh,
-            [QKeySequence.Refresh], ["view-refresh"], "Refresh view")
+            [QKeySequence(Qt.Key_F5)], ["view-refresh"], "Refresh view")
         
         self.actions["newtalk"] = self.createaction("New &Talk Node", self.newtalk,
             [QKeySequence(Qt.ControlModifier+Qt.Key_T)], ["insert-object"], "Add new Talk node")
