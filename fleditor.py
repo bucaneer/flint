@@ -25,17 +25,17 @@ class FlGlob:
 
 class FlPalette (object):
     """Palette of custom colors for quick reference."""
-    dark    = QColor( 38,  39,  41)
-    light   = QColor(250, 250, 250)
-    hl1     = QColor(200,  60,  19)
-    hl1var  = QColor(224, 111,  19)
-    hl2     = QColor( 39, 118, 153)
-    hl2var  = QColor(108, 158, 171)
-    bank    = QColor(150, 170, 160)
-    bankvar = QColor(130, 150, 140)
-    root    = QColor(128, 128, 128)
-    rootvar = QColor(112, 112, 112)
-    bg      = QColor( 90,  94,  98)
+    dark    = QColor( 38,  39,  41) # shadows, node text
+    light   = QColor(250, 250, 250) # highlights, node labels
+    hl1var  = QColor(255, 121,  13) # talk active
+    hl1     = QColor(224, 111,  19) # talk normal
+    hl2var  = QColor(102, 183, 204) # response active
+    hl2     = QColor(108, 158, 171) # response normal
+    bankvar = QColor(134, 179, 156) # bank active
+    bank    = QColor(130, 150, 140) # bank normal
+    rootvar = QColor(153, 153, 153) # root active
+    root    = QColor(128, 128, 128) # root normal
+    bg      = QColor( 90,  94,  98) # scene, bank background
 
 class FlNodeStyle (object):    
     def __init__ (self, font):
@@ -369,7 +369,7 @@ class NodeItem(QGraphicsItem):
         self.graphgroup.addToGroup(self.shadowbox)
         
         self.activebox = QGraphicsRectItem(self)
-        activepen = QPen(self.altcolor, self.style.selectmargin, join=Qt.MiterJoin)
+        activepen = QPen(self.maincolor, self.style.selectmargin, join=Qt.MiterJoin)
         self.activebox.setPen(activepen)
         self.activebox.hide()
         self.graphgroup.addToGroup(self.activebox)
@@ -610,8 +610,8 @@ class TextNodeItem (NodeItem):
             menu.exec_(event.screenPos())
 
 class TalkNodeItem (TextNodeItem):
-    maincolor = FlPalette.hl1var
-    altcolor = FlPalette.hl1
+    maincolor = FlPalette.hl1
+    altcolor = FlPalette.hl1var
     label = "%s Talk"
     
     def graphicsetup (self):
@@ -634,8 +634,8 @@ class TalkNodeItem (TextNodeItem):
         self.qhubicon.setPixmap(pixmap)
 
 class ResponseNodeItem (TextNodeItem):
-    maincolor = FlPalette.hl2var
-    altcolor = FlPalette.hl2
+    maincolor = FlPalette.hl2
+    altcolor = FlPalette.hl2var
     label = "%s Response"
     
     def graphicsetup (self):
