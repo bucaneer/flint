@@ -706,7 +706,7 @@ class BankNodeItem (NodeItem):
         maxwidth = 0
         subnodes = self.sublist()
         for subnode in subnodes:
-            if isinstance(subnode, BankNodeItem):
+            if subnode.nodeobj.typename == "bank":
                 subnode.updatelayout(external=True)
             noderect = subnode.boundingRect()
             nodeheight = noderect.height()
@@ -1783,7 +1783,7 @@ class TreeEditor (object):
                 newnodedocs[nodeID] = self.nodedocs[nodeID]
             else:
                 newnodedocs[nodeID] = dict()
-                if isinstance(nodeobj, fp.TextNode):
+                if nodeobj.typename in ("talk", "response"):
                     textdoc = QTextDocument(self)
                     textdoc.setDocumentLayout(QPlainTextDocumentLayout(textdoc))
                     textdoc.setPlainText(nodeobj.text)
@@ -2364,7 +2364,7 @@ class TreeView (TreeEditor, QGraphicsView):
             if sib:
                 self.setselectednode(sib)
         elif key == Qt.Key_Right:
-            if mod & Qt.ControlModifier and isinstance(node, BankNodeItem):
+            if mod & Qt.ControlModifier and node.nodeobj.typename == "bank":
                 sublist = node.sublist()
                 if sublist:
                     subnode = sublist[0]
