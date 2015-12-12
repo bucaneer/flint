@@ -63,6 +63,12 @@ class FlNodeStyle (object):
         self.selectmargin = selectmargin
         self.shadowoffset = selectmargin
         
+        self.nodemargins = QMarginsF(*[nodemargin]*4)
+        self.banknodemargins = QMarginsF(*[nodemargin//2]*4)
+        self.itemmargins = QMarginsF(*[itemmargin]*4)
+        self.activemargins = QMarginsF(*[selectmargin//2]*4)
+        self.selectmargins = QMarginsF(*[selectmargin//2]*4)
+        
         self.nodetextwidth = basemetrics.averageCharWidth()*40
         
         nodewidth = self.nodetextwidth + 2*(activemargin+nodemargin+itemmargin)
@@ -363,7 +369,7 @@ class NodeItem(QGraphicsItem):
         self.graphgroup.addToGroup(self.shadowbox)
         
         self.activebox = QGraphicsRectItem(self)
-        activepen = QPen(self.altcolor, self.style.activemargin, join=Qt.MiterJoin)
+        activepen = QPen(self.altcolor, self.style.selectmargin, join=Qt.MiterJoin)
         self.activebox.setPen(activepen)
         self.activebox.hide()
         self.graphgroup.addToGroup(self.activebox)
@@ -482,11 +488,11 @@ class NodeItem(QGraphicsItem):
             rect = self.nodelabel.mapRectToParent(self.nodelabel.boundingRect())
         else:
             rect = self.fggroup.boundingRect()
-        mainrect = rect.marginsAdded(QMarginsF(*[self.style.nodemargin]*4))
+        mainrect = rect.marginsAdded(self.style.nodemargins)
         self.mainbox.setRect(mainrect)
         self.shadowbox.setRect(mainrect)
-        self.selectbox.setRect(mainrect.marginsAdded(QMarginsF(*[self.style.selectmargin//2]*4)))
-        activerect = mainrect.marginsAdded(QMarginsF(*[self.style.activemargin//2]*4))
+        self.selectbox.setRect(mainrect.marginsAdded(self.style.selectmargins))
+        activerect = mainrect.marginsAdded(self.style.activemargins)
         self.activebox.setRect(activerect)
         self.graphgroup.setPos(-activerect.width()//2-activerect.x(), -activerect.height()//2-activerect.y())
         self.prepareGeometryChange()
@@ -727,11 +733,11 @@ class BankNodeItem (NodeItem):
         else:
             self.updatecenterbox()
             rect = self.fggroup.boundingRect()
-        mainrect = rect.marginsAdded(QMarginsF(*[self.style.nodemargin//2]*4))
+        mainrect = rect.marginsAdded(self.style.banknodemargins)
         self.mainbox.setRect(mainrect)
         self.shadowbox.setRect(mainrect)
-        self.selectbox.setRect(mainrect.marginsAdded(QMarginsF(*[self.style.selectmargin//2]*4)))
-        activerect = mainrect.marginsAdded(QMarginsF(*[self.style.activemargin//2]*4))
+        self.selectbox.setRect(mainrect.marginsAdded(self.style.selectmargins))
+        activerect = mainrect.marginsAdded(self.style.activemargins)
         self.activebox.setRect(activerect)
         oldypos = self.centerbox.mapToScene(self.centerbox.pos()).y()
         self.graphgroup.setPos(-activerect.width()//2-activerect.x(), -activerect.height()//2-activerect.y())
@@ -874,10 +880,6 @@ class FrameItem (QGraphicsItem):
             painter.drawRect(self.boundingRect())
 
 class ParagraphEdit (QPlainTextEdit):
-    def __init__ (self, parent):
-        super().__init__(parent)
-        self.setTabChangesFocus(True)
-    
     def keyPressEvent (self, event):
         key = event.key()
         mod = event.modifiers()
@@ -889,6 +891,7 @@ class ParagraphEdit (QPlainTextEdit):
 class TextEditWidget (QWidget):
     def __init__ (self, parent):
         super().__init__(parent)
+        self.setEnabled(False)
         layout = QFormLayout(self)
         l_speaker = QLabel("&Speaker")
         self.speaker = QLineEdit(self)
@@ -900,6 +903,7 @@ class TextEditWidget (QWidget):
         
         l_nodetext = QLabel("&Text")
         self.nodetext = ParagraphEdit(self)
+        self.nodetext.setTabChangesFocus(True)
         l_nodetext.setBuddy(self.nodetext)
         
         layout.addRow(l_speaker, self.speaker)
@@ -907,6 +911,9 @@ class TextEditWidget (QWidget):
         layout.addRow(l_nodetext, self.nodetext)
         
         self.nodeobj = None
+        textdoc = QTextDocument(self)
+        textdoc.setDocumentLayout(QPlainTextDocumentLayout(textdoc))
+        self.blankdoc = textdoc
         self.speaker.textChanged.connect(self.setnodespeaker)
         self.listener.textChanged.connect(self.setnodelistener)
         self.nodetext.textChanged.connect(self.setnodetext)
@@ -914,29 +921,46 @@ class TextEditWidget (QWidget):
     @pyqtSlot(str)
     def loadnode (self, nodeID):
         view = FlGlob.mainwindow.activeview
-        self.nodeobj = view.nodecontainer.nodes[nodeID]
-        if not isinstance(self.nodeobj, fp.TextNode):
-            return
-        nodetextdoc = view.nodedocs[nodeID]["text"]
-        self.speaker.setText(self.nodeobj.speaker)
-        self.listener.setText(self.nodeobj.listener)
-        self.nodetext.setDocument(nodetextdoc)
-        self.nodetext.moveCursor(QTextCursor.End)
+        if view is not None:
+            nodeobj = view.nodecontainer.nodes.get(nodeID, None)
+        else:
+            nodeobj = None
+        self.nodeobj = nodeobj
+        
+        if nodeobj is not None and nodeobj.typename in ("talk", "response"):
+            self.setEnabled(True)
+            nodetextdoc = view.nodedocs[nodeID]["text"]
+            self.speaker.setText(nodeobj.speaker)
+            self.listener.setText(nodeobj.listener)
+            self.nodetext.setDocument(nodetextdoc)
+            self.nodetext.moveCursor(QTextCursor.End)
+        else:
+            self.setEnabled(False)
+            self.nodeobj = None
+            self.speaker.setText("")
+            self.listener.setText("")
+            self.nodetext.setDocument(self.blankdoc)
     
     @pyqtSlot()
     def setnodespeaker (self):
+        if self.nodeobj is None:
+            return
         self.nodeobj.speaker = self.speaker.text()
         view = FlGlob.mainwindow.activeview
         view.callupdates(self.nodeobj.ID, "updatespeaker")
     
     @pyqtSlot()
     def setnodelistener (self):
+        if self.nodeobj is None:
+            return
         self.nodeobj.listener = self.listener.text()
         view = FlGlob.mainwindow.activeview
         view.callupdates(self.nodeobj.ID, "updatespeaker")
     
     @pyqtSlot()
     def setnodetext (self):
+        if self.nodeobj is None:
+            return
         self.nodeobj.text = self.nodetext.toPlainText()
 
 class ScriptParamWidget (QWidget):
@@ -1217,17 +1241,24 @@ class ConditionCallWidget (CallWidget):
 class CallEditWidget (QWidget):
     def __init__ (self, parent):
         super().__init__(parent)
+        self.setEnabled(False)
         callsarea = QScrollArea(self)
         callsarea.setWidgetResizable(True)
         self.callsarea = callsarea
-        
+        self.resetwidget()
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignTop)
+    
+    def resetwidget (self):
+        callswidget = self.callsarea.widget()
+        if callswidget is not None:
+            callswidget.setParent(None)
+            callswidget.deleteLater()
         callswidget = QWidget(self.callsarea)
         callslayout = QVBoxLayout(callswidget)
         callslayout.setAlignment(Qt.AlignTop)
         self.callsarea.setWidget(callswidget)
-        
-        layout = QVBoxLayout(self)
-        layout.setAlignment(Qt.AlignTop)
+        return callswidget
 
 class ConditionEditWidget (CallEditWidget):
     def __init__ (self, parent):
@@ -1237,13 +1268,22 @@ class ConditionEditWidget (CallEditWidget):
     @pyqtSlot(str)
     def loadnode (self, nodeID):
         view = FlGlob.mainwindow.activeview
-        nodeobj = view.nodecontainer.nodes[nodeID]
+        if view is not None:
+            nodeobj = view.nodecontainer.nodes.get(nodeID, None)
+        else:
+            nodeobj = None
         self.nodeobj = nodeobj
-        callobj = nodeobj.condition
-        callswidget = self.callsarea.widget()
-        scwidget = ConditionCallWidget(callswidget, callobj, nodeID)
-        scwidget.actremove.setEnabled(False)
-        callswidget.layout().addWidget(scwidget)
+ 
+        if nodeobj is not None:
+            self.setEnabled(True)
+            callobj = nodeobj.condition
+            callswidget = self.resetwidget()
+            scwidget = ConditionCallWidget(callswidget, callobj, nodeID)
+            scwidget.actremove.setEnabled(False)
+            callswidget.layout().addWidget(scwidget)
+        else:
+            self.setEnabled(False)
+            self.resetwidget()
 
 class ScriptEditWidget (CallEditWidget):
     def __init__ (self, parent, slot="enter"):
@@ -1265,14 +1305,24 @@ class ScriptEditWidget (CallEditWidget):
     @pyqtSlot(str)
     def loadnode (self, nodeID):
         view = FlGlob.mainwindow.activeview
-        nodeobj = view.nodecontainer.nodes[nodeID]
+        if view is not None:
+            nodeobj = view.nodecontainer.nodes.get(nodeID, None)
+        else:
+            nodeobj = None
         self.nodeobj = nodeobj
-        if self.slot == "enter":
-            self.scripts = nodeobj.enterscripts
-        elif self.slot == "exit":
-            self.scripts = nodeobj.exitscripts
-        for callobj in self.scripts:
-            self.addscriptcallwidget(callobj)
+        
+        if nodeobj is not None:
+            self.setEnabled(True)
+            self.resetwidget()
+            if self.slot == "enter":
+                self.scripts = nodeobj.enterscripts
+            elif self.slot == "exit":
+                self.scripts = nodeobj.exitscripts
+            for callobj in self.scripts:
+                self.addscriptcallwidget(callobj)
+        else:
+            self.setEnabled(False)
+            self.resetwidget()
     
     @pyqtSlot(fp.MetaCall)
     def addscriptcall (self, metacall):
@@ -1305,6 +1355,7 @@ class ScriptEditWidget (CallEditWidget):
 class PropertiesEditWidget (QWidget):
     def __init__ (self, parent):
         super().__init__(parent)
+        self.setEnabled(False)
         layout = QFormLayout(self)
         
         l_persistence = QLabel("&Persistence", self)
@@ -1352,35 +1403,53 @@ class PropertiesEditWidget (QWidget):
         layout.addRow(l_questionhub, questionhub)
         layout.addRow(l_randweight, randweight)
         layout.addRow(l_comment, comment)
+        
+        textdoc = QTextDocument(self)
+        textdoc.setDocumentLayout(QPlainTextDocumentLayout(textdoc))
+        self.blankdoc = textdoc
     
     @pyqtSlot(str)
     def loadnode (self, nodeID):
         view = FlGlob.mainwindow.activeview
-        nodeobj = view.nodecontainer.nodes[nodeID]
+        if view is not None:
+            nodeobj = view.nodecontainer.nodes.get(nodeID, None)
+        else:
+            nodeobj = None
         self.nodeobj = nodeobj
         
-        self.persistence.setCurrentText(nodeobj.persistence)
-        
-        if nodeobj.typename == "bank":
-            self.banktype.setCurrentText(nodeobj.banktype)
-            self.banktype.setEnabled(True)
+        if nodeobj is not None:
+            self.setEnabled(True)
+            self.persistence.setCurrentText(nodeobj.persistence)
+            
+            if nodeobj.typename == "bank":
+                self.banktype.setCurrentText(nodeobj.banktype)
+                self.banktype.setEnabled(True)
+            else:
+                self.banktype.setEnabled(False)
+            
+            if nodeobj.typename == "talk":
+                self.questionhub.setCurrentText(nodeobj.questionhub)
+                self.questionhub.setEnabled(True)
+            else:
+                self.questionhub.setEnabled(False)
+            
+            self.randweight.setText(str(nodeobj.randweight))
+            
+            commentdoc = view.nodedocs[nodeID]["comment"]
+            self.comment.setDocument(commentdoc)
+            self.comment.moveCursor(QTextCursor.End)
         else:
-            self.banktype.setEnabled(False)
-        
-        if nodeobj.typename == "talk":
-            self.questionhub.setCurrentText(nodeobj.questionhub)
-            self.questionhub.setEnabled(True)
-        else:
-            self.questionhub.setEnabled(False)
-        
-        self.randweight.setText(str(nodeobj.randweight))
-        
-        commentdoc = view.nodedocs[nodeID]["comment"]
-        self.comment.setDocument(commentdoc)
-        self.comment.moveCursor(QTextCursor.End)
+            self.setEnabled(False)
+            self.persistence.setCurrentText("")
+            self.banktype.setCurrentText("")
+            self.questionhub.setCurrentText("")
+            self.randweight.setText("")
+            self.comment.setDocument(self.blankdoc)
     
     @pyqtSlot()
     def persistencechanged (self):
+        if self.nodeobj is None:
+            return
         persistence = self.persistence.currentText()
         self.nodeobj.persistence = persistence
         view = FlGlob.mainwindow.activeview
@@ -1388,6 +1457,8 @@ class PropertiesEditWidget (QWidget):
     
     @pyqtSlot()
     def banktypechanged (self):
+        if self.nodeobj is None:
+            return
         banktype = self.banktype.currentText()
         self.nodeobj.banktype = banktype
         view = FlGlob.mainwindow.activeview
@@ -1395,6 +1466,8 @@ class PropertiesEditWidget (QWidget):
     
     @pyqtSlot()
     def questionhubchanged (self):
+        if self.nodeobj is None:
+            return
         questionhub = self.questionhub.currentText()
         self.nodeobj.questionhub = questionhub
         view = FlGlob.mainwindow.activeview
@@ -1402,6 +1475,8 @@ class PropertiesEditWidget (QWidget):
     
     @pyqtSlot()
     def randweightchanged (self):
+        if self.nodeobj is None:
+            return
         randweight = float(self.randweight.text())
         self.nodeobj.randweight = randweight
         view = FlGlob.mainwindow.activeview
@@ -1409,6 +1484,8 @@ class PropertiesEditWidget (QWidget):
     
     @pyqtSlot()
     def commentchanged (self):
+        if self.nodeobj is None:
+            return
         comment = self.comment.toPlainText()
         self.nodeobj.comment = comment
 
@@ -2148,9 +2225,9 @@ class TreeView (TreeEditor, QGraphicsView):
     
     @pyqtSlot(str)
     def selectbyID (self, nodeID):
-        log("debug", "%s.selectbyID(%s)" % (self, nodeID))
         if FlGlob.mainwindow.activeview is not self:
             return
+        log("debug", "%s.selectbyID(%s)" % (self, nodeID))
         if self.selectednode is not None and self.selectednode.realid() == nodeID:
             self.shownode(self.selectednode)
             return
@@ -2177,9 +2254,9 @@ class TreeView (TreeEditor, QGraphicsView):
     
     @pyqtSlot(str)
     def activatebyID (self, nodeID):
-        log("debug", "%s.activatebyID(%s)" % (self, nodeID))
         if FlGlob.mainwindow.activeview is not self:
             return
+        log("debug", "%s.activatebyID(%s)" % (self, nodeID))
         if nodeID in self.itemindex:
             nodeitem = self.itembyID(nodeID)
             if self.activenode:
@@ -2323,6 +2400,7 @@ class NodeCopy (object):
 class EditorWindow (QMainWindow):
     copiednode = NodeCopy()
     actions = dict()
+    editdocks = dict()
     activeview = None
     activenode = ""
     selectednode = ""
@@ -2350,66 +2428,10 @@ class EditorWindow (QMainWindow):
         tabs.tabCloseRequested.connect(self.closetab)
         tabs.tabBarDoubleClicked.connect(self.nametab)
         tabs.currentChanged.connect(self.tabswitched)
-        self.tabs = tabs                        
-        
-        mapview = MapView(self)
-        maptimer = QTimer(self)
-        maptimer.timeout.connect(mapview.update)
-        maptimer.start(100) # OPTION: mapview frame rate
-        
-        mapdock = QDockWidget("Map view", self)
-        mapdock.setWidget(mapview)
-        
-        textdock = QDockWidget("&Text", self)
-        textdock.newWidget = lambda: TextEditWidget(self)
-        textdock.setWidget(TextEditWidget(self))
-        textdock.widget().setEnabled(False)
-        self.textdock = textdock
-        
-        conddock = QDockWidget("&Condition", self)
-        conddock.newWidget = lambda: ConditionEditWidget(self)
-        conddock.setWidget(ConditionEditWidget(self))
-        conddock.widget().setEnabled(False)
-        self.conddock = conddock
-        
-        onenterdock = QDockWidget("On E&nter", self)
-        onenterdock.newWidget = lambda: ScriptEditWidget(self, slot="enter")
-        onenterdock.setWidget(ScriptEditWidget(self, slot="enter"))
-        onenterdock.widget().setEnabled(False)
-        self.onenterdock = onenterdock
-        
-        onexitdock = QDockWidget("On E&xit", self)
-        onexitdock.newWidget = lambda: ScriptEditWidget(self, slot="exit")
-        onexitdock.setWidget(ScriptEditWidget(self, slot="exit"))
-        onexitdock.widget().setEnabled(False)
-        self.onexitdock = onexitdock
-        
-        propdock = QDockWidget("&Properties", self)
-        propdock.newWidget = lambda: PropertiesEditWidget(self)
-        propdock.setWidget(PropertiesEditWidget(self))
-        propdock.widget().setEnabled(False)
-        self.propdock = propdock
-        
-        nodelist = NodeListWidget(self)
-        self.viewChanged.connect(nodelist.setview)
-        self.viewUpdated.connect(nodelist.populatelist)
-        self.selectedChanged.connect(nodelist.selectbyID)
-        listdock = QDockWidget("Node &List", self)
-        listdock.setWidget(nodelist)
-        self.listdock = listdock
+        self.tabs = tabs
         
         self.setCentralWidget(tabs)
-        self.setTabPosition(Qt.AllDockWidgetAreas, QTabWidget.North)
-        self.addDockWidget(Qt.RightDockWidgetArea, mapdock)
-        self.addDockWidget(Qt.RightDockWidgetArea, textdock)
-        self.tabifyDockWidget(textdock, conddock)
-        self.tabifyDockWidget(conddock, onenterdock)
-        self.tabifyDockWidget(onenterdock, onexitdock)
-        self.tabifyDockWidget(onexitdock, propdock)
-        textdock.raise_()
-        
-        self.addDockWidget(Qt.LeftDockWidgetArea, listdock)
-        
+        self.initdocks()
         self.filteractions()
     
     def initactions (self):
@@ -2510,7 +2532,7 @@ class EditorWindow (QMainWindow):
                         actions = ["copynode", "settemplate"]
                     else:
                         actions = []
-                elif nodeobj.typename in ["talk", "response"]:
+                elif nodeobj.typename in ("talk", "response"):
                     actions = ["copynode", "moveup", "movedown", "unlinknode", 
                         "unlinkstree", "settemplate", "nodetobank"]
                     if nodeobj.nodebank == -1:
@@ -2692,6 +2714,54 @@ class EditorWindow (QMainWindow):
         edittoolbar.addAction(self.actions["movedown"])
         self.addToolBar(edittoolbar)
     
+    def initdocks (self):
+        mapview = MapView(self)
+        maptimer = QTimer(self)
+        maptimer.timeout.connect(mapview.update)
+        maptimer.start(100) # OPTION: mapview frame rate
+        mapdock = QDockWidget("Map view", self)
+        mapdock.setWidget(mapview)
+        
+        textdock = QDockWidget("&Text", self)
+        textdock.setWidget(TextEditWidget(self))
+        self.editdocks["text"] = textdock
+        
+        conddock = QDockWidget("&Condition", self)
+        conddock.setWidget(ConditionEditWidget(self))
+        self.editdocks["cond"] = conddock
+        
+        onenterdock = QDockWidget("On E&nter", self)
+        onenterdock.setWidget(ScriptEditWidget(self, slot="enter"))
+        self.editdocks["enter"] = onenterdock
+        
+        onexitdock = QDockWidget("On E&xit", self)
+        onexitdock.setWidget(ScriptEditWidget(self, slot="exit"))
+        self.editdocks["exit"] = onexitdock
+        
+        propdock = QDockWidget("&Properties", self)
+        propdock.setWidget(PropertiesEditWidget(self))
+        self.editdocks["prop"] = propdock
+        
+        nodelist = NodeListWidget(self)
+        self.viewChanged.connect(nodelist.setview)
+        self.viewUpdated.connect(nodelist.populatelist)
+        self.selectedChanged.connect(nodelist.selectbyID)
+        listdock = QDockWidget("Node &List", self)
+        listdock.setWidget(nodelist)
+        self.listdock = listdock
+        
+        self.setTabPosition(Qt.AllDockWidgetAreas, QTabWidget.North)
+        self.addDockWidget(Qt.RightDockWidgetArea, mapdock)
+        
+        self.addDockWidget(Qt.RightDockWidgetArea, textdock)
+        self.tabifyDockWidget(textdock, conddock)
+        self.tabifyDockWidget(conddock, onenterdock)
+        self.tabifyDockWidget(onenterdock, onexitdock)
+        self.tabifyDockWidget(onexitdock, propdock)
+        textdock.raise_()
+        
+        self.addDockWidget(Qt.LeftDockWidgetArea, listdock)
+    
     @pyqtSlot(int)
     def tabswitched (self, index):
         view = self.tabs.widget(index)
@@ -2710,6 +2780,9 @@ class EditorWindow (QMainWindow):
                 self.setselectednode(view, view.selectednode.realid())
             else:
                 self.setselectednode(view, "-1")
+        else:
+            self.setactivenode(view, "-1")
+            self.setselectednode(view, "-1")
         self.viewChanged.emit()
     
     def setactivenode (self, view, nodeID):
@@ -2722,28 +2795,9 @@ class EditorWindow (QMainWindow):
         self.selectednode = nodeID
         self.selectedChanged.emit(nodeID)
     
-    def resetdocks (self):
-        for dock in (self.textdock, self.onenterdock, self.onexitdock, self.conddock, self.propdock):
-            olddock = dock.widget()
-            dock.setWidget(dock.newWidget())
-            dock.widget().setEnabled(False)
-            olddock.deleteLater()
-    
     @pyqtSlot(str)
     def loadnode (self, nodeID):
-        self.resetdocks()
-        if nodeID == "-1":
-            return
-        view = self.activeview
-        nodeobj = view.nodecontainer.nodes[nodeID]
-        if nodeobj.typename in ["talk", "response"]:
-            self.textdock.widget().setEnabled(True)
-            self.textdock.widget().loadnode(nodeID)
-        else:
-            self.textdock.widget().setEnabled(False)
-        
-        for dock in (self.onenterdock, self.onexitdock, self.conddock, self.propdock):
-            dock.widget().setEnabled(True)
+        for dock in self.editdocks.values():
             dock.widget().loadnode(nodeID)
     
     @pyqtSlot()
@@ -2798,7 +2852,6 @@ class EditorWindow (QMainWindow):
     
     @pyqtSlot(int)
     def closetab (self, index):
-        self.resetdocks()
         view = self.tabs.widget(index)
         self.tabs.removeTab(index)
         view.deleteLater()
