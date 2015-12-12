@@ -595,6 +595,8 @@ class TextNodeItem (NodeItem):
         if self.isselected():
             window = FlGlob.mainwindow
             menu.addAction(window.actions["collapse"])
+            if self.isghost():
+                menu.addAction(window.actions["selectreal"])
             menu.addAction(window.actions["copynode"])
             menu.addMenu(window.addmenu)
             menu.addAction(window.actions["moveup"])
@@ -760,6 +762,8 @@ class BankNodeItem (NodeItem):
         if self.isselected():
             window = FlGlob.mainwindow
             menu.addAction(window.actions["collapse"])
+            if self.isghost():
+                menu.addAction(window.actions["selectreal"])
             menu.addAction(window.actions["copynode"])
             menu.addMenu(window.subnodemenu)
             menu.addMenu(window.addmenu)
@@ -2489,6 +2493,8 @@ class EditorWindow (QMainWindow):
             ["gtk-zoom-100", "zoom-original"], "Zoom to original size")
         self.actions["gotoactive"] = self.createaction("Go To &Active", self.gotoactive, 
             None, ["go-jump"], "Center on active node")
+        self.actions["selectreal"] = self.createaction("Select &Real", self.selectreal, 
+            None, ["go-jump"], "Select real node")
         self.actions["refresh"] = self.createaction("Refresh", self.refresh,
             [QKeySequence.Refresh], ["view-refresh"], "Refresh view")
         
@@ -2545,12 +2551,16 @@ class EditorWindow (QMainWindow):
                 else:
                     action.setEnabled(True)
         else:
-            genericactions = ["zoomin", "zoomout", "zoomorig", "gotoactive",
-                "collapse", "openfile", "save", "saveas", "newtree", "close", "refresh"]
+            genericactions = ["zoomin", "zoomout", "zoomorig", "openfile", 
+                "save", "saveas", "newtree", "close", "refresh"]
             if view.undohistory:
-                genericactions.extend(["undo"])
+                genericactions.append("undo")
             if view.redohistory:
-                genericactions.extend(["redo"])
+                genericactions.append("redo")
+            if view.activenode:
+                genericactions.append("gotoactive")
+            if view.selectednode:
+                genericactions.extend(["collapse", "selectreal"])
             nodes = view.nodecontainer.nodes
             if not self.selectednode or self.selectednode not in nodes:
                 actions = []
@@ -2704,6 +2714,7 @@ class EditorWindow (QMainWindow):
         viewmenu.addAction(self.actions["zoomout"])
         viewmenu.addAction(self.actions["zoomorig"])
         viewmenu.addAction(self.actions["gotoactive"])
+        viewmenu.addAction(self.actions["selectreal"])
         viewmenu.addAction(self.actions["collapse"])
         viewmenu.addAction(self.actions["refresh"])
         
@@ -2914,6 +2925,12 @@ class EditorWindow (QMainWindow):
     def gotoactive (self):
         view = self.activeview
         view.centerOn(view.activenode)
+    
+    @pyqtSlot()
+    def selectreal (self):
+        view = self.activeview
+        nodeID = view.selectednode.realid()
+        view.setselectednode(view.itembyID(nodeID))
     
     @pyqtSlot()
     def refresh (self):
