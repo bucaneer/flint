@@ -2013,6 +2013,26 @@ class TreeEditor (object):
                 "Transform node %s from Bank" % nodeID)
             self.addundoable(hist)
     
+    def splitnode (self, nodeID, splitID=None, undo=False):
+        cont = self.nodecontainer
+        selnode = cont.nodes[nodeID]
+        
+        if splitID is None:
+            nodedict = selnode.todict()
+            nodedict["subnodes"] = []
+            newnode = cont.newnode(nodedict)
+            newID = newnode.ID
+        else:
+            newID = splitID
+        selnode.linkIDs = [newID]
+        
+        if not undo:
+            hist = HistoryAction(
+                self.unlink_inherit, {"nodeID": newID, "refID": nodeID}, 
+                self.splitnode, {"nodeID": nodeID, "splitID": newID},
+                "Split node %s" % nodeID)
+            self.addundoable(hist)
+    
     def collapse (self, fullID, collapse=None):
         if fullID in self.collapsednodes:
             if collapse is None or not collapse:
@@ -2323,7 +2343,8 @@ class TreeView (TreeEditor, QGraphicsView):
                 fullID = item.id()
                 self.nodeorder[fullID] = None
         super().nodetobank(nodeID, undo)
-        self.updateview()
+        if not undo:
+            self.updateview()
     
     def banktonode (self, nodeID, undo=False):
         if nodeID in self.itemindex:
@@ -2331,7 +2352,13 @@ class TreeView (TreeEditor, QGraphicsView):
                 fullID = item.id()
                 self.nodeorder[fullID] = None
         super().banktonode(nodeID, undo)
-        self.updateview()
+        if not undo:
+            self.updateview()
+    
+    def splitnode (self, nodeID, splitID=None, undo=False):
+        super().splitnode(nodeID, splitID, undo)
+        if not undo:
+            self.updateview()
     
     def collapse (self, fullID, collapse=None):
         super().collapse(fullID, collapse)
@@ -2504,6 +2531,8 @@ class EditorWindow (QMainWindow):
             None, None, "Transform node into a Bank node")
         self.actions["banktonode"] = self.createaction("Bank -> Regular", self.banktonode,
             None, None, "Transform Bank node into a regular node")
+        self.actions["splitnode"] = self.createaction("Split Node", self.splitnode,
+            None, None, "Split node in two")
     
     @pyqtSlot()
     def filteractions (self):
@@ -2537,14 +2566,14 @@ class EditorWindow (QMainWindow):
                         "unlinkstree", "settemplate", "nodetobank"]
                     if nodeobj.nodebank == -1:
                         actions.extend(["newtalk", "newresponse", "newbank", 
-                            "pasteclone", "pastelink", "parentswap"])
+                            "pasteclone", "pastelink", "parentswap", "splitnode"])
                 elif nodeobj.typename == "bank":
                     actions = ["copynode", "moveup", "movedown", "unlinknode",
                         "unlinkstree", "newtalksub", "newresponsesub", "pastesubnode",
                         "newbanksub", "settemplate"]
                     if nodeobj.nodebank == -1:
                         actions.extend(["newtalk", "newresponse", "newbank", 
-                            "pasteclone", "pastelink", "parentswap"])
+                            "pasteclone", "pastelink", "parentswap", "splitnode"])
                     if len(nodeobj.subnodes) == 1:
                         actions.extend(["banktonode"])
                 elif nodeobj.typename == "root":
@@ -2625,6 +2654,7 @@ class EditorWindow (QMainWindow):
         transformmenu = QMenu("Trans&form...")
         transformmenu.addAction(self.actions["nodetobank"])
         transformmenu.addAction(self.actions["banktonode"])
+        transformmenu.addAction(self.actions["splitnode"])
         self.transformmenu = transformmenu
         
         undomenu = QMenu("Undo")
@@ -3049,6 +3079,12 @@ class EditorWindow (QMainWindow):
         view = self.activeview
         nodeID = view.selectednode.realid()
         view.banktonode(nodeID)
+    
+    @pyqtSlot()
+    def splitnode (self):
+        view = self.activeview
+        nodeID = view.selectednode.realid()
+        view.splitnode(nodeID)
     
     @pyqtSlot()
     def collapse (self):

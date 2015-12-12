@@ -133,6 +133,9 @@ class ChartNode (object):
 		if self.randweight:
 			node_dict['randweight']   = self.randweight
 		return node_dict
+	
+	def __repr__ (self):
+		return "<%s %s>" % (type(self).__name__, self.ID)
 
 class TextNode (ChartNode):
 	def todict (self):
