@@ -83,7 +83,7 @@ class FlNodeStyle (object):
         
         # Edge style
         self.pensize = self.shadowoffset
-        self.arrowsize = self.pensize * 5
+        self.arrowsize = self.pensize * 3.5
 
 class QGraphicsRectItemCond (QGraphicsRectItem):
     def __init__ (self, parent=0, cond=None):
@@ -809,14 +809,12 @@ class EdgeItem (QGraphicsItem):
         visuals[True] = (pen, brush)
         visuals[False] = (pen2, brush2)
         self.visuals = visuals
-        
-        self.nopen = QPen(0)
     
     def boundingRect (self):
         self.childpos = self.source.childpos
         if self.childpos:
-            halfarrow = self.arrowsize/2
-            xmax = max([c[0] for c in self.childpos]) + self.style.shadowoffset
+            halfarrow = (self.arrowsize + + self.pensize*1.5)/2
+            xmax = max([c[0] for c in self.childpos]) + self.style.shadowoffset + self.pensize*1.5
             ymin = self.childpos[0][1] - halfarrow
             ymax = self.childpos[-1][1] + halfarrow + self.style.shadowoffset
             rect = QRectF(0, ymin, xmax, abs(ymax-ymin))
@@ -844,7 +842,7 @@ class EdgeItem (QGraphicsItem):
         painter.drawLine(x0, y0, vert_x, y0)
         
         arrow = self.arrowsize
-        corr = pen.width()/2
+        corr = self.pensize/2
         for tx, ty in children:
             tx += off
             ty += off
@@ -852,9 +850,7 @@ class EdgeItem (QGraphicsItem):
             arrowtip = [QPointF(tx, ty),
                         QPointF(tx-arrow, ty-(arrow/2)),
                         QPointF(tx-arrow, ty+(arrow/2))]
-            painter.setPen(self.nopen)
             painter.drawPolygon(*arrowtip)
-            painter.setPen(pen)
         
         if len(children) > 1:
             vert_top = children[0][1] + off
