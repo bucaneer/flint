@@ -1665,6 +1665,7 @@ class MapView (QGraphicsView):
         super().__init__(parent)
         self.setOptimizationFlags(QGraphicsView.DontAdjustForAntialiasing | QGraphicsView.DontSavePainterState)
         self.setRenderHints(QPainter.SmoothPixmapTransform | QPainter.Antialiasing)
+        self.setViewport(QGLWidget(QGLFormat(QGL.SampleBuffers)))
         self.treeview = None
         self.scenerect = self.viewrect = QRectF()
     
