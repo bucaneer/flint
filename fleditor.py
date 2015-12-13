@@ -1667,6 +1667,8 @@ class MapView (QGraphicsView):
         self.setRenderHints(QPainter.SmoothPixmapTransform | QPainter.Antialiasing)
         self.setViewport(QGLWidget(QGLFormat(QGL.SampleBuffers)))
         self.treeview = None
+        self.blankscene = QGraphicsScene(self)
+        self.setScene(self.blankscene)
         self.scenerect = self.viewrect = QRectF()
     
     def mousePressEvent (self, event):
@@ -1690,6 +1692,7 @@ class MapView (QGraphicsView):
         activeview = window.activeview
         if activeview is None:
             self.treeview = None
+            self.setScene(self.blankscene)
             return
         if activeview is not self.treeview:
             self.treeview = activeview
