@@ -158,12 +158,14 @@ class NodeItem(QGraphicsItem):
         else:
             ret = []
         if generate:
-            if self.edge:
-                self.edge.prepareGeometryChange()
-                self.edge.sourceright = self.boundingRect().right()
             x = self.x()
             y = self.y()
             self.childpos = [(t.x()+t.boundingRect().left()-self.style.activemargin-x, t.y()-y) for t in ret]
+            if self.edge:
+                if self.childpos != self.edge.childpos:
+                    self.edge.prepareGeometryChange()
+                    self.edge.sourceright = self.boundingRect().right()
+                    self.edge.update(self.edge.boundingRect())
         return ret
     
     def setedge (self, edge):
@@ -794,6 +796,7 @@ class EdgeItem (QGraphicsItem):
     def __init__ (self, source):
         super().__init__()
         self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
+        self.childpos = []
         self.source = source
         self.sourceright = 0
         source.setedge(self)
@@ -817,23 +820,21 @@ class EdgeItem (QGraphicsItem):
         self.nopen = QPen(0)
     
     def boundingRect (self):
-        xmin = 0
-        xmax = xmin + self.style.rankwidth
-        self.children = self.source.childpos
-        halfarrow = self.arrowsize/2
-        if self.children:
-            ymin = self.children[0][1] - halfarrow
-            ymax = self.children[-1][1] + halfarrow + self.style.shadowoffset
+        self.childpos = self.source.childpos
+        if self.childpos:
+            halfarrow = self.arrowsize/2
+            xmax = max([c[0] for c in self.childpos]) + self.style.shadowoffset
+            ymin = self.childpos[0][1] - halfarrow
+            ymax = self.childpos[-1][1] + halfarrow + self.style.shadowoffset
+            rect = QRectF(0, ymin, xmax, abs(ymax-ymin))
         else:
-            y = 0
-            ymin = y - halfarrow
-            ymax = y + halfarrow
-        return QRectF(xmin, ymin, abs(xmax-xmin), abs(ymax-ymin))
+            rect = QRectF(0, 0, 0, 0)
+        return rect
     
     def paint (self, painter, style, widget, off=0, main=True):
         if not self.source:
             return
-        children = self.children
+        children = self.childpos
         if not children:
             return
         
@@ -2180,11 +2181,12 @@ class TreeView (TreeEditor, QGraphicsView):
         fromID, toID = fullID
         parent = self.itembyID(fromID)
         nodeobj = self.nodecontainer.nodes[toID]
-        nodeitem = self.__types[nodeobj.typename](nodeobj, parent=parent, view=self, state=state)
-        edgeitem = EdgeItem(nodeitem)
         scene = self.scene()
-        scene.addItem(edgeitem)
+        nodeitem = self.__types[nodeobj.typename](nodeobj, parent=parent, view=self, state=state)
         scene.addItem(nodeitem)
+        if not nodeitem.issubnode():
+            edgeitem = EdgeItem(nodeitem)
+            scene.addItem(edgeitem)
         
         if toID in self.itemindex:
             if state == 1:
@@ -2218,9 +2220,10 @@ class TreeView (TreeEditor, QGraphicsView):
             self.itemindex.pop(toID)
         scene = self.scene()
         scene.removeItem(nodeitem)
-        scene.removeItem(edgeitem)
-        edgeitem.source = None
-        nodeitem.edge = None
+        if edgeitem is not None:
+            scene.removeItem(edgeitem)
+            edgeitem.source = None
+            nodeitem.edge = None
         if self.activenode is nodeitem:
             self.activenode = None
         if self.selectednode is nodeitem:
