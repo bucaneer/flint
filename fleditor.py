@@ -500,7 +500,7 @@ class NodeItem(QGraphicsItem):
         if self.iscollapsed():
             rect = self.nodelabel.mapRectToParent(self.nodelabel.boundingRect())
         else:
-            rect = self.fggroup.boundingRect()
+            rect = self.fggroup.childrenBoundingRect()
         mainrect = rect.marginsAdded(self.style.nodemargins)
         self.mainbox.setRect(mainrect)
         self.shadowbox.setRect(mainrect)
@@ -592,10 +592,6 @@ class TextNodeItem (NodeItem):
         textrect = ndtxt.mapRectToParent(ndtxt.boundingRect())
         self.textbox.setRect(textrect)
         self.comment.setY(textrect.bottom()+self.style.itemmargin)
-        self.fggroup.removeFromGroup(self.textbox)
-        self.fggroup.addToGroup(self.textbox)
-        self.fggroup.removeFromGroup(ndtxt)
-        self.fggroup.addToGroup(ndtxt)
         
         textheight = textrect.height()
         if textheight == self.textheight:
@@ -738,9 +734,6 @@ class BankNodeItem (NodeItem):
         centerrect = self.centerbox.mapRectToParent(centerrect)
         
         self.comment.setY(centerrect.bottom()+self.style.itemmargin)
-        
-        self.fggroup.removeFromGroup(self.centerbox)
-        self.fggroup.addToGroup(self.centerbox)
     
     def updatelayout (self, external=False):
         subnodes = self.sublist()
@@ -748,7 +741,7 @@ class BankNodeItem (NodeItem):
             rect = self.nodelabel.mapRectToParent(self.nodelabel.boundingRect())
         else:
             self.updatecenterbox()
-            rect = self.fggroup.boundingRect()
+            rect = self.fggroup.childrenBoundingRect()
         mainrect = rect.marginsAdded(self.style.banknodemargins)
         self.mainbox.setRect(mainrect)
         self.shadowbox.setRect(mainrect)
