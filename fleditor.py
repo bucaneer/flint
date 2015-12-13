@@ -5,7 +5,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtOpenGL import *
-import flint_parser as fp
+import conv_parser as cp
 import os
 import weakref
 import inspect as insp
@@ -1049,7 +1049,7 @@ class CallWidget (QGroupBox):
         menu.exec_(event.globalPos())
 
 class ScriptCallWidget (CallWidget):
-    removed = pyqtSignal(fp.ScriptCall)
+    removed = pyqtSignal(cp.ScriptCall)
     
     def __init__ (self, parent, callobj, nodeID, cond=False):
         name = callobj.funcname
@@ -1101,11 +1101,11 @@ class ScriptCallWidget (CallWidget):
         self.callobj.funcparams = newparams
 
 class CallCreateWidget (QWidget):
-    newCallObj = pyqtSignal(fp.MetaCall)
+    newCallObj = pyqtSignal(cp.MetaCall)
     
     def __init__ (self, parent, cond=False):
         super().__init__(parent)
-        scripts = fp.ScriptCall.scripts
+        scripts = cp.ScriptCall.scripts
         if cond:
             names = ["( )"]
             condcalls = [n for n, sc in scripts.items() if "return" in sc.__annotations__]
@@ -1128,9 +1128,9 @@ class CallCreateWidget (QWidget):
     def newscriptcall (self):
         name = self.combobox.currentText()
         if name == "( )":
-            callobj = fp.MetaCall({"type":"cond","operator":"and","calls":[]})
+            callobj = cp.MetaCall({"type":"cond","operator":"and","calls":[]})
         else:
-            signature = insp.signature(fp.ScriptCall.scripts[name])
+            signature = insp.signature(cp.ScriptCall.scripts[name])
             defaults = {int: 0, bool: False}
             params = []
             for param in signature.parameters.values():
@@ -1140,11 +1140,11 @@ class CallCreateWidget (QWidget):
                     params.append(defaults[param.annotation])
                 else:
                     params.append("")
-            callobj = fp.MetaCall({"type":"script", "command":name, "params":params})
+            callobj = cp.MetaCall({"type":"script", "command":name, "params":params})
         self.newCallObj.emit(callobj)
 
 class ConditionCallWidget (CallWidget):
-    removed = pyqtSignal(fp.ConditionCall)
+    removed = pyqtSignal(cp.ConditionCall)
     
     def __init__ (self, parent, callobj, nodeID, cond=True):
         name = "()"
@@ -1182,7 +1182,7 @@ class ConditionCallWidget (CallWidget):
         self.toggled.connect(operatorwidget.setVisible)
         self.toggled.connect(newwidget.setVisible)
     
-    @pyqtSlot(fp.MetaCall)
+    @pyqtSlot(cp.MetaCall)
     def addcall (self, metacall):
         callobj = metacall.callobj
         self.callobj.calls.append(callobj)
@@ -1233,8 +1233,8 @@ class ConditionCallWidget (CallWidget):
         self.callobj.setoperator(operatorname)
         self.newtitle()
     
-    @pyqtSlot(fp.ScriptCall)
-    @pyqtSlot(fp.ConditionCall)
+    @pyqtSlot(cp.ScriptCall)
+    @pyqtSlot(cp.ConditionCall)
     def removecall (self, callobj):
         prompt = QMessageBox.question(self, "Prompt", "Remove call?")
         if prompt == QMessageBox.No:
@@ -1332,7 +1332,7 @@ class ScriptEditWidget (CallEditWidget):
             self.setEnabled(False)
             self.resetwidget()
     
-    @pyqtSlot(fp.MetaCall)
+    @pyqtSlot(cp.MetaCall)
     def addscriptcall (self, metacall):
         callobj = metacall.callobj
         self.scripts.append(callobj)
@@ -1347,7 +1347,7 @@ class ScriptEditWidget (CallEditWidget):
         self.widgets[callobj] = scwidget
         callswidget.layout().addWidget(scwidget)
     
-    @pyqtSlot(fp.ScriptCall)
+    @pyqtSlot(cp.ScriptCall)
     def removescriptcall (self, callobj):
         prompt = QMessageBox.question(self, "Prompt", "Remove call?")
         if prompt == QMessageBox.No:
@@ -2917,13 +2917,13 @@ class EditorWindow (QMainWindow):
         self.openfile(filename)
     
     def openfile (self, filename):
-        nodecontainer = fp.loadjson(filename)
+        nodecontainer = cp.loadjson(filename)
         treeview = TreeView(nodecontainer, parent=self)
         self.newtab(treeview)
     
     @pyqtSlot()
     def newtree (self):
-        nodecontainer = fp.newcontainer()
+        nodecontainer = cp.newcontainer()
         treeview = TreeView(nodecontainer, parent=self)
         self.newtab(treeview)
     
