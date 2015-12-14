@@ -1247,7 +1247,7 @@ class ConditionCallWidget (CallWidget):
     @pyqtSlot(cp.ScriptCall)
     @pyqtSlot(cp.ConditionCall)
     def removecall (self, callobj):
-        prompt = QMessageBox.question(self, "Prompt", "Remove call?")
+        prompt = QMessageBox.question(self, "Prompt", "Remove call?", defaultButton=QMessageBox.Yes)
         if prompt == QMessageBox.No:
             return
         widget = self.widgets.pop(callobj)
@@ -1368,7 +1368,7 @@ class ScriptEditWidget (CallEditWidget):
     
     @pyqtSlot(cp.ScriptCall)
     def removescriptcall (self, callobj):
-        prompt = QMessageBox.question(self, "Prompt", "Remove call?")
+        prompt = QMessageBox.question(self, "Prompt", "Remove call?", defaultButton=QMessageBox.Yes)
         if prompt == QMessageBox.No:
             return
         callswidget = self.callsarea.widget()
@@ -3221,12 +3221,12 @@ the Projects widget, or register it in a project.")
             return
         if len(view.itemindex[selID]) == 1:
             if inherit or len(selected.nodeobj.linkIDs) == 0:
-                text = "This will remove the only instance of node %s.\n\nContinue?" % selID
+                text = "Unlink unique node %s?" % selID
             else:
-                text = "This will remove the only instance of node %s and all unique nodes in its subtree.\n\nContinue?" % selID
+                text = "Unlink unique node %s and its subtree?" % selID
         else:
             text = "Unlink node %s from node %s?" % (selID, selected.refID)
-        answer = QMessageBox.question(self, "Node removal", text)
+        answer = QMessageBox.question(self, "Unlink", text, defaultButton=QMessageBox.Yes)
         if answer == QMessageBox.No:
             return
         
