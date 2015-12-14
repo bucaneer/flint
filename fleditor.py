@@ -1063,16 +1063,17 @@ class ScriptCallWidget (CallWidget):
         paramslayout = QVBoxLayout(paramswidget)
         paramslayout.setContentsMargins(*[0]*4)
         paramslist = []
-        signature = insp.signature(callobj.funccall)
-        for param in signature.parameters.values():
-            pname = param.name
-            annot = param.annotation if param.annotation is not insp._empty else ""
-            default = params.pop()
-            parwidget = ScriptParamWidget(paramswidget, pname, annot, default)
-            paramslayout.addWidget(parwidget)
-            paramslist.append(parwidget)
-            parwidget.signal.connect(self.paramchanged)
-        layout.addWidget(paramswidget)
+        if callobj.funccall is not None:
+            signature = insp.signature(callobj.funccall)
+            for param in signature.parameters.values():
+                pname = param.name
+                annot = param.annotation if param.annotation is not insp._empty else ""
+                default = params.pop()
+                parwidget = ScriptParamWidget(paramswidget, pname, annot, default)
+                paramslayout.addWidget(parwidget)
+                paramslist.append(parwidget)
+                parwidget.signal.connect(self.paramchanged)
+            layout.addWidget(paramswidget)
         
         self.paramslist = paramslist
         
@@ -1288,12 +1289,15 @@ class ConditionEditWidget (CallEditWidget):
         self.nodeobj = nodeobj
  
         if nodeobj is not None:
-            self.setEnabled(True)
             callobj = nodeobj.condition
             callswidget = self.resetwidget()
             scwidget = ConditionCallWidget(callswidget, callobj, nodeID)
             scwidget.actremove.setEnabled(False)
             callswidget.layout().addWidget(scwidget)
+            if view.nodecontainer.proj is not None:
+                self.setEnabled(True)
+            else:
+                self.setEnabled(False)
         else:
             self.setEnabled(False)
             self.resetwidget()
@@ -1326,7 +1330,6 @@ class ScriptEditWidget (CallEditWidget):
         self.nodeobj = nodeobj
         
         if nodeobj is not None:
-            self.setEnabled(True)
             self.resetwidget()
             self.newwidget.reload()
             if self.slot == "enter":
@@ -1335,6 +1338,10 @@ class ScriptEditWidget (CallEditWidget):
                 self.scripts = nodeobj.exitscripts
             for callobj in self.scripts:
                 self.addscriptcallwidget(callobj)
+            if view.nodecontainer.proj is not None:
+                self.setEnabled(True)
+            else:
+                self.setEnabled(False)
         else:
             self.setEnabled(False)
             self.resetwidget()

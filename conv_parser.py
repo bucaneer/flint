@@ -5,14 +5,19 @@ class ScriptCall (object):
     def __init__ (self, sc_dict, scripts=None):
         self.typename = sc_dict['type']
         self.funcname = sc_dict['command']
+        self.funcparams = sc_dict.get('params', [])
+        self._not = sc_dict.get('not', False)
+        if scripts is None:
+            self.funccall = None
+            return
         self.scripts = scripts
         if self.funcname not in self.scripts:
             raise RuntimeError("Unknown script: %s" % self.funcname)
         self.funccall = self.scripts[self.funcname]
-        self.funcparams = sc_dict.get('params', [])
-        self._not = sc_dict.get('not', False)
     
     def run (self):
+        if self.funccall is None:
+            return None
         if self._not:
             return not self.funccall(*self.funcparams)
         else:
@@ -64,7 +69,7 @@ class ChartNode (object):
         if container.proj:
             scripts = container.proj.scripts
         else:
-            scripts = dict()
+            scripts = None
         self.typename = node_dict['type']
         self.ID = str(nodeID)
         self.linkIDs = []
