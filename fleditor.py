@@ -1095,8 +1095,28 @@ class CallCreateWidget (QWidget):
     
     def __init__ (self, parent, cond=False):
         super().__init__(parent)
-        scripts = cp.ScriptCall.scripts
-        if cond:
+        self.cond = cond
+        
+        self.combobox = QComboBox(self)
+        addbutton = QPushButton("Add", self)
+        addbutton.clicked.connect(self.newscriptcall)
+        
+        layout = QHBoxLayout(self)
+        layout.addWidget(self.combobox)
+        layout.addWidget(addbutton)
+        
+        self.reload()
+    
+    def getscripts (self):
+        view = FlGlob.mainwindow.activeview
+        if view is not None and view.nodecontainer.proj is not None:
+            return view.nodecontainer.proj.scripts
+        else:
+            return dict()
+    
+    def reload (self):
+        scripts = self.getscripts() #cp.ScriptCall.scripts
+        if self.cond:
             names = ["( )"]
             condcalls = [n for n, sc in scripts.items() if "return" in sc.__annotations__]
             names.extend(sorted(condcalls))
@@ -1104,20 +1124,15 @@ class CallCreateWidget (QWidget):
             names = sorted(scripts.keys())
         self.scriptcalls = names
         
-        combobox = QComboBox(self)
-        combobox.insertItems(len(self.scriptcalls), self.scriptcalls)
-        self.combobox = combobox
-        addbutton = QPushButton("Add", self)
-        addbutton.clicked.connect(self.newscriptcall)
-        
-        layout = QHBoxLayout(self)
-        layout.addWidget(combobox)
-        layout.addWidget(addbutton)
+        self.combobox.clear()
+        self.combobox.insertItems(len(self.scriptcalls), self.scriptcalls)
     
     @pyqtSlot()
     def newscriptcall (self):
         name = self.combobox.currentText()
-        if name == "( )":
+        if not name:
+            return
+        elif name == "( )":
             callobj = cp.MetaCall({"type":"cond","operator":"and","calls":[]})
         else:
             signature = insp.signature(cp.ScriptCall.scripts[name])
@@ -1293,6 +1308,7 @@ class ScriptEditWidget (CallEditWidget):
         
         newwidget = CallCreateWidget(self)
         newwidget.newCallObj.connect(self.addscriptcall)
+        self.newwidget = newwidget
         
         self.widgets = dict()
         
@@ -1312,6 +1328,7 @@ class ScriptEditWidget (CallEditWidget):
         if nodeobj is not None:
             self.setEnabled(True)
             self.resetwidget()
+            self.newwidget.reload()
             if self.slot == "enter":
                 self.scripts = nodeobj.enterscripts
             elif self.slot == "exit":

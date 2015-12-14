@@ -1,11 +1,11 @@
-import fl_scripts
 import json
 import os.path as path
 
-class ScriptCall (fl_scripts.ScriptCalls):
-    def __init__ (self, sc_dict):
+class ScriptCall (object):
+    def __init__ (self, sc_dict, scripts=None):
         self.typename = sc_dict['type']
         self.funcname = sc_dict['command']
+        self.scripts = scripts
         if self.funcname not in self.scripts:
             raise RuntimeError("Unknown script: %s" % self.funcname)
         self.funccall = self.scripts[self.funcname]
@@ -27,7 +27,7 @@ class ScriptCall (fl_scripts.ScriptCalls):
         return sc_dict
 
 class ConditionCall (object):
-    def __init__ (self, cond_dict):
+    def __init__ (self, cond_dict, scripts=None):
         self.types = {"script":ScriptCall, "cond":ConditionCall}
         self.operators = {"and":True, "or":False}
         self.typename = cond_dict['type']
@@ -36,7 +36,7 @@ class ConditionCall (object):
         self.calls = []
         for call in cond_dict['calls']:
             typename = self.types[ call['type'] ]
-            self.calls.append( typename(call) )
+            self.calls.append( typename(call, scripts) )
     
     def run (self):
         for call in self.calls:
@@ -61,6 +61,10 @@ class MetaCall (object):
 class ChartNode (object):
     def __init__ (self, container, node_dict, nodeID):
         self.container = container
+        if container.proj:
+            scripts = container.proj.scripts
+        else:
+            scripts = dict()
         self.typename = node_dict['type']
         self.ID = str(nodeID)
         self.linkIDs = []
@@ -68,10 +72,10 @@ class ChartNode (object):
         for link in node_dict.get('links', []):
             self.addlink(str(link))
         
-        self.condition = ConditionCall(node_dict.get('condition', self.container.defaultcond))
+        self.condition = ConditionCall(node_dict.get('condition', self.container.defaultcond), scripts)
         
-        self.enterscripts = [ScriptCall(s) for s in node_dict.get('enterscripts', [])]
-        self.exitscripts  = [ScriptCall(s) for s in node_dict.get('exitscripts',  [])]
+        self.enterscripts = [ScriptCall(s, scripts) for s in node_dict.get('enterscripts', [])]
+        self.exitscripts  = [ScriptCall(s, scripts) for s in node_dict.get('exitscripts',  [])]
         
         self.randweight  = node_dict.get("randweight",        0)
         self.nodebank    = node_dict.get("nodebank",         -1)
@@ -184,10 +188,11 @@ class BankNode (ChartNode):
 class NodesContainer (object):
     types = { 'talk': TalkNode, 'response': ResponseNode, 'bank': BankNode,
         'root': ChartNode }
-    def __init__ (self, nodes_dict, filename=""):
+    def __init__ (self, nodes_dict, filename="", proj=None):
         self.defaultcond = {"type":"cond","operator":"and","calls":[]}
         self.defaultcondcall = ConditionCall(self.defaultcond)
         self.filename = path.abspath(filename)
+        self.proj = proj
         self.name = nodes_dict['name']
         self.nextID = str(nodes_dict['nextID'])
         self.nodes = dict()
@@ -235,9 +240,9 @@ class NodesContainer (object):
                     nodes_dict["templates"][typename] = template
         return nodes_dict
 
-def loadjson (filename):
+def loadjson (filename, proj=None):
     with open(filename, 'r') as f:
-        return NodesContainer(json.load(f), filename)
+        return NodesContainer(json.load(f), filename, proj=proj)
 
 def writejson (nodecont, filename):
     with open(filename, 'w') as f:
