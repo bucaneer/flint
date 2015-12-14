@@ -6,17 +6,22 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtOpenGL import *
 import conv_parser as cp
+import proj_parser as pp
 import os
 import weakref
 import inspect as insp
 from collections import deque, OrderedDict
 
 def log (level, text):
-    if level in FlGlob.loglevels:
-        if FlGlob.loglevels[level] <= FlGlob.loglevel:
-            print("[%s] %s" % (level, text))
-    else:
-        log("warn", "Unknown loglevel: %s" % level)
+    if level not in FlGlob.loglevels:
+        print("[warn] Unknown loglevel: %s" % level)
+        level = "warn"
+    if FlGlob.loglevels[level] <= FlGlob.loglevel:
+        print("[%s] %s" % (level, text))
+        if level == "warn":
+            QMessageBox.warning(FlGlob.mainwindow, "Warning", text)
+        elif level == "error":
+            QMessageBox.critical(FlGlob.mainwindow, "Error", text)
 
 class FlGlob:
     loglevels = {"quiet": 0, "error": 1, "warn": 2, "info": 3, "debug": 4, "verbose": 5}
@@ -1675,6 +1680,42 @@ class NodeListWidget (QWidget):
         self.trashbutton.setEnabled(False)
         self.view.removetrash()
 
+class ProjectWidget (QWidget):
+    ProjType = QTreeWidgetItem.UserType + 1
+    ConvType = QTreeWidgetItem.UserType + 2
+    
+    def __init__ (self, parent):
+        super().__init__(parent)
+        self.tree = QTreeWidget(self)
+        self.tree.setColumnCount(2)
+        self.tree.setHeaderLabels(("Name", "Path"))
+        self.tree.itemActivated.connect(self.onactivate)
+        
+        layout = QVBoxLayout(self)
+        layout.addWidget(self.tree)
+    
+    @pyqtSlot(str)
+    def addproject (self, path):
+        proj = FlGlob.mainwindow.projects[path]
+        if proj.name:
+            projname = proj.name
+        else:
+            projname = os.path.basename(os.path.splitext(path)[0])
+        root = QTreeWidgetItem((projname, path), self.ProjType)
+        self.tree.addTopLevelItem(root)
+        
+        for relpath in proj.convs:
+            name = os.path.basename(os.path.splitext(relpath)[0])
+            conv = QTreeWidgetItem((name, relpath), self.ConvType)
+            root.addChild(conv)
+    
+    @pyqtSlot(QTreeWidgetItem, int)
+    def onactivate (self, item, column):
+        window = FlGlob.mainwindow
+        if item.type() == self.ConvType:
+            projpath = item.parent().data(1, 0)
+            window.openconv(projpath, item.data(1, 0))
+
 class MapView (QGraphicsView):
     def __init__ (self, parent):
         super().__init__(parent)
@@ -2522,9 +2563,12 @@ class EditorWindow (QMainWindow):
     copiednode = NodeCopy()
     actions = dict()
     editdocks = dict()
+    projects = dict()
+    convs = dict()
     activeview = None
     activenode = ""
     selectednode = ""
+    newProject = pyqtSignal(str)
     viewChanged = pyqtSignal()
     viewUpdated = pyqtSignal()
     activeChanged = pyqtSignal(str)
@@ -2873,6 +2917,11 @@ class EditorWindow (QMainWindow):
         propdock.setWidget(PropertiesEditWidget(self))
         self.editdocks["prop"] = propdock
         
+        projwidget = ProjectWidget(self)
+        self.newProject.connect(projwidget.addproject)
+        projdock = QDockWidget("Projects", self)
+        projdock.setWidget(projwidget)
+        
         nodelist = NodeListWidget(self)
         self.viewChanged.connect(nodelist.setview)
         self.viewUpdated.connect(nodelist.populatelist)
@@ -2891,6 +2940,7 @@ class EditorWindow (QMainWindow):
         self.tabifyDockWidget(onexitdock, propdock)
         textdock.raise_()
         
+        self.addDockWidget(Qt.LeftDockWidgetArea, projdock)
         self.addDockWidget(Qt.LeftDockWidgetArea, listdock)
     
     @pyqtSlot(int)
@@ -2933,14 +2983,43 @@ class EditorWindow (QMainWindow):
     
     @pyqtSlot()
     def selectopenfile (self):
-        filename = QFileDialog.getOpenFileName(self, "Open file", os.getcwd(), "Dialog files (*.json)")[0]
+        filters = OrderedDict()
+        filters["Project files (*.proj)"] = self.openproj
+        filters["Dialog files (*.json)"]  = self.openconvfile
+        filename, selfilter = QFileDialog.getOpenFileName(self, "Open file", 
+            os.getcwd(), ";;".join(filters.keys()))
         if filename == "":
             return
-        self.openfile(filename)
+        filters[selfilter](filename)
     
-    def openfile (self, filename):
-        nodecontainer = cp.loadjson(filename)
-        treeview = TreeView(nodecontainer, parent=self)
+    def openproj (self, filename):
+        proj = pp.loadjson(filename)
+        path = proj.path
+        if path in self.projects:
+            return
+        self.projects[path] = proj
+        self.newProject.emit(path)
+    
+    def openconvfile (self, filename):
+        cont = cp.loadjson(filename)
+        treeview = TreeView(cont, parent=self)
+        self.newtab(treeview)
+    
+    def openconv (self, projpath, relpath):
+        proj = self.projects[projpath]
+        abspath = proj.checkpath(relpath)
+        if abspath is None:
+            log("error", "Not part of project or no such file: %s" % relpath)
+        elif abspath in self.convs:
+            view = self.convs[abspath]()
+            if view is not None:
+                if view.nodecontainer.proj is None:
+                    self.closeview(view)
+                else:
+                    self.tabs.setCurrentWidget(view)
+                    return
+        cont = cp.loadjson(abspath, proj)
+        treeview = TreeView(cont, parent=self)
         self.newtab(treeview)
     
     @pyqtSlot()
@@ -2951,10 +3030,17 @@ class EditorWindow (QMainWindow):
     
     def newtab (self, treeview):
         name = treeview.nodecontainer.name
+        filename = treeview.nodecontainer.filename
+        if filename:
+            self.convs[filename] = weakref.ref(treeview)
         self.selectedChanged.connect(treeview.selectbyID)
         self.activeChanged.connect(treeview.activatebyID)
         tabindex = self.tabs.addTab(treeview, name)
         self.tabs.setCurrentIndex(tabindex)
+        if treeview.nodecontainer.proj is None:
+            log("warn", "Script editing is disabled for conversations opened \
+not as part of a project.\n\nTo enable script editing, reopen this file from \
+the Projects widget, or register it in a project.")
     
     @pyqtSlot()
     def save (self, newfile=False):
@@ -2967,6 +3053,7 @@ class EditorWindow (QMainWindow):
                 os.path.join(os.getcwd(), (nodecont.name or "Untitled")+".json"),
                 "Dialog files (*.json)")[0]
             nodecont.filename = filename
+            self.convs[filename] = weakref.ref(view)
         nodecont.savetofile()
     
     @pyqtSlot()
@@ -2978,12 +3065,18 @@ class EditorWindow (QMainWindow):
         view = self.activeview
         if view is None:
             return
+        self.closeview(view)
+    
+    def closeview (self, view):
         index = self.tabs.indexOf(view)
         self.closetab(index)
     
     @pyqtSlot(int)
     def closetab (self, index):
         view = self.tabs.widget(index)
+        filename = view.nodecontainer.filename
+        if filename and filename in self.convs:
+            self.convs.pop(filename)
         self.tabs.removeTab(index)
         view.deleteLater()
         view = None
@@ -3245,7 +3338,7 @@ if __name__ == '__main__':
                 FlGlob.loglevel = FlGlob.loglevels[param]
                 log("info", "Loglevel: %s" % param)
             else:
-                log("warn", "Unknown loglevel: %s" % param)
+                log("warn", "Unrecognized loglevel: %s" % param)
     app = QApplication(sys.argv)
     window = EditorWindow()
     window.show()

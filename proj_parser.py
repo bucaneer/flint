@@ -7,6 +7,7 @@ import conv_parser as cp
 class FlintProject (object):
     def __init__ (self, projdict, filename=""):
         self.filename = path.abspath(filename)
+        self.name = projdict.get("name", "")
         self.path = path.dirname(self.filename)
         self.scriptfile = projdict.get("scripts", "")
         self.scripts = self.initscripts(self.scriptfile)
@@ -36,14 +37,21 @@ class FlintProject (object):
         paths.sort()
         return paths
     
-    def loadconv (self, relpath):
+    def checkpath (self, relpath):
         if relpath not in self.convs:
             return None
         abspath = path.abspath(path.join(self.path, relpath))
-        return cp.loadjson(abspath, self)
+        if not path.exists(abspath):
+            return None
+        return abspath
+    
+    def savetofile (self):
+        if self.filename == "":
+            return
+        writejson(self, self.filename)
     
     def todict (self):
-        return {"scripts": self.scriptfile, "convs": self.convs}
+        return {"scripts": self.scriptfile, "convs": self.convs, "name": self.name}
 
 def loadjson (filename):
     with open(filename, 'r') as f:
