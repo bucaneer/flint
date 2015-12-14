@@ -1550,12 +1550,14 @@ class NodeListWidget (QWidget):
         
         remwidget = QWidget(self)
         remlayout = QHBoxLayout(remwidget)
-        remselected = QPushButton("Remove selected")
+        remselected = QPushButton(self)
         remselected.setIcon(QIcon.fromTheme("edit-delete"))
+        remselected.setToolTip("Remove selected")
         remselected.clicked.connect(self.remselected)
         self.selbutton = remselected
-        remtrash = QPushButton("Remove trash")
+        remtrash = QPushButton(self)
         remtrash.setIcon(QIcon.fromTheme("edit-clear"))
+        remtrash.setToolTip("Clear all trash")
         remtrash.clicked.connect(self.remtrash)
         self.trashbutton = remtrash
         remlayout.addWidget(remselected)
