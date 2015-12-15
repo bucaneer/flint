@@ -45,6 +45,15 @@ class FlintProject (object):
             return None
         return abspath
     
+    def registerconv (self, abspath):
+        if not path.exists(abspath):
+            raise RuntimeError("No such file: %s" % abspath)
+        relpath = path.relpath(abspath, start=self.path)
+        if relpath in self.convs:
+            return # overwriting is OK
+        self.convs.append(relpath)
+        self.convs.sort()
+    
     def savetofile (self):
         if self.filename == "":
             return

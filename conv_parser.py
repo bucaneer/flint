@@ -196,7 +196,7 @@ class NodesContainer (object):
     def __init__ (self, nodes_dict, filename="", proj=None):
         self.defaultcond = {"type":"cond","operator":"and","calls":[]}
         self.defaultcondcall = ConditionCall(self.defaultcond)
-        self.filename = path.abspath(filename)
+        self.filename = path.abspath(filename) if filename else ""
         self.proj = proj
         self.name = nodes_dict['name']
         self.nextID = str(nodes_dict['nextID'])
@@ -232,7 +232,7 @@ class NodesContainer (object):
             self.nodes[fromID].addlink(toID, pos=pos)
     
     def savetofile (self):
-        if self.filename == "":
+        if not self.filename or self.filename.startswith("\0TEMP"):
             return
         writejson(self, self.filename)
     
@@ -255,6 +255,6 @@ def writejson (nodecont, filename):
             sort_keys=True, ensure_ascii=False,
             default=lambda o: o.todict() )
 
-def newcontainer ():
+def newcontainer (proj=None):
     nodes_dict = { "name": "Untitled", "nextID": 1, "nodes": { "0": {"type": "root"} } }
-    return NodesContainer(nodes_dict)
+    return NodesContainer(nodes_dict, proj=proj)
