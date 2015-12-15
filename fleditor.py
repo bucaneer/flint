@@ -1782,6 +1782,7 @@ class MapView (QGraphicsView):
         self.setOptimizationFlags(QGraphicsView.DontAdjustForAntialiasing | QGraphicsView.DontSavePainterState)
         self.setRenderHints(QPainter.SmoothPixmapTransform | QPainter.Antialiasing)
         self.setViewport(QGLWidget(QGLFormat(QGL.SampleBuffers)))
+        self.setViewportUpdateMode(QGraphicsView.NoViewportUpdate)
         self.treeview = None
         self.blankscene = QGraphicsScene(self)
         self.setScene(self.blankscene)
