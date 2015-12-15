@@ -130,6 +130,8 @@ class NodeItem(QGraphicsItem):
     def __init__ (self, nodeobj, parent=None, view=None, state=1):
         super().__init__()
         self.edge = None
+        self.linkIDs = None
+        self.children = None
         self.childpos = None
         self.nodeobj = nodeobj
         self.style = FlGlob.mainwindow.style
@@ -152,14 +154,19 @@ class NodeItem(QGraphicsItem):
         ID = self.nodeobj.ID
         itemtable = self.view.itemtable
         if self.state == 1 and ID in itemtable and not self.iscollapsed():
-            children = []
-            for child in self.nodeobj.linkIDs:
-                if child in itemtable[ID]:
-                    item = itemtable[ID][child]
-                else:
-                    continue
-                children.append(item)
-            ret = children
+            if self.nodeobj.linkIDs == self.linkIDs:
+                ret = self.children
+            else:
+                children = []
+                for child in self.nodeobj.linkIDs:
+                    if child in itemtable[ID]:
+                        item = itemtable[ID][child]
+                    else:
+                        continue
+                    children.append(item)
+                self.linkIDs = self.nodeobj.linkIDs.copy()
+                self.children = children
+                ret = children
         else:
             ret = []
         if generate:
@@ -268,10 +275,12 @@ class NodeItem(QGraphicsItem):
     def y_bottom (self):
         return self.y() + self.boundingRect().height()//2
     
-    def bulkshift (self, diff):
+    def bulkshift (self, children, diff):
         self.setY(self.y() + diff)
-        for child in self.childlist():
-            child.bulkshift(diff)
+        if children is None:
+            children = self.childlist()
+        for child in children:
+            child.bulkshift(None, diff)
     
     def treeposition (self, ranks=None):
         if ranks is None:
@@ -282,7 +291,8 @@ class NodeItem(QGraphicsItem):
             localranks = child.treeposition(localranks)
         rank = self.x() // self.style.rankwidth
         if children:
-            top, bottom, depth = self.subtreesize(1)
+            top = children[0].y_top()
+            bottom = children[-1].y_bottom()
             self.setY((top+bottom)//2)
         localranks[rank] = [self.y_top, self.y_bottom]
         streeshift = None
@@ -295,7 +305,7 @@ class NodeItem(QGraphicsItem):
             else:
                 ranks[r] = localranks[r]
         if streeshift:
-            self.bulkshift(streeshift)
+            self.bulkshift(children, streeshift)
         return ranks
     
     def siblings (self):
