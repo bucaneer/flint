@@ -3173,11 +3173,14 @@ the Projects widget, or register it in a project.")
     def closetab (self, index):
         view = self.tabs.widget(index)
         filename = view.nodecontainer.filename
-        answer = QMessageBox.question(self, "Save", "Save changes before closing?", defaultButton=QMessageBox.Yes)
+        answer = QMessageBox.question(self, "Close Conversation", "Save changes before closing?", 
+            buttons=(QMessageBox.Cancel|QMessageBox.No|QMessageBox.Yes), defaultButton=QMessageBox.Yes)
         if answer == QMessageBox.Yes:
             ret = self.saveconv(view.nodecontainer.filename)
             if ret is None:
                 return
+        elif answer != QMessageBox.No:
+            return
         if filename and filename in self.convs:
             self.convs.pop(filename)
         self.tabs.removeTab(index)
