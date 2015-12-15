@@ -11,6 +11,7 @@ import os
 import weakref
 import inspect as insp
 from collections import deque, OrderedDict
+import gc
 
 def log (level, text):
     if level not in FlGlob.loglevels:
@@ -163,7 +164,7 @@ class NodeItem(QGraphicsItem):
                         item = itemtable[ID][child]
                     else:
                         continue
-                    children.append(item)
+                    children.append(weakref.proxy(item))
                 self.linkIDs = self.nodeobj.linkIDs.copy()
                 self.children = children
                 ret = children
@@ -1266,6 +1267,8 @@ class ConditionCallWidget (CallWidget):
         self.callobj.calls.remove(callobj)
         view = FlGlob.mainwindow.activeview
         view.callupdates(self.nodeID, "updatecondition")
+        widget = None
+        gc.collect()
 
 class CallEditWidget (QWidget):
     def __init__ (self, parent):
@@ -1283,6 +1286,8 @@ class CallEditWidget (QWidget):
         if callswidget is not None:
             callswidget.setParent(None)
             callswidget.deleteLater()
+            callswidget = None
+            gc.collect()
         callswidget = QWidget(self.callsarea)
         callslayout = QVBoxLayout(callswidget)
         callslayout.setAlignment(Qt.AlignTop)
@@ -1388,6 +1393,8 @@ class ScriptEditWidget (CallEditWidget):
         self.scripts.remove(callobj)
         view = FlGlob.mainwindow.activeview
         view.callupdates(self.nodeobj.ID, "update%sscripts" % self.slot)
+        scwidget = None
+        gc.collect()
 
 class PropertiesEditWidget (QWidget):
     def __init__ (self, parent):
@@ -1713,6 +1720,7 @@ class ProjectWidget (QWidget):
             projname = os.path.basename(os.path.splitext(path)[0])
         root = QTreeWidgetItem((projname, path), self.ProjType)
         self.tree.addTopLevelItem(root)
+        root.setExpanded(True)
         
         for relpath in proj.convs:
             name = os.path.basename(os.path.splitext(relpath)[0])
@@ -2300,6 +2308,7 @@ class TreeView (TreeEditor, QGraphicsView):
             self.selectednode = None
         nodeitem = None
         edgeitem = None
+        gc.collect()
     
     def setstate (self, fullID, state):
         log("verbose", "%s.stestate(%s, %s)" % (self, fullID, state))
@@ -3090,6 +3099,7 @@ the Projects widget, or register it in a project.")
         self.tabs.removeTab(index)
         view.deleteLater()
         view = None
+        gc.collect()
     
     @pyqtSlot(int)
     def nametab (self, index):
