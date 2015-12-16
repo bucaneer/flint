@@ -2558,10 +2558,16 @@ class TreeView (TreeEditor, QGraphicsView):
         self.updateview()
     
     def removenode (self, nodeID):
+        copied = FlGlob.mainwindow.copiednode
+        copied.ID = None
+        copied.view = copied.blank
         super().removenode(nodeID)
         self.updateview()
     
     def removetrash (self):
+        copied = FlGlob.mainwindow.copiednode
+        copied.ID = None
+        copied.view = copied.blank
         super().removetrash()
         self.updateview()
     
