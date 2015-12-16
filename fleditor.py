@@ -164,7 +164,7 @@ class NodeItem(QGraphicsItem):
                         item = itemtable[ID][child]
                     else:
                         continue
-                    children.append(weakref.proxy(item))
+                    children.append(item)
                 self.linkIDs = self.nodeobj.linkIDs.copy()
                 self.children = children
                 ret = children
@@ -2531,6 +2531,8 @@ class TreeView (TreeEditor, QGraphicsView):
             for item in self.itemindex[nodeID]:
                 fullID = item.id()
                 self.nodeorder[fullID] = None
+                for ref in self.itemindex[item.refID]:
+                    ref.linkIDs = None
         super().nodetobank(nodeID, subID, undo)
         if not undo:
             self.updateview()
@@ -2540,6 +2542,8 @@ class TreeView (TreeEditor, QGraphicsView):
             for item in self.itemindex[nodeID]:
                 fullID = item.id()
                 self.nodeorder[fullID] = None
+                for ref in self.itemindex[item.refID]:
+                    ref.linkIDs = None
         super().banktonode(nodeID, undo)
         if not undo:
             self.updateview()
