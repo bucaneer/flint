@@ -3294,7 +3294,7 @@ the Projects widget, or register it in a project.")
         nodedict["nodebank"] = -1
         nodedict["subnodes"] = []
         
-        if nodeobj.nodebank != -1:
+        if nodeobj.nodebank != -1 or nodeobj.ID in view.trash:
             self.copiednode = NodeCopy(ID=None, view=None, ndict=nodedict)
         else:
             self.copiednode = NodeCopy(ID=nodeobj.ID, view=view, ndict=nodedict)
