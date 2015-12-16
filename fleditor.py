@@ -3156,6 +3156,7 @@ the Projects widget, or register it in a project.")
         if cont.proj is not None:
             cont.proj.registerconv(filename)
             self.projectUpdated.emit(cont.proj.path)
+            cont.proj.savetofile()
         return True
     
     @pyqtSlot()
