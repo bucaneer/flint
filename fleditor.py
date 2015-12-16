@@ -155,7 +155,7 @@ class NodeItem(QGraphicsItem):
         ID = self.nodeobj.ID
         itemtable = self.view.itemtable
         if self.state == 1 and ID in itemtable and not self.iscollapsed():
-            if self.nodeobj.linkIDs == self.linkIDs:
+            if self.children and self.nodeobj.linkIDs == self.linkIDs and None not in [c() for c in self.children]:
                 ret = self.children
             else:
                 children = []
@@ -164,7 +164,7 @@ class NodeItem(QGraphicsItem):
                         item = itemtable[ID][child]
                     else:
                         continue
-                    children.append(item)
+                    children.append(weakref.ref(item))
                 self.linkIDs = self.nodeobj.linkIDs.copy()
                 self.children = children
                 ret = children
@@ -173,7 +173,10 @@ class NodeItem(QGraphicsItem):
         if generate:
             x = self.x()
             y = self.y()
-            self.childpos = [(t.x()+t.boundingRect().left()-self.style.activemargin-x, t.y()-y) for t in ret]
+            self.childpos = []
+            for target in ret:
+                t = target()
+                self.childpos.append((t.x()+t.boundingRect().left()-self.style.activemargin-x, t.y()-y))
             if self.edge:
                 if self.childpos != self.edge.childpos:
                     self.edge.prepareGeometryChange()
@@ -234,7 +237,7 @@ class NodeItem(QGraphicsItem):
     
     def nudgechildren (self):
         for child in self.childlist():
-            child.setrank(self)
+            child().setrank(self)
     
     def getyoffset (self):
         if self.nodeobj.nodebank == -1:
@@ -279,7 +282,7 @@ class NodeItem(QGraphicsItem):
     def bulkshift (self, children, diff):
         self.setY(self.y() + diff)
         if children is None:
-            children = self.childlist()
+            children = [c() for c in self.childlist()]
         for child in children:
             child.bulkshift(None, diff)
     
@@ -287,7 +290,7 @@ class NodeItem(QGraphicsItem):
         if ranks is None:
             ranks = dict()
         localranks = dict()
-        children = self.childlist()
+        children = [c() for c in self.childlist()]
         for child in children:
             localranks = child.treeposition(localranks)
         rank = self.x() // self.style.rankwidth
@@ -352,7 +355,7 @@ class NodeItem(QGraphicsItem):
         else:
             generate = False
         
-        children = self.childlist(generate=generate)
+        children = [c() for c in self.childlist(generate=generate)]
         maxdepth = abs(depth)
         if children and depth:
             nextdepth = depth-1
@@ -2616,7 +2619,7 @@ class TreeView (TreeEditor, QGraphicsView):
                 children = node.childlist()
                 count = len(children)-1
                 if children:
-                    self.setselectednode(children[count//2])
+                    self.setselectednode(children[count//2]())
         elif key == Qt.Key_Enter or key == Qt.Key_Return:
             if self.selectednode:
                 self.setactivenode(self.selectednode)
