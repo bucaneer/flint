@@ -75,3 +75,36 @@ def writejson (proj, filename):
         json.dump(proj, f, indent=3, separators=(',', ': '),
             sort_keys=True, ensure_ascii=False,
             default=lambda o: o.todict() )
+
+def newproject (filename, save=True, scripts=True):
+    name = path.splitext(path.basename(filename))[0]
+    proj = FlintProject({"name": name}, filename)
+    if scripts:
+        scriptpath = path.join(proj.path, "scripts.py")
+        newscriptfile(scriptpath)
+        proj.scripts = proj.initscripts(proj.relpath(scriptpath))
+    if save or scripts:
+        proj.savetofile()
+    return proj
+
+def newscriptfile (filename):
+    with open(filename, 'x') as f:
+        f.write(
+"""\
+class ScriptCalls (object):
+    scripts = dict()
+    
+    def __init__ (self, func):
+        self.scripts[func.__name__] = func
+
+# Add function definitions decorated with "@ScriptCalls", like this:
+#
+#@ScriptCalls
+#def exampleScript (arg1: bool, arg2: int):
+#    pass
+#
+#@ScriptCalls
+#def exampleCondition (arg: str) -> bool:
+#    pass
+"""
+)

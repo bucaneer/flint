@@ -2759,8 +2759,10 @@ class EditorWindow (QMainWindow):
             [QKeySequence.Save], ["document-save"], "Save Conversation file")
         self.actions["saveas"] = self.createaction("Save &As", self.saveas,
             [QKeySequence.SaveAs], ["document-save-as"], "Save Conversation file as")
-        self.actions["newconv"] = self.createaction("&New", self.newconv,
-            [QKeySequence.New], ["document-new"], "New Conversation")
+        self.actions["newproj"] = self.createaction("New &Project", self.newproj,
+            None, ["folder-new"], "New Project")
+        self.actions["newconv"] = self.createaction("New &Conversation", self.newconv,
+            None, ["document-new"], "New Conversation")
         self.actions["close"] = self.createaction("Close", self.closefile,
             None, ["window-close"], "Close file")
         
@@ -2831,7 +2833,7 @@ class EditorWindow (QMainWindow):
     def filteractions (self):
         view = self.activeview
         if view is None:
-            defaultactions = ("openfile", "newconv")
+            defaultactions = ("openfile", "newproj", "newconv")
             for name, action in self.actions.items():
                 if name not in defaultactions:
                     action.setEnabled(False)
@@ -2839,7 +2841,7 @@ class EditorWindow (QMainWindow):
                     action.setEnabled(True)
         else:
             genericactions = ["zoomin", "zoomout", "zoomorig", "openfile", 
-                "save", "saveas", "newconv", "close", "refresh"]
+                "save", "saveas", "newproj", "newconv", "close", "refresh"]
             if view.undohistory:
                 genericactions.append("undo")
             if view.redohistory:
@@ -2922,6 +2924,7 @@ class EditorWindow (QMainWindow):
         
         filemenu = menubar.addMenu("&File")
         filemenu.addAction(self.actions["openfile"])
+        filemenu.addAction(self.actions["newproj"])
         filemenu.addAction(self.actions["newconv"])
         filemenu.addSeparator()
         filemenu.addAction(self.actions["save"])
@@ -3016,7 +3019,7 @@ class EditorWindow (QMainWindow):
     def inittoolbars (self):
         filetoolbar = QToolBar("File actions")
         filetoolbar.addAction(self.actions["openfile"])
-        filetoolbar.addAction(self.actions["newconv"])
+        filetoolbar.addAction(self.actions["newproj"])
         filetoolbar.addAction(self.actions["save"])
         self.addToolBar(filetoolbar)
         
@@ -3150,14 +3153,27 @@ class EditorWindow (QMainWindow):
     def openproj (self, filename):
         try:
             proj = pp.loadjson(filename)
-        except RuntimeError as err:
-            log("error", "Failed loading %s: %s" % (filename, *err.args))
-            return
-        path = proj.path
-        if path in self.projects:
-            return
-        self.projects[path] = proj
-        self.newProject.emit(path)
+            path = proj.path
+            if path in self.projects:
+                return
+            self.projects[path] = proj
+            self.newProject.emit(path)
+        except Exception as e:
+            log("error", "Failed loading %s: %s" % (filename, repr(e)))
+    
+    @pyqtSlot()
+    def newproj (self):
+        filename = QFileDialog.getSaveFileName(self, "Create new Project", 
+                os.path.join(os.getcwd(), "Untitled.proj"),
+                "Project files (*.proj)")[0]
+        if filename:
+            try:
+                proj = pp.newproject(filename)
+                self.projects[proj.path] = proj
+                self.newProject.emit(proj.path)
+                proj.savetofile()
+            except Exception as e:
+                log("error", "Failed creating project: %s" % repr(e))
     
     def openconvfile (self, filename):
         cont = cp.loadjson(filename)
