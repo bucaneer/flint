@@ -2556,6 +2556,15 @@ class TreeView (TreeEditor, QGraphicsView):
                 self.nodeorder[fullID] = None
                 for ref in self.itemindex[item.refID]:
                     ref.linkIDs = None
+        subID = self.nodecontainer.nodes[nodeID].subnodes[0]
+        subitem = self.itembyID(subID)
+        subitems = deque()
+        subitems.append(subitem)
+        while subitems:
+            subitem = subitems.popleft()
+            self.nodeorder[subitem.id()] = None
+            for subID in subitem.nodeobj.subnodes:
+                subitems.append(self.itembyID(subID))
         super().banktonode(nodeID, undo)
         if not undo:
             self.updateview()
