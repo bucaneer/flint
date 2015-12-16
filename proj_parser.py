@@ -12,6 +12,7 @@ class FlintProject (object):
         self.scriptfile = projdict.get("scripts", "")
         self.scripts = self.initscripts(self.scriptfile)
         self.convs = self.initconvs(projdict.get("convs", []))
+        self.tempconvs = []
     
     def initscripts (self, relpath):
         if relpath:
@@ -45,10 +46,13 @@ class FlintProject (object):
             return None
         return abspath
     
+    def relpath (self, abspath):
+        return path.relpath(abspath, start=self.path)
+    
     def registerconv (self, abspath):
         if not path.exists(abspath):
             raise RuntimeError("No such file: %s" % abspath)
-        relpath = path.relpath(abspath, start=self.path)
+        relpath = self.relpath(abspath)
         if relpath in self.convs:
             return # overwriting is OK
         self.convs.append(relpath)

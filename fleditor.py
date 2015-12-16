@@ -48,8 +48,11 @@ class FlNodeStyle (object):
         basefont = font
         boldfont = QFont(basefont)
         boldfont.setBold(True)
+        italicfont = QFont(basefont)
+        italicfont.setItalic(True)
         self.basefont = basefont
         self.boldfont = boldfont
+        self.italicfont = italicfont
         
         basemetrics = QFontMetrics(basefont)
         self.basemetrics = basemetrics
@@ -1722,15 +1725,24 @@ class ProjectWidget (QWidget):
         self.tree.itemActivated.connect(self.onactivate)
         
         buttons = QWidget(self)
-        newconv = QPushButton(self)
+        newconv = QPushButton(buttons)
         newconv.setIcon(QIcon.fromTheme("document-new"))
         newconv.setToolTip("New Conversation")
-        #newconv.setEnabled.connect(
         newconv.setEnabled(False)
         self.tree.currentItemChanged.connect(lambda c,p: newconv.setEnabled(bool(c)))
         newconv.clicked.connect(self.newconv)
+        
+        regconv = QPushButton(buttons)
+        regconv.setIcon(QIcon.fromTheme("add-files-to-archive"))
+        regconv.setToolTip("Add Conversation to Project")
+        regconv.setEnabled(False)
+        regconv.clicked.connect(self.regconv)
+        self.regconv = regconv
+        self.tree.currentItemChanged.connect(self.togglereg)
+        
         butlayout = QHBoxLayout(buttons)
         butlayout.addWidget(newconv)
+        butlayout.addWidget(regconv)
         butlayout.addStretch()
         
         layout = QVBoxLayout(self)
@@ -1739,7 +1751,8 @@ class ProjectWidget (QWidget):
     
     @pyqtSlot(str)
     def addproject (self, path, pos=None):
-        proj = FlGlob.mainwindow.projects[path]
+        window = FlGlob.mainwindow
+        proj = window.projects[path]
         if proj.name:
             projname = proj.name
         else:
@@ -1751,13 +1764,30 @@ class ProjectWidget (QWidget):
             self.tree.insertTopLevelItem(pos, root)
         root.setExpanded(True)
         
-        for relpath in proj.convs:
-            name = os.path.basename(os.path.splitext(relpath)[0])
+        for relpath in proj.convs + proj.tempconvs:
+            abspath = proj.checkpath(relpath)
+            if relpath in window.convs: # temp
+                name = window.convs[relpath]().nodecontainer.name
+                loaded = True
+            elif abspath in window.convs: # saved
+                name = window.convs[abspath]().nodecontainer.name
+                loaded = True
+            else: # not loaded
+                if relpath in proj.tempconvs: # closed temp
+                    proj.tempconvs.remove(relpath)
+                    continue
+                name = os.path.basename(os.path.splitext(relpath)[0])
+                loaded = False
             conv = QTreeWidgetItem((name, relpath), self.ConvType)
+            if loaded:
+                conv.setIcon(0, QIcon.fromTheme("folder-open"))
+            else:
+                conv.setFont(0, window.style.italicfont)
             root.addChild(conv)
     
     @pyqtSlot(str)
     def updateproject (self, path):
+        log("debug", "updateproject %s" % path)
         count = self.tree.topLevelItemCount()
         item = None
         for i in range(count):
@@ -1775,17 +1805,45 @@ class ProjectWidget (QWidget):
             window.openconv(projpath, item.data(1, 0))
     
     @pyqtSlot()
-    def newconv (self):
-        window = FlGlob.mainwindow
+    def togglereg (self):
         item = self.tree.currentItem()
+        view = FlGlob.mainwindow.activeview
+        if item and view and view.nodecontainer.proj is None:
+            self.regconv.setEnabled(True)
+        else:
+            self.regconv.setEnabled(False)
+    
+    def getitemroot (self, item):
         while item.type() != self.ProjType:
             item = item.parent()
+        return item
+    
+    @pyqtSlot()
+    def newconv (self):
+        window = FlGlob.mainwindow
+        item = self.getitemroot(self.tree.currentItem())
         path = item.data(1, 0)
         proj = window.projects[path]
-        viewid = window.newconv(proj)
-        log("debug", "newconv %s %s" % (path, viewid))
-        newitem = QTreeWidgetItem(("Untitled", viewid), self.ConvType)
-        item.addChild(newitem)
+        tempID = window.newtempID()
+        proj.tempconvs.append(tempID)
+        window.newconv(proj, tempID)
+    
+    @pyqtSlot()
+    def regconv (self):
+        window = FlGlob.mainwindow
+        item = self.getitemroot(self.tree.currentItem())
+        path = item.data(1, 0)
+        proj = window.projects[path]
+        cont = window.activeview.nodecontainer
+        if cont.filename and not cont.filename.startswith("\0TEMP"):
+            relpath = proj.relpath(cont.filename)
+            if relpath not in proj.convs:
+                proj.registerconv(cont.filename)
+            window.openconv(proj.path, relpath)
+        else:
+            cont.proj = proj
+            proj.tempconvs.append(cont.filename)
+        self.updateproject(proj.path)
 
 class MapView (QGraphicsView):
     def __init__ (self, parent):
@@ -3015,6 +3073,7 @@ class EditorWindow (QMainWindow):
         projwidget = ProjectWidget(self)
         self.newProject.connect(projwidget.addproject)
         self.projectUpdated.connect(projwidget.updateproject)
+        self.viewChanged.connect(projwidget.togglereg)
         projdock = QDockWidget("Projects", self)
         projdock.setWidget(projwidget)
         
@@ -3103,7 +3162,7 @@ class EditorWindow (QMainWindow):
     def openconvfile (self, filename):
         cont = cp.loadjson(filename)
         treeview = TreeView(cont, parent=self)
-        return self.newtab(treeview)
+        self.newtab(treeview)
     
     def openconv (self, projpath, relpath):
         proj = self.projects[projpath]
@@ -3129,24 +3188,31 @@ class EditorWindow (QMainWindow):
                     return
         cont = cp.loadjson(abspath, proj)
         treeview = TreeView(cont, parent=self)
-        return self.newtab(treeview)
+        self.newtab(treeview)
     
     @pyqtSlot()
-    def newconv (self, proj=None):
+    def newconv (self, proj=None, tempID=None):
         nodecontainer = cp.newcontainer(proj)
         treeview = TreeView(nodecontainer, parent=self)
-        return self.newtab(treeview)
+        self.newtab(treeview, tempID=tempID)
     
-    def newtab (self, treeview):
+    def newtempID (self):
+        viewid = "\0TEMP%s" % self.tempID
+        self.tempID += 1
+        return viewid
+    
+    def newtab (self, treeview, tempID=None):
         name = treeview.nodecontainer.name
         filename = treeview.nodecontainer.filename
         log("debug", "newtab %s" % filename)
         if filename:
             viewid = filename
-        else:
-            viewid = "\0TEMP%s" % self.tempID
+        elif tempID is not None:
+            viewid = tempID
             treeview.nodecontainer.filename = viewid
-            self.tempID += 1
+        else:
+            viewid = self.newtempID()
+            treeview.nodecontainer.filename = viewid
         self.convs[viewid] = weakref.ref(treeview)
         self.selectedChanged.connect(treeview.selectbyID)
         self.activeChanged.connect(treeview.activatebyID)
@@ -3156,8 +3222,9 @@ class EditorWindow (QMainWindow):
             log("warn", "Script editing is disabled for conversations opened \
 not as part of a project.\n\nTo enable script editing, reopen this file from \
 the Projects widget, or register it in a project.")
-        
-        return viewid
+        if treeview.nodecontainer.proj is not None:
+            log("debug", "newtab emit: %s" % treeview.nodecontainer.proj.path)
+            self.projectUpdated.emit(treeview.nodecontainer.proj.path)
     
     @pyqtSlot()
     def save (self, newfile=False):
@@ -3181,7 +3248,9 @@ the Projects widget, or register it in a project.")
             self.convs.pop(convID)
         cont.savetofile()
         if cont.proj is not None:
-            cont.proj.registerconv(filename)
+            if convID in cont.proj.tempconvs:
+                cont.proj.tempconvs.remove(convID)
+            cont.proj.registerconv(cont.filename)
             self.projectUpdated.emit(cont.proj.path)
             cont.proj.savetofile()
         return True
@@ -3204,6 +3273,7 @@ the Projects widget, or register it in a project.")
     @pyqtSlot(int)
     def closetab (self, index):
         view = self.tabs.widget(index)
+        proj = view.nodecontainer.proj
         filename = view.nodecontainer.filename
         answer = QMessageBox.question(self, "Close Conversation", "Save changes before closing?", 
             buttons=(QMessageBox.Cancel|QMessageBox.No|QMessageBox.Yes), defaultButton=QMessageBox.Yes)
@@ -3219,6 +3289,8 @@ the Projects widget, or register it in a project.")
         view.deleteLater()
         view = None
         gc.collect()
+        if proj is not None:
+            self.projectUpdated.emit(proj.path)
     
     @pyqtSlot(int)
     def nametab (self, index):
