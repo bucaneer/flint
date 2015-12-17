@@ -3565,6 +3565,7 @@ def elidestring (string, length):
         return string[:length-1]+"…"
 
 if __name__ == '__main__':
+    app = QApplication(sys.argv)
     for arg in sys.argv[1:]:
         split = arg.split("=", maxsplit=1)
         argname = split[0]
@@ -3575,7 +3576,8 @@ if __name__ == '__main__':
                 log("info", "Loglevel: %s" % param)
             else:
                 log("warn", "Unrecognized loglevel: %s" % param)
-    app = QApplication(sys.argv)
+        elif argname == "--icontheme":
+            QIcon.setThemeName(param)
     window = EditorWindow()
     window.show()
     sys.exit(app.exec_())
