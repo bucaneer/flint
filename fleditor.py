@@ -1720,36 +1720,26 @@ class ProjectWidget (QWidget):
     def __init__ (self, parent):
         super().__init__(parent)
         self.tree = QTreeWidget(self)
+        self.tree.setSelectionMode(QAbstractItemView.SingleSelection)
         self.tree.setUniformRowHeights(True)
         self.tree.setColumnCount(2)
         self.tree.setColumnHidden(1, True)
         self.tree.setHeaderLabels(("Name", "Path"))
         self.tree.itemActivated.connect(self.onactivate)
         
-        buttons = QWidget(self)
-        newconv = QPushButton(buttons)
-        newconv.setIcon(QIcon.fromTheme("document-new"))
-        newconv.setToolTip("New Conversation")
-        newconv.setEnabled(False)
-        self.tree.currentItemChanged.connect(lambda c,p: newconv.setEnabled(bool(c)))
-        newconv.clicked.connect(self.newconv)
-        
-        regconv = QPushButton(buttons)
-        regconv.setIcon(QIcon.fromTheme("add-files-to-archive"))
-        regconv.setToolTip("Add Conversation to Project")
-        regconv.setEnabled(False)
-        regconv.clicked.connect(self.regconv)
-        self.regconv = regconv
-        self.tree.currentItemChanged.connect(self.togglereg)
-        
-        butlayout = QHBoxLayout(buttons)
-        butlayout.addWidget(newconv)
-        butlayout.addWidget(regconv)
-        butlayout.addStretch()
+        actions = QToolBar(self)
+        actions.addAction(FlGlob.mainwindow.globactions["newconv"])
         
         layout = QVBoxLayout(self)
         layout.addWidget(self.tree)
-        layout.addWidget(buttons)
+        layout.addWidget(actions)
+    
+    def currentproj (self):
+        sel = self.tree.selectedItems()
+        if not sel:
+            return None
+        else:
+            return self.getitemroot(sel[0]).data(1, 0)
     
     @pyqtSlot(str)
     def addproject (self, path, pos=None):
@@ -1812,15 +1802,6 @@ class ProjectWidget (QWidget):
             projpath = item.parent().data(1, 0)
             window.openconv(projpath, item.data(1, 0))
     
-    @pyqtSlot()
-    def togglereg (self):
-        item = self.tree.currentItem()
-        view = FlGlob.mainwindow.activeview
-        if item and view and view.nodecontainer.proj is None:
-            self.regconv.setEnabled(True)
-        else:
-            self.regconv.setEnabled(False)
-    
     def getitemroot (self, item):
         while item.type() != self.ProjType:
             item = item.parent()
@@ -1835,23 +1816,6 @@ class ProjectWidget (QWidget):
         tempID = window.newtempID()
         proj.tempconvs.append(tempID)
         window.newconv(proj, tempID)
-    
-    @pyqtSlot()
-    def regconv (self):
-        window = FlGlob.mainwindow
-        item = self.getitemroot(self.tree.currentItem())
-        path = item.data(1, 0)
-        proj = window.projects[path]
-        cont = window.activeview.nodecontainer
-        if cont.filename and not cont.filename.startswith("\0TEMP"):
-            relpath = proj.relpath(cont.filename)
-            if relpath not in proj.convs:
-                proj.registerconv(cont.filename)
-            window.openconv(proj.filename, relpath)
-        else:
-            cont.proj = proj
-            proj.tempconvs.append(cont.filename)
-        self.updateproject(proj.filename)
 
 class MapView (QGraphicsView):
     def __init__ (self, parent):
@@ -2772,7 +2736,7 @@ class EditorWindow (QMainWindow):
         self.globactions["newproj"] = self.createaction("New &Project", self.newproj,
             None, "folder-new", "New Project")
         self.globactions["newconv"] = self.createaction("New &Conversation", self.newconv,
-            None, "document-new", "New Conversation")
+            (QKeySequence.New), "document-new", "New Conversation")
         self.globactions["close"] = self.createaction("Close", self.closefile,
             None, "window-close", "Close file")
         self.globactions["zoomin"] = self.createaction("Zoom &In", self.zoomin, 
@@ -3011,7 +2975,8 @@ class EditorWindow (QMainWindow):
         projwidget = ProjectWidget(self)
         self.newProject.connect(projwidget.addproject)
         self.projectUpdated.connect(projwidget.updateproject)
-        self.viewChanged.connect(projwidget.togglereg)
+        projwidget.tree.itemSelectionChanged.connect(self.filterglobactions)
+        self.projwidget = projwidget
         projdock = QDockWidget("Projects", self)
         projdock.setWidget(projwidget)
         
@@ -3040,10 +3005,12 @@ class EditorWindow (QMainWindow):
     def filterglobactions (self):
         view = self.activeview
         if view is None:
-            actions = ("openfile", "newproj", "newconv")
+            actions = ("openfile", "newproj")
         else:
             actions = ("zoomin", "zoomout", "zoomorig", "openfile", 
-                "save", "saveas", "newproj", "newconv", "close", "refresh")
+                "save", "saveas", "newproj", "close", "refresh")
+        if self.projwidget.currentproj() is not None:
+            actions += ("newconv",)
         for name, action in self.globactions.items():
             if name in actions:
                 action.setEnabled(True)
@@ -3217,27 +3184,29 @@ class EditorWindow (QMainWindow):
             self.newtab(treeview)
     
     @pyqtSlot()
-    def newconv (self, proj=None, tempID=None):
+    def newconv (self):
+        projpath = self.projwidget.currentproj()
+        if projpath is None:
+            return
+        proj = self.projects[projpath]
         nodecontainer = cp.newcontainer(proj)
         treeview = TreeView(nodecontainer, parent=self)
-        self.newtab(treeview, tempID=tempID)
+        self.newtab(treeview)
     
     def newtempID (self):
         viewid = "\0TEMP%s" % self.tempID
         self.tempID += 1
         return viewid
     
-    def newtab (self, treeview, tempID=None):
+    def newtab (self, treeview):
         name = treeview.nodecontainer.name
         filename = treeview.nodecontainer.filename
         log("debug", "newtab %s" % filename)
         if filename:
             viewid = filename
-        elif tempID is not None:
-            viewid = tempID
-            treeview.nodecontainer.filename = viewid
         else:
-            viewid = self.newtempID()
+            viewid = "\0TEMP%s" % self.tempID
+            self.tempID += 1
             treeview.nodecontainer.filename = viewid
         self.convs[viewid] = weakref.ref(treeview)
         self.selectedChanged.connect(treeview.selectbyID)
@@ -3248,7 +3217,9 @@ class EditorWindow (QMainWindow):
             log("warn", "Script editing is disabled for conversations opened \
 not as part of a project.\n\nTo enable script editing, reopen this file from \
 the Projects widget, or register it in a project.")
-        if treeview.nodecontainer.proj is not None:
+        else:
+            if viewid.startswith("\0TEMP"):
+                treeview.nodecontainer.proj.tempconvs.append(viewid)
             self.projectUpdated.emit(treeview.nodecontainer.proj.filename)
     
     @pyqtSlot()
