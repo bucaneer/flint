@@ -2720,6 +2720,7 @@ class NodeCopy (object):
 
 class EditorWindow (QMainWindow):
     copiednode = NodeCopy()
+    globactions = dict()
     actions = dict()
     editdocks = dict()
     projects = dict()
@@ -2741,7 +2742,7 @@ class EditorWindow (QMainWindow):
         FlGlob.mainwindow = self
         self.activeChanged.connect(self.loadnode)
         self.selectedChanged.connect(self.filteractions)
-        self.viewChanged.connect(self.filteractions)
+        self.viewChanged.connect(self.filterglobactions)
         
         self.style = FlNodeStyle(QFont())
         self.initactions()
@@ -2758,77 +2759,77 @@ class EditorWindow (QMainWindow):
         
         self.setCentralWidget(tabs)
         self.initdocks()
+        self.filterglobactions()
         self.filteractions()
     
     def initactions (self):
-        self.actions["openfile"] = self.createaction("&Open", self.selectopenfile,
-            [QKeySequence.Open], ["document-open"], "Open Conversation file")
-        self.actions["save"] = self.createaction("&Save", self.save,
-            [QKeySequence.Save], ["document-save"], "Save Conversation file")
-        self.actions["saveas"] = self.createaction("Save &As", self.saveas,
-            [QKeySequence.SaveAs], ["document-save-as"], "Save Conversation file as")
-        self.actions["newproj"] = self.createaction("New &Project", self.newproj,
-            None, ["folder-new"], "New Project")
-        self.actions["newconv"] = self.createaction("New &Conversation", self.newconv,
-            None, ["document-new"], "New Conversation")
-        self.actions["close"] = self.createaction("Close", self.closefile,
-            None, ["window-close"], "Close file")
+        self.globactions["openfile"] = self.createaction("&Open", self.selectopenfile,
+            (QKeySequence.Open), "document-open", "Open Conversation file")
+        self.globactions["save"] = self.createaction("&Save", self.save,
+            (QKeySequence.Save), "document-save", "Save Conversation file")
+        self.globactions["saveas"] = self.createaction("Save &As", self.saveas,
+            (QKeySequence.SaveAs), "document-save-as", "Save Conversation file as")
+        self.globactions["newproj"] = self.createaction("New &Project", self.newproj,
+            None, "folder-new", "New Project")
+        self.globactions["newconv"] = self.createaction("New &Conversation", self.newconv,
+            None, "document-new", "New Conversation")
+        self.globactions["close"] = self.createaction("Close", self.closefile,
+            None, "window-close", "Close file")
+        self.globactions["zoomin"] = self.createaction("Zoom &In", self.zoomin, 
+            (QKeySequence.ZoomIn, QKeySequence(Qt.ControlModifier + Qt.KeypadModifier + Qt.Key_Plus)), 
+            "zoom-in", "Zoom in")
+        self.globactions["zoomout"] = self.createaction("Zoom &Out", self.zoomout, 
+            (QKeySequence.ZoomOut, QKeySequence(Qt.ControlModifier + Qt.KeypadModifier + Qt.Key_Minus)), 
+            "zoom-out", "Zoom out")
+        self.globactions["zoomorig"] = self.createaction("Zoom O&riginal", self.zoomorig, 
+            (QKeySequence(Qt.ControlModifier + Qt.Key_0), QKeySequence(Qt.ControlModifier + Qt.KeypadModifier + Qt.Key_0)), 
+            "zoom-original", "Zoom to original size")
+        self.globactions["refresh"] = self.createaction("Refresh", self.refresh,
+            (QKeySequence(Qt.Key_F5)), "view-refresh", "Refresh view")
         
         self.actions["undo"] = self.createaction("&Undo", self.undofactory(1),
-            [QKeySequence.Undo], ["edit-undo"], "Undo last action")
+            (QKeySequence.Undo), "edit-undo", "Undo last action")
         self.actions["redo"] = self.createaction("&Redo", self.redofactory(1),
-            [QKeySequence.Redo], ["edit-redo"], "Redo action")
-        
-        self.actions["zoomin"] = self.createaction("Zoom &In", self.zoomin, 
-            [QKeySequence.ZoomIn, QKeySequence(Qt.ControlModifier + Qt.KeypadModifier + Qt.Key_Plus)], 
-            ["gtk-zoom-in", "zoom-in"], "Zoom in")
-        self.actions["zoomout"] = self.createaction("Zoom &Out", self.zoomout, 
-            [QKeySequence.ZoomOut, QKeySequence(Qt.ControlModifier + Qt.KeypadModifier + Qt.Key_Minus)], 
-            ["gtk-zoom-out", "zoom-out"], "Zoom out")
-        self.actions["zoomorig"] = self.createaction("Zoom O&riginal", self.zoomorig, 
-            [QKeySequence(Qt.ControlModifier + Qt.Key_0), QKeySequence(Qt.ControlModifier + Qt.KeypadModifier + Qt.Key_0)], 
-            ["gtk-zoom-100", "zoom-original"], "Zoom to original size")
+            (QKeySequence.Redo), "edit-redo", "Redo action")
         self.actions["gotoactive"] = self.createaction("Go To &Active", self.gotoactive, 
-            None, ["go-jump"], "Center on active node")
+            None, "go-jump", "Center on active node")
         self.actions["selectreal"] = self.createaction("Select &Real", self.selectreal, 
-            None, ["go-jump"], "Select real node")
-        self.actions["refresh"] = self.createaction("Refresh", self.refresh,
-            [QKeySequence(Qt.Key_F5)], ["view-refresh"], "Refresh view")
+            None, "go-jump", "Select real node")
         
         self.actions["newtalk"] = self.createaction("New &Talk Node", self.newtalk,
-            [QKeySequence(Qt.ControlModifier+Qt.Key_T)], ["insert-object"], "Add new Talk node")
+            (QKeySequence(Qt.ControlModifier+Qt.Key_T)), "insert-object", "Add new Talk node")
         self.actions["newresponse"] = self.createaction("New &Response Node", self.newresponse,
-            [QKeySequence(Qt.ControlModifier+Qt.Key_R)], ["insert-object"], "Add new Response node")
+            (QKeySequence(Qt.ControlModifier+Qt.Key_R)), "insert-object", "Add new Response node")
         self.actions["newbank"] = self.createaction("New &Bank Node", self.newbank,
-            [QKeySequence(Qt.ControlModifier+Qt.Key_B)], ["insert-object"], "Add new Bank node")
+            (QKeySequence(Qt.ControlModifier+Qt.Key_B)), "insert-object", "Add new Bank node")
         self.actions["copynode"] = self.createaction("&Copy Node", self.copynode,
-            [QKeySequence.Copy], ["edit-copy"], "Copy node")
+            (QKeySequence.Copy), "edit-copy", "Copy node")
         self.actions["pasteclone"] = self.createaction("Paste &Clone", self.pasteclone,
-            [QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_V)], ["edit-paste"], "Paste cloned node")
+            (QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_V)), "edit-paste", "Paste cloned node")
         self.actions["pastelink"] = self.createaction("Paste &Link", self.pastelink,
-            [QKeySequence.Paste], ["insert-link"], "Paste link to node")
+            (QKeySequence.Paste), "insert-link", "Paste link to node")
         self.actions["unlinkstree"] = self.createaction("Unlink &Subtree", self.unlink,
-            [QKeySequence.Delete], ["edit-clear"], "Unlink subtree from parent")
+            (QKeySequence.Delete), "edit-clear", "Unlink subtree from parent")
         self.actions["unlinknode"] = self.createaction("Unlink &Node", self.unlinkinherit,
-            [QKeySequence(Qt.ControlModifier+Qt.Key_Delete)], ["edit-delete"], "Unlink node and let parent inherit its child nodes")
+            (QKeySequence(Qt.ControlModifier+Qt.Key_Delete)), "edit-delete", "Unlink node and let parent inherit its child nodes")
         self.actions["moveup"] = self.createaction("Move &Up", self.moveup,
-            [QKeySequence(Qt.ShiftModifier+Qt.Key_Up)], ["go-up"], "Move node up")
+            (QKeySequence(Qt.ShiftModifier+Qt.Key_Up)), "go-up", "Move node up")
         self.actions["movedown"] = self.createaction("Move &Down", self.movedown,
-            [QKeySequence(Qt.ShiftModifier+Qt.Key_Down)], ["go-down"], "Move node down")
+            (QKeySequence(Qt.ShiftModifier+Qt.Key_Down)), "go-down", "Move node down")
         self.actions["collapse"] = self.createaction("(Un)Colla&pse subtree", self.collapse,
-            [QKeySequence(Qt.ControlModifier+Qt.Key_Space)], None, "(Un)Collapse subtree")
+            (QKeySequence(Qt.ControlModifier+Qt.Key_Space)), None, "(Un)Collapse subtree")
         self.actions["newtalksub"] = self.createaction("New &Talk Subnode", self.newtalksub,
-            [QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_T)], ["insert-object"], "Add new Talk subnode")
+            (QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_T)), "insert-object", "Add new Talk subnode")
         self.actions["newbanksub"] = self.createaction("New &Bank Subnode", self.newbanksub,
-            [QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_B)], ["insert-object"], "Add new Bank subnode")
+            (QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_B)), "insert-object", "Add new Bank subnode")
         self.actions["newresponsesub"] = self.createaction("New &Response Subnode", self.newresponsesub,
-            [QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_R)], ["insert-object"], "Add new Response subnode")
+            (QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_R)), "insert-object", "Add new Response subnode")
         self.actions["pastesubnode"] = self.createaction("&Paste Subnode", self.pastesubnode,
-            [QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_C)], ["edit-paste"], "Paste cloned node as subnode")
+            (QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_C)), "edit-paste", "Paste cloned node as subnode")
         self.actions["parentswap"] = self.createaction("S&wap with Parent", self.parentswap,
-            [QKeySequence(Qt.ShiftModifier+Qt.Key_Left)], ["go-left"], "Swap places with parent node")
+            (QKeySequence(Qt.ShiftModifier+Qt.Key_Left)), "go-left", "Swap places with parent node")
         self.actions["settemplate"] = self.createaction("Set as Te&mplate", self.settemplate,
-            None, ["text-x-generic-template"], "Set node as the template for its type")
+            None, "text-x-generic-template", "Set node as the template for its type")
         
         self.actions["nodetobank"] = self.createaction("Regular -> Bank", self.nodetobank,
             None, None, "Transform node into a Bank node")
@@ -2837,85 +2838,11 @@ class EditorWindow (QMainWindow):
         self.actions["splitnode"] = self.createaction("Split Node", self.splitnode,
             None, None, "Split node in two")
     
-    @pyqtSlot()
-    def filteractions (self):
-        view = self.activeview
-        if view is None:
-            defaultactions = ("openfile", "newproj", "newconv")
-            for name, action in self.actions.items():
-                if name not in defaultactions:
-                    action.setEnabled(False)
-                else:
-                    action.setEnabled(True)
-        else:
-            genericactions = ["zoomin", "zoomout", "zoomorig", "openfile", 
-                "save", "saveas", "newproj", "newconv", "close", "refresh"]
-            if view.undohistory:
-                genericactions.append("undo")
-            if view.redohistory:
-                genericactions.append("redo")
-            if view.activenode:
-                genericactions.append("gotoactive")
-            if view.selectednode:
-                genericactions.extend(["collapse", "selectreal"])
-            nodes = view.nodecontainer.nodes
-            if not self.selectednode or self.selectednode not in nodes:
-                actions = []
-            else:
-                nodeobj = nodes[self.selectednode]
-                if self.selectednode not in view.itemindex:
-                    if nodeobj.typename != "root":
-                        actions = ["copynode", "settemplate"]
-                    else:
-                        actions = []
-                elif nodeobj.typename in ("talk", "response"):
-                    actions = ["copynode", "moveup", "movedown", "unlinknode", 
-                        "unlinkstree", "settemplate", "nodetobank"]
-                    if nodeobj.nodebank == -1:
-                        actions.extend(["newtalk", "newresponse", "newbank", 
-                            "pasteclone", "pastelink", "parentswap", "splitnode"])
-                elif nodeobj.typename == "bank":
-                    actions = ["copynode", "moveup", "movedown", "unlinknode",
-                        "unlinkstree", "newtalksub", "newresponsesub", "pastesubnode",
-                        "newbanksub", "settemplate"]
-                    if nodeobj.nodebank == -1:
-                        actions.extend(["newtalk", "newresponse", "newbank", 
-                            "pasteclone", "pastelink", "parentswap", "splitnode"])
-                    if len(nodeobj.subnodes) == 1:
-                        actions.extend(["banktonode"])
-                elif nodeobj.typename == "root":
-                    actions = ["newtalk", "newresponse", "newbank", "pasteclone",
-                        "pastelink"]
-            
-            actions.extend(genericactions)
-            for name, action in self.actions.items():
-                if name in actions:
-                    if name == "pasteclone" or name == "pastesubnode":
-                        if self.copiednode.ndict is not None:
-                            action.setEnabled(True)
-                        else:
-                            action.setEnabled(False)
-                    elif name == "pastelink":
-                        if self.copiednode.view() is view and self.copiednode.ID in view.nodecontainer.nodes: 
-                            action.setEnabled(True)
-                        else:
-                            action.setEnabled(False)
-                    else:
-                        action.setEnabled(True)
-                else:
-                    action.setEnabled(False)
-    
-    def createaction (self, text, slot=None, shortcuts=None, icons=None,
+    def createaction (self, text, slot=None, shortcuts=None, icon=None,
                      tip=None, checkable=False):
         action = QAction(text, self)
-        if icons is not None:
-            if len(icons) > 1:
-                fallbacks = QIcon.fromTheme(icons.pop(-1))
-                for icon in reversed(icons):
-                    fallbacks = QIcon.fromTheme(icon, fallbacks)
-                action.setIcon(fallbacks)
-            else:
-                action.setIcon(QIcon.fromTheme(icons[0]))
+        if icon is not None:
+            action.setIcon(QIcon.fromTheme(icon))
         if shortcuts is not None:
             action.setShortcuts(shortcuts)
         if tip is not None:
@@ -2931,14 +2858,14 @@ class EditorWindow (QMainWindow):
         menubar = self.menuBar()
         
         filemenu = menubar.addMenu("&File")
-        filemenu.addAction(self.actions["openfile"])
-        filemenu.addAction(self.actions["newproj"])
-        filemenu.addAction(self.actions["newconv"])
+        filemenu.addAction(self.globactions["openfile"])
+        filemenu.addAction(self.globactions["newproj"])
+        filemenu.addAction(self.globactions["newconv"])
         filemenu.addSeparator()
-        filemenu.addAction(self.actions["save"])
-        filemenu.addAction(self.actions["saveas"])
+        filemenu.addAction(self.globactions["save"])
+        filemenu.addAction(self.globactions["saveas"])
         filemenu.addSeparator()
-        filemenu.addAction(self.actions["close"])
+        filemenu.addAction(self.globactions["close"])
         
         addmenu = QMenu("Add &link...")
         addmenu.addAction(self.actions["pasteclone"])
@@ -3008,13 +2935,13 @@ class EditorWindow (QMainWindow):
         self.editmenu = editmenu
         
         viewmenu = menubar.addMenu("&View")
-        viewmenu.addAction(self.actions["zoomin"])
-        viewmenu.addAction(self.actions["zoomout"])
-        viewmenu.addAction(self.actions["zoomorig"])
+        viewmenu.addAction(self.globactions["zoomin"])
+        viewmenu.addAction(self.globactions["zoomout"])
+        viewmenu.addAction(self.globactions["zoomorig"])
         viewmenu.addAction(self.actions["gotoactive"])
         viewmenu.addAction(self.actions["selectreal"])
         viewmenu.addAction(self.actions["collapse"])
-        viewmenu.addAction(self.actions["refresh"])
+        viewmenu.addAction(self.globactions["refresh"])
         
         windowmenu = menubar.addMenu("&Window")
         def generatemenu ():
@@ -3026,9 +2953,9 @@ class EditorWindow (QMainWindow):
     
     def inittoolbars (self):
         filetoolbar = QToolBar("File actions")
-        filetoolbar.addAction(self.actions["openfile"])
-        filetoolbar.addAction(self.actions["newproj"])
-        filetoolbar.addAction(self.actions["save"])
+        filetoolbar.addAction(self.globactions["openfile"])
+        filetoolbar.addAction(self.globactions["newproj"])
+        filetoolbar.addAction(self.globactions["save"])
         self.addToolBar(filetoolbar)
         
         historytoolbar = QToolBar("History")
@@ -3037,9 +2964,9 @@ class EditorWindow (QMainWindow):
         self.addToolBar(historytoolbar)
         
         viewtoolbar = QToolBar("View control")
-        viewtoolbar.addAction(self.actions["zoomorig"])
-        viewtoolbar.addAction(self.actions["zoomin"])
-        viewtoolbar.addAction(self.actions["zoomout"])
+        viewtoolbar.addAction(self.globactions["zoomorig"])
+        viewtoolbar.addAction(self.globactions["zoomin"])
+        viewtoolbar.addAction(self.globactions["zoomout"])
         viewtoolbar.addAction(self.actions["gotoactive"])
         self.addToolBar(viewtoolbar)
         
@@ -3108,6 +3035,80 @@ class EditorWindow (QMainWindow):
         
         self.addDockWidget(Qt.LeftDockWidgetArea, projdock)
         self.addDockWidget(Qt.LeftDockWidgetArea, listdock)
+    
+    @pyqtSlot()
+    def filterglobactions (self):
+        view = self.activeview
+        if view is None:
+            actions = ("openfile", "newproj", "newconv")
+        else:
+            actions = ("zoomin", "zoomout", "zoomorig", "openfile", 
+                "save", "saveas", "newproj", "newconv", "close", "refresh")
+        for name, action in self.globactions.items():
+            if name in actions:
+                action.setEnabled(True)
+            else:
+                action.setEnabled(False)
+    
+    @pyqtSlot()
+    def filteractions (self):
+        view = self.activeview
+        genericactions = []
+        actions = []
+        if view:
+            if view.undohistory:
+                genericactions.append("undo")
+            if view.redohistory:
+                genericactions.append("redo")
+            if view.activenode:
+                genericactions.append("gotoactive")
+            if view.selectednode:
+                genericactions.extend(["collapse", "selectreal"])
+            
+            nodes = view.nodecontainer.nodes
+            if self.selectednode and self.selectednode in nodes:
+                nodeobj = nodes[self.selectednode]
+                if self.selectednode not in view.itemindex:
+                    if nodeobj.typename != "root":
+                        actions = ["copynode", "settemplate"]
+                    else:
+                        actions = []
+                elif nodeobj.typename in ("talk", "response"):
+                    actions = ["copynode", "moveup", "movedown", "unlinknode", 
+                        "unlinkstree", "settemplate", "nodetobank"]
+                    if nodeobj.nodebank == -1:
+                        actions.extend(["newtalk", "newresponse", "newbank", 
+                            "pasteclone", "pastelink", "parentswap", "splitnode"])
+                elif nodeobj.typename == "bank":
+                    actions = ["copynode", "moveup", "movedown", "unlinknode",
+                        "unlinkstree", "newtalksub", "newresponsesub", "pastesubnode",
+                        "newbanksub", "settemplate"]
+                    if nodeobj.nodebank == -1:
+                        actions.extend(["newtalk", "newresponse", "newbank", 
+                            "pasteclone", "pastelink", "parentswap", "splitnode"])
+                    if len(nodeobj.subnodes) == 1:
+                        actions.extend(["banktonode"])
+                elif nodeobj.typename == "root":
+                    actions = ["newtalk", "newresponse", "newbank", "pasteclone",
+                        "pastelink"]
+        
+        actions.extend(genericactions)
+        for name, action in self.actions.items():
+            if name in actions:
+                if name == "pasteclone" or name == "pastesubnode":
+                    if self.copiednode.ndict is not None:
+                        action.setEnabled(True)
+                    else:
+                        action.setEnabled(False)
+                elif name == "pastelink":
+                    if self.copiednode.view() is view and self.copiednode.ID in view.nodecontainer.nodes: 
+                        action.setEnabled(True)
+                    else:
+                        action.setEnabled(False)
+                else:
+                    action.setEnabled(True)
+            else:
+                action.setEnabled(False)
     
     @pyqtSlot(int)
     def tabswitched (self, index):
@@ -3540,7 +3541,6 @@ the Projects widget, or register it in a project.")
                 view.redohistory.appendleft(action)
                 count -= 1
             view.updateview()
-            self.filteractions()
         
         return undo
     
@@ -3555,7 +3555,6 @@ the Projects widget, or register it in a project.")
                 view.undohistory.appendleft(action)
                 count -= 1
             view.updateview()
-            self.filteractions()
         
         return redo
 
