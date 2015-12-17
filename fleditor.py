@@ -1720,7 +1720,9 @@ class ProjectWidget (QWidget):
     def __init__ (self, parent):
         super().__init__(parent)
         self.tree = QTreeWidget(self)
+        self.tree.setUniformRowHeights(True)
         self.tree.setColumnCount(2)
+        self.tree.setColumnHidden(1, True)
         self.tree.setHeaderLabels(("Name", "Path"))
         self.tree.itemActivated.connect(self.onactivate)
         
@@ -1758,6 +1760,8 @@ class ProjectWidget (QWidget):
         else:
             projname = os.path.basename(os.path.splitext(path)[0])
         root = QTreeWidgetItem((projname, path), self.ProjType)
+        root.setIcon(0, QIcon.fromTheme("package-generic"))
+        root.setToolTip(0, path)
         if pos is None:
             self.tree.addTopLevelItem(root)
         else:
@@ -1778,13 +1782,15 @@ class ProjectWidget (QWidget):
                 if relpath in proj.tempconvs: # closed temp
                     proj.tempconvs.remove(relpath)
                     continue
-                name = os.path.basename(os.path.splitext(relpath)[0])
+                name = os.path.basename(relpath)
                 loaded = False
             conv = QTreeWidgetItem((name, relpath), self.ConvType)
             if loaded:
                 conv.setIcon(0, QIcon.fromTheme("folder-open"))
             else:
+                conv.setIcon(0, QIcon.fromTheme("folder"))
                 conv.setFont(0, window.style.italicfont)
+            conv.setToolTip(0, relpath)
             root.addChild(conv)
     
     @pyqtSlot(str)
