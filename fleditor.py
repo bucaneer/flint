@@ -1585,21 +1585,19 @@ class NodeListWidget (QWidget):
         self.nodelist.itemActivated.connect(self.activatenode)
         self.nodelist.setSelectionMode(QAbstractItemView.ExtendedSelection)
         
-        remwidget = QWidget(self)
-        remlayout = QHBoxLayout(remwidget)
-        remselected = QPushButton(self)
+        remwidget = QToolBar(self)
+        remselected = QAction("Remove Selected", self)
         remselected.setIcon(QIcon.fromTheme("edit-delete"))
         remselected.setToolTip("Remove selected")
-        remselected.clicked.connect(self.remselected)
-        self.selbutton = remselected
-        remtrash = QPushButton(self)
+        remselected.triggered.connect(self.remselected)
+        self.remselaction = remselected
+        remtrash = QAction("Remove Trash", self)
         remtrash.setIcon(QIcon.fromTheme("edit-clear"))
         remtrash.setToolTip("Clear all trash")
-        remtrash.clicked.connect(self.remtrash)
-        self.trashbutton = remtrash
-        remlayout.addWidget(remselected)
-        remlayout.addWidget(remtrash)
-        remlayout.addStretch()
+        remtrash.triggered.connect(self.remtrash)
+        self.remtrashaction = remtrash
+        remwidget.addAction(remselected)
+        remwidget.addAction(remtrash)
         
         layout = QVBoxLayout(self)
         layout.addWidget(self.search)
@@ -1633,7 +1631,7 @@ class NodeListWidget (QWidget):
             listitem = self.listitem(self.view, nodeobj, nodeID)
             self.nodelist.addItem(listitem)
             self.index[nodeID] = listitem
-        self.trashbutton.setEnabled(bool(self.view.trash))
+        self.remtrashaction.setEnabled(bool(self.view.trash))
     
     @pyqtSlot(str)
     def selectbyID (self, nodeID):
@@ -1680,10 +1678,7 @@ class NodeListWidget (QWidget):
     def onselectionchange (self):
         selected = self.nodelist.selectedItems()
         seltrash = [item for item in selected if item.data(item.TrashRole)]
-        if seltrash:
-            self.selbutton.setEnabled(True)
-        else:
-            self.selbutton.setEnabled(False)
+        self.remselaction.setEnabled(bool(seltrash))
     
     @pyqtSlot(NodeListItem)
     def activatenode (self, listitem):
@@ -1701,7 +1696,7 @@ class NodeListWidget (QWidget):
         if answer == QMessageBox.No:
             return
         self.view.removenodes([str(item.data(item.IDRole)) for item in selected])
-        self.selbutton.setEnabled(False)
+        self.remselaction.setEnabled(False)
     
     @pyqtSlot()
     def remtrash (self):
@@ -1710,7 +1705,7 @@ class NodeListWidget (QWidget):
             "Permanently remove all (%s) trash nodes?\n\nThis will also clear the undo action list." % count)
         if answer == QMessageBox.No:
             return
-        self.trashbutton.setEnabled(False)
+        self.remtrashaction.setEnabled(False)
         self.view.removetrash()
 
 class ProjectWidget (QWidget):
