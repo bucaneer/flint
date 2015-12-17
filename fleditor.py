@@ -1767,11 +1767,13 @@ class ProjectWidget (QWidget):
         for relpath in proj.convs + proj.tempconvs:
             abspath = proj.checkpath(relpath)
             if relpath in window.convs: # temp
-                name = window.convs[relpath]().nodecontainer.name
-                loaded = True
+                cont = window.convs[relpath]().nodecontainer
+                name = cont.name
+                loaded = cont.proj is proj
             elif abspath in window.convs: # saved
-                name = window.convs[abspath]().nodecontainer.name
-                loaded = True
+                cont = window.convs[abspath]().nodecontainer
+                name = cont.name
+                loaded = cont.proj is proj
             else: # not loaded
                 if relpath in proj.tempconvs: # closed temp
                     proj.tempconvs.remove(relpath)
@@ -3187,24 +3189,27 @@ class EditorWindow (QMainWindow):
             if relpath in self.convs:
                 view = self.convs[relpath]()
                 self.tabs.setCurrentWidget(view)
-                return
             else:
                 log("error", "Temprorary ID invalid: %s" % relpath)
-                return
         elif abspath is None:
             log("error", "Not part of project or no such file: %s" % relpath)
-            return
         elif abspath in self.convs:
             view = self.convs[abspath]()
             if view is not None:
                 if view.nodecontainer.proj is None:
-                    self.closeview(view)
+                    cont = view.nodecontainer
+                    cont.proj = proj
+                    cont.reinitscripts()
+                    view.updateview()
+                    self.projectUpdated.emit(proj.path)
                 else:
                     self.tabs.setCurrentWidget(view)
-                    return
-        cont = cp.loadjson(abspath, proj)
-        treeview = TreeView(cont, parent=self)
-        self.newtab(treeview)
+            else:
+                log("error", "Conversation no longer open: %s" % abspath)
+        else:
+            cont = cp.loadjson(abspath, proj)
+            treeview = TreeView(cont, parent=self)
+            self.newtab(treeview)
     
     @pyqtSlot()
     def newconv (self, proj=None, tempID=None):

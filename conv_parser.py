@@ -86,13 +86,22 @@ class ChartNode (object):
         self.nodebank    = node_dict.get("nodebank",         -1)
         self.text        = node_dict.get("text",             "")
         self.speaker     = node_dict.get("speaker",          "")
-        self.listener     = node_dict.get("listener",        "")
+        self.listener    = node_dict.get("listener",         "")
         self.optvars     = node_dict.get("vars",         dict())
         self.comment     = node_dict.get("comment",          "")
         self.persistence = node_dict.get("persistence",      "")
         self.subnodes    = node_dict.get("subnodes",         [])
-        self.banktype     = node_dict.get("banktype",   "First")
+        self.banktype    = node_dict.get("banktype",    "First")
         self.questionhub = node_dict.get("questionhub",      "")
+    
+    def reinitscripts (self):
+        if self.container.proj:
+            scripts = self.container.proj.scripts
+        else:
+            scripts = None
+        self.enterscripts = [ScriptCall(s.todict(), scripts) for s in self.enterscripts]
+        self.exitcripts   = [ScriptCall(s.todict(), scripts) for s in self.exitscripts]
+        self.condition = ConditionCall(self.condition.todict(), scripts)
     
     def checkcond (self):
         return self.condition.run()
@@ -211,6 +220,10 @@ class NodesContainer (object):
             }
         self.templates = self.defaulttemplates.copy()
         self.templates.update(nodes_dict.get('templates', dict()))
+    
+    def reinitscripts (self):
+        for node in self.nodes.values():
+            node.reinitscripts()
     
     def newnode (self, node_dict, newID=False, refID=False, bankID=False, force=False):
         if not newID:
