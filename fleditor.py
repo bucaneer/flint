@@ -1841,11 +1841,11 @@ class ProjectWidget (QWidget):
             relpath = proj.relpath(cont.filename)
             if relpath not in proj.convs:
                 proj.registerconv(cont.filename)
-            window.openconv(proj.path, relpath)
+            window.openconv(proj.filename, relpath)
         else:
             cont.proj = proj
             proj.tempconvs.append(cont.filename)
-        self.updateproject(proj.path)
+        self.updateproject(proj.filename)
 
 class MapView (QGraphicsView):
     def __init__ (self, parent):
@@ -3155,7 +3155,7 @@ class EditorWindow (QMainWindow):
     def openproj (self, filename):
         try:
             proj = pp.loadjson(filename)
-            path = proj.path
+            path = proj.filename
             if path in self.projects:
                 return
             self.projects[path] = proj
@@ -3171,8 +3171,8 @@ class EditorWindow (QMainWindow):
         if filename:
             try:
                 proj = pp.newproject(filename)
-                self.projects[proj.path] = proj
-                self.newProject.emit(proj.path)
+                self.projects[proj.filename] = proj
+                self.newProject.emit(proj.filename)
                 proj.savetofile()
             except Exception as e:
                 log("error", "Failed creating project: %s" % repr(e))
@@ -3201,7 +3201,7 @@ class EditorWindow (QMainWindow):
                     cont.proj = proj
                     cont.reinitscripts()
                     view.updateview()
-                    self.projectUpdated.emit(proj.path)
+                    self.projectUpdated.emit(proj.filename)
                 else:
                     self.tabs.setCurrentWidget(view)
             else:
@@ -3244,8 +3244,7 @@ class EditorWindow (QMainWindow):
 not as part of a project.\n\nTo enable script editing, reopen this file from \
 the Projects widget, or register it in a project.")
         if treeview.nodecontainer.proj is not None:
-            log("debug", "newtab emit: %s" % treeview.nodecontainer.proj.path)
-            self.projectUpdated.emit(treeview.nodecontainer.proj.path)
+            self.projectUpdated.emit(treeview.nodecontainer.proj.filename)
     
     @pyqtSlot()
     def save (self, newfile=False):
@@ -3272,7 +3271,7 @@ the Projects widget, or register it in a project.")
             if convID in cont.proj.tempconvs:
                 cont.proj.tempconvs.remove(convID)
             cont.proj.registerconv(cont.filename)
-            self.projectUpdated.emit(cont.proj.path)
+            self.projectUpdated.emit(cont.proj.filaname)
             cont.proj.savetofile()
         return True
     
@@ -3311,7 +3310,7 @@ the Projects widget, or register it in a project.")
         view = None
         gc.collect()
         if proj is not None:
-            self.projectUpdated.emit(proj.path)
+            self.projectUpdated.emit(proj.filename)
     
     @pyqtSlot(int)
     def nametab (self, index):
