@@ -72,11 +72,11 @@ class FlNodeStyle (object):
         self.selectmargin = selectmargin
         self.shadowoffset = selectmargin
         
-        self.nodemargins = QMarginsF(*[nodemargin]*4)
-        self.banknodemargins = QMarginsF(*[nodemargin//2]*4)
-        self.itemmargins = QMarginsF(*[itemmargin]*4)
-        self.activemargins = QMarginsF(*[selectmargin//2]*4)
-        self.selectmargins = QMarginsF(*[selectmargin//2]*4)
+        self.nodemargins = QMarginsF(*(nodemargin,)*4)
+        self.banknodemargins = QMarginsF(*(nodemargin//2,)*4)
+        self.itemmargins = QMarginsF(*(itemmargin,)*4)
+        self.activemargins = QMarginsF(*(selectmargin//2,)*4)
+        self.selectmargins = QMarginsF(*(selectmargin//2,)*4)
         
         self.nodetextwidth = basemetrics.averageCharWidth()*40
         
@@ -397,7 +397,7 @@ class NodeItem(QGraphicsItem):
         self.shadowbox.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
         self.shadowbox.setBrush(FlPalette.dark)
         self.shadowbox.setPen(nopen)
-        self.shadowbox.setPos(*[self.style.shadowoffset]*2)
+        self.shadowbox.setPos(*(self.style.shadowoffset,)*2)
         self.graphgroup.addToGroup(self.shadowbox)
         
         self.activebox = QGraphicsRectItem(self)
@@ -987,7 +987,7 @@ class ScriptParamWidget (QWidget):
     def __init__ (self, parent, name, annot, default):
         super().__init__(parent)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(*[0]*4)
+        layout.setContentsMargins(0, 0, 0, 0)
         label = QLabel(name)
         if annot is bool:
             editor = QCheckBox("True", self)
@@ -1069,7 +1069,7 @@ class ScriptCallWidget (CallWidget):
         self.nodeID = nodeID
         params = callobj.funcparams[::-1]
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(*[9, 4]*2)
+        layout.setContentsMargins(9, 4, 9, 4)
         
         if cond:
             notcheck = QCheckBox("Not", self)
@@ -1083,7 +1083,7 @@ class ScriptCallWidget (CallWidget):
         
         paramswidget = QWidget(self)
         paramslayout = QVBoxLayout(paramswidget)
-        paramslayout.setContentsMargins(*[0]*4)
+        paramslayout.setContentsMargins(0, 0, 0, 0)
         paramslist = []
         if callobj.funccall is not None:
             signature = insp.signature(callobj.funccall)
@@ -1192,7 +1192,7 @@ class ConditionCallWidget (CallWidget):
         callswidget = QWidget(self)
         self.callswidget = callswidget
         callslayout = QVBoxLayout(callswidget)
-        callslayout.setContentsMargins(*[0]*4)
+        callslayout.setContentsMargins(0, 0, 0, 0)
         self.types = {"cond": ConditionCallWidget, "script": ScriptCallWidget}
         for call in callobj.calls:
             self.addcallwidget(call)
@@ -1202,7 +1202,7 @@ class ConditionCallWidget (CallWidget):
         newwidget.newCallObj.connect(self.addcall)
         
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(*[4]*4)
+        layout.setContentsMargins(4, 4, 4, 4)
         layout.addWidget(operatorwidget)
         layout.addWidget(callswidget)
         layout.addWidget(newwidget)
@@ -1411,7 +1411,7 @@ class PropertiesEditWidget (QWidget):
         
         l_persistence = QLabel("&Persistence", self)
         persistence = QComboBox(self)
-        persvals = ["", "Mark", "OnceEver", "OncePerConv"]
+        persvals = ("", "Mark", "OnceEver", "OncePerConv")
         persistence.insertItems(len(persvals), persvals)
         persistence.currentTextChanged.connect(self.persistencechanged)
         l_persistence.setBuddy(persistence)
@@ -1419,7 +1419,7 @@ class PropertiesEditWidget (QWidget):
         
         l_banktype = QLabel("&Bank play type", self)
         banktype = QComboBox(self)
-        banktypes = ["First", "All", "Append"]
+        banktypes = ("First", "All", "Append")
         banktype.insertItems(len(banktypes), banktypes)
         banktype.currentTextChanged.connect(self.banktypechanged)
         l_banktype.setBuddy(banktype)
@@ -1427,7 +1427,7 @@ class PropertiesEditWidget (QWidget):
         
         l_questionhub = QLabel("&Question hub", self)
         questionhub = QComboBox(self)
-        qhubtypes = ["", "ShowOnce", "ShowNever"]
+        qhubtypes = ("", "ShowOnce", "ShowNever")
         questionhub.insertItems(len(qhubtypes), qhubtypes)
         questionhub.currentTextChanged.connect(self.questionhubchanged)
         l_questionhub.setBuddy(questionhub)
@@ -1579,7 +1579,7 @@ class NodeListWidget (QWidget):
         
         self.nodelist = QListWidget(self)
         self.nodelist.setSortingEnabled(True)
-        self.nodelist.setIconSize(QSize(*[FlGlob.mainwindow.style.boldheight]*2))
+        self.nodelist.setIconSize(QSize(*(FlGlob.mainwindow.style.boldheight,)*2))
         self.nodelist.currentItemChanged.connect(self.selectnode)
         self.nodelist.itemSelectionChanged.connect(self.onselectionchange)
         self.nodelist.itemActivated.connect(self.activatenode)
@@ -3053,46 +3053,44 @@ class EditorWindow (QMainWindow):
     @pyqtSlot()
     def filteractions (self):
         view = self.activeview
-        genericactions = []
-        actions = []
+        genericactions = ()
+        actions = ()
         if view:
             if view.undohistory:
-                genericactions.append("undo")
+                genericactions += ("undo",)
             if view.redohistory:
-                genericactions.append("redo")
+                genericactions += ("redo",)
             if view.activenode:
-                genericactions.append("gotoactive")
+                genericactions += ("gotoactive",)
             if view.selectednode:
-                genericactions.extend(["collapse", "selectreal"])
+                genericactions += ("collapse", "selectreal")
             
             nodes = view.nodecontainer.nodes
             if self.selectednode and self.selectednode in nodes:
                 nodeobj = nodes[self.selectednode]
                 if self.selectednode not in view.itemindex:
                     if nodeobj.typename != "root":
-                        actions = ["copynode", "settemplate"]
-                    else:
-                        actions = []
+                        actions = ("copynode", "settemplate")
                 elif nodeobj.typename in ("talk", "response"):
-                    actions = ["copynode", "moveup", "movedown", "unlinknode", 
-                        "unlinkstree", "settemplate", "nodetobank"]
+                    actions = ("copynode", "moveup", "movedown", "unlinknode", 
+                        "unlinkstree", "settemplate", "nodetobank")
                     if nodeobj.nodebank == -1:
-                        actions.extend(["newtalk", "newresponse", "newbank", 
-                            "pasteclone", "pastelink", "parentswap", "splitnode"])
+                        actions += ("newtalk", "newresponse", "newbank", 
+                            "pasteclone", "pastelink", "parentswap", "splitnode")
                 elif nodeobj.typename == "bank":
-                    actions = ["copynode", "moveup", "movedown", "unlinknode",
+                    actions = ("copynode", "moveup", "movedown", "unlinknode",
                         "unlinkstree", "newtalksub", "newresponsesub", "pastesubnode",
-                        "newbanksub", "settemplate"]
+                        "newbanksub", "settemplate")
                     if nodeobj.nodebank == -1:
-                        actions.extend(["newtalk", "newresponse", "newbank", 
-                            "pasteclone", "pastelink", "parentswap", "splitnode"])
+                        actions += ("newtalk", "newresponse", "newbank", 
+                            "pasteclone", "pastelink", "parentswap", "splitnode")
                     if len(nodeobj.subnodes) == 1:
-                        actions.extend(["banktonode"])
+                        actions += ("banktonode",)
                 elif nodeobj.typename == "root":
-                    actions = ["newtalk", "newresponse", "newbank", "pasteclone",
-                        "pastelink"]
+                    actions = ("newtalk", "newresponse", "newbank", "pasteclone",
+                        "pastelink")
         
-        actions.extend(genericactions)
+        actions += genericactions
         for name, action in self.actions.items():
             if name in actions:
                 if name == "pasteclone" or name == "pastesubnode":
