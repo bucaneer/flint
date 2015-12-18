@@ -58,10 +58,10 @@ class ConditionCall (object):
             "calls": [call.todict() for call in self.calls] }
 
 class MetaCall (object):
-    def __init__ (self, call_dict):
+    def __init__ (self, call_dict, scripts=None):
         types = {"script":ScriptCall, "cond":ConditionCall}
         typename = call_dict["type"]
-        self.callobj = types[typename](call_dict)
+        self.callobj = types[typename](call_dict, scripts=scripts)
 
 class ChartNode (object):
     def __init__ (self, container, node_dict, nodeID):

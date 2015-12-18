@@ -1130,15 +1130,17 @@ class CallCreateWidget (QWidget):
         
         self.reload()
     
-    def getscripts (self):
+    def getscripts (self, strict=False):
         view = FlGlob.mainwindow.activeview
         if view is not None and view.nodecontainer.proj is not None:
             return view.nodecontainer.proj.scripts
+        elif strict:
+            return None
         else:
             return dict()
     
     def reload (self):
-        scripts = self.getscripts() #cp.ScriptCall.scripts
+        scripts = self.getscripts()
         if self.cond:
             names = ["( )"]
             condcalls = [n for n, sc in scripts.items() if "return" in sc.__annotations__]
@@ -1158,7 +1160,8 @@ class CallCreateWidget (QWidget):
         elif name == "( )":
             callobj = cp.MetaCall({"type":"cond","operator":"and","calls":[]})
         else:
-            signature = insp.signature(cp.ScriptCall.scripts[name])
+            scripts = self.getscripts()
+            signature = insp.signature(scripts[name])
             defaults = {int: 0, bool: False}
             params = []
             for param in signature.parameters.values():
@@ -1168,7 +1171,8 @@ class CallCreateWidget (QWidget):
                     params.append(defaults[param.annotation])
                 else:
                     params.append("")
-            callobj = cp.MetaCall({"type":"script", "command":name, "params":params})
+            callobj = cp.MetaCall({"type":"script", "command":name, "params":params},
+                scripts=self.getscripts(strict=True))
         self.newCallObj.emit(callobj)
 
 class ConditionCallWidget (CallWidget):
