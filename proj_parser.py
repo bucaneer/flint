@@ -14,7 +14,7 @@ class FlintProject (object):
         self.convs = self.initconvs(projdict.get("convs", []))
         self.tempconvs = []
     
-    def initscripts (self, relpath):
+    def initscripts (self, relpath, reinit=False):
         if relpath:
             abspath = path.join(self.path, relpath)
             if path.exists(abspath):
@@ -22,11 +22,16 @@ class FlintProject (object):
                 scriptdir = path.dirname(abspath)
                 sys.path.append(scriptdir)
                 scriptmod = importlib.import_module(modname)
+                if reinit:
+                    scriptmod = importlib.reload(scriptmod)
                 return scriptmod.ScriptCalls.scripts
             else:
                 raise RuntimeError("Invalid script path: %s" % relpath)
         else:
             return dict()
+    
+    def reloadscripts (self):
+        self.scripts = self.initscripts(self.scriptfile, reinit=True)
     
     def initconvs (self, convs_list):
         paths = []

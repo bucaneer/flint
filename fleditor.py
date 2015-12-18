@@ -1722,8 +1722,10 @@ class ProjectWidget (QWidget):
         self.tree.setHeaderLabels(("Name", "Path"))
         self.tree.itemActivated.connect(self.onactivate)
         
+        window = FlGlob.mainwindow
         actions = QToolBar(self)
-        actions.addAction(FlGlob.mainwindow.globactions["newconv"])
+        actions.addAction(window.globactions["newconv"])
+        actions.addAction(window.globactions["reloadscripts"])
         
         layout = QVBoxLayout(self)
         layout.addWidget(self.tree)
@@ -2745,6 +2747,8 @@ class EditorWindow (QMainWindow):
             "zoom-original", "Zoom to original size")
         self.globactions["refresh"] = self.createaction("Refresh", self.refresh,
             (QKeySequence(Qt.Key_F5)), "view-refresh", "Refresh view")
+        self.globactions["reloadscripts"] = self.createaction("Reload Scripts", self.reloadscripts,
+            None, "view-refresh", "Reload scripts from file")
         
         self.actions["undo"] = self.createaction("&Undo", self.undofactory(1),
             (QKeySequence.Undo), "edit-undo", "Undo last action")
@@ -3005,7 +3009,7 @@ class EditorWindow (QMainWindow):
             actions = ("zoomin", "zoomout", "zoomorig", "openfile", 
                 "save", "saveas", "newproj", "close", "refresh")
         if self.projwidget.currentproj() is not None:
-            actions += ("newconv",)
+            actions += ("newconv", "reloadscripts")
         for name, action in self.globactions.items():
             if name in actions:
                 action.setEnabled(True)
@@ -3146,6 +3150,27 @@ class EditorWindow (QMainWindow):
                 proj.savetofile()
             except Exception as e:
                 log("error", "Failed creating project: %s" % repr(e))
+    
+    @pyqtSlot()
+    def reloadscripts (self):
+        projfile = self.projwidget.currentproj()
+        if projfile is None:
+            return
+        proj = self.projects[projfile]
+        proj.reloadscripts()
+        for conv in proj.convs:
+            abspath = proj.checkpath(conv)
+            if abspath and abspath in self.convs:
+                view = self.convs[abspath]()
+                view.nodecontainer.reinitscripts()
+                if view is self.activeview:
+                    view.updateview()
+        for conv in proj.tempconvs:
+            if conv in self.convs:
+                view = self.convs[abspath]()
+                view.nodecontainer.reinitscripts()
+                if view is self.activeview:
+                    view.updateview()
     
     def openconvfile (self, filename):
         try:
