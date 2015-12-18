@@ -206,6 +206,7 @@ class NodesContainer (object):
         self.defaultcond = {"type":"cond","operator":"and","calls":[]}
         self.defaultcondcall = ConditionCall(self.defaultcond)
         self.filename = path.abspath(filename) if filename else ""
+        self.projfile = nodes_dict.get("project", "")
         self.proj = proj
         self.name = nodes_dict['name']
         self.nextID = str(nodes_dict['nextID'])
@@ -251,11 +252,14 @@ class NodesContainer (object):
     
     def todict (self):
         nodes_dict = {"name":self.name, "nextID":self.nextID, "nodes":self.nodes}
-        if self.templates is not self.defaulttemplates:
+        if self.templates and self.templates is not self.defaulttemplates:
             nodes_dict["templates"] = dict()
             for typename, template in self.templates.items():
                 if template != self.defaulttemplates[typename]:
                     nodes_dict["templates"][typename] = template
+        if self.proj is not None:
+            projfile = path.relpath(self.proj.filename, start=path.dirname(self.filename))
+            nodes_dict["project"] = projfile
         return nodes_dict
 
 def loadjson (filename, proj=None):

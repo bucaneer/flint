@@ -1794,8 +1794,8 @@ class ProjectWidget (QWidget):
     def onactivate (self, item, column):
         window = FlGlob.mainwindow
         if item.type() == self.ConvType:
-            projpath = item.parent().data(1, 0)
-            window.openconv(projpath, item.data(1, 0))
+            projfile = item.parent().data(1, 0)
+            window.openconv(projfile, item.data(1, 0))
     
     def getitemroot (self, item):
         while item.type() != self.ProjType:
@@ -3120,6 +3120,9 @@ class EditorWindow (QMainWindow):
         filters[selfilter](filename)
     
     def openproj (self, filename):
+        if filename in self.projects:
+            return
+        
         try:
             proj = pp.loadjson(filename)
             path = proj.filename
@@ -3145,12 +3148,22 @@ class EditorWindow (QMainWindow):
                 log("error", "Failed creating project: %s" % repr(e))
     
     def openconvfile (self, filename):
-        cont = cp.loadjson(filename)
-        treeview = TreeView(cont, parent=self)
-        self.newtab(treeview)
+        try:
+            cont = cp.loadjson(filename)
+            if cont.projfile:
+                projfile = os.path.join(os.path.dirname(filename), cont.projfile)
+                self.openproj(projfile)
+                if projfile not in self.projects:
+                    return
+                cont.proj = self.projects[projfile]
+                cont.reinitscripts()
+            treeview = TreeView(cont, parent=self)
+            self.newtab(treeview)
+        except Exception as e:
+            log("error", "Failed opening %s: %s" % (filename, repr(e)))
     
-    def openconv (self, projpath, relpath):
-        proj = self.projects[projpath]
+    def openconv (self, projfile, relpath):
+        proj = self.projects[projfile]
         abspath = proj.checkpath(relpath)
         if relpath.startswith("\0TEMP"):
             if relpath in self.convs:
@@ -3180,10 +3193,10 @@ class EditorWindow (QMainWindow):
     
     @pyqtSlot()
     def newconv (self):
-        projpath = self.projwidget.currentproj()
-        if projpath is None:
+        projfile = self.projwidget.currentproj()
+        if projfile is None:
             return
-        proj = self.projects[projpath]
+        proj = self.projects[projfile]
         nodecontainer = cp.newcontainer(proj)
         treeview = TreeView(nodecontainer, parent=self)
         self.newtab(treeview)
@@ -3209,9 +3222,7 @@ class EditorWindow (QMainWindow):
         tabindex = self.tabs.addTab(treeview, name)
         self.tabs.setCurrentIndex(tabindex)
         if treeview.nodecontainer.proj is None:
-            log("warn", "Script editing is disabled for conversations opened \
-not as part of a project.\n\nTo enable script editing, reopen this file from \
-the Projects widget, or register it in a project.")
+            log("warn", "This Conversation is not part of a Project. Script editing is disabled.")
         else:
             if viewid.startswith("\0TEMP"):
                 treeview.nodecontainer.proj.tempconvs.append(viewid)
@@ -3242,7 +3253,7 @@ the Projects widget, or register it in a project.")
             if convID in cont.proj.tempconvs:
                 cont.proj.tempconvs.remove(convID)
             cont.proj.registerconv(cont.filename)
-            self.projectUpdated.emit(cont.proj.filaname)
+            self.projectUpdated.emit(cont.proj.filename)
             cont.proj.savetofile()
         return True
     
