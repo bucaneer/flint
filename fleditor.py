@@ -685,6 +685,7 @@ class BankNodeItem (NodeItem):
     def __init__ (self, nodeobj, parent=None, view=None, state=1):
         super().__init__(nodeobj, parent, view, state)
         self.rect = QRectF()
+        self.setZValue(-1)
         self.updatecomment()
         self.updatebanktype()
     
