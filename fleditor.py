@@ -1557,16 +1557,51 @@ class SearchWidget (QWidget):
         searchbutton.setIcon(QIcon.fromTheme("edit-find"))
         searchbutton.setToolTip("Search")
         searchbutton.clicked.connect(self.search)
+        advbutton = QPushButton("Advanced", self)
+        advbutton.clicked.connect(self.advancedpopup)
         
         layout.addWidget(self.inputline)
         layout.addWidget(searchbutton)
+        layout.addWidget(advbutton)
+        
+        self.fields = {"text": True}
     
     def search (self):
         query = self.inputline.text().casefold()
         view = self.parent().view
         if view is not None:
-            view.search(query)
+            view.search(query, self.fields)
             self.searched.emit()
+    
+    def adv_factory (self, field):
+        def adv (state):
+            self.fields[field] = bool(state)
+        return adv
+    
+    @pyqtSlot()
+    def advancedpopup (self):
+        checks = OrderedDict()
+        checks["Text"] = (("Text", "text"), ("Speaker", "speaker"), ("Listener", "listener"))
+        checks["Enter Scripts"] = (("Function name", "entername"), ("Arguments", "enterarg"))
+        checks["Exit Scripts"] = (("Function name", "exitname"), ("Arguments", "exitarg"))
+        checks["Condition"] = (("Function name", "condname"), ("Arguments", "condarg"))
+        checks["Properties"] = (("Persistence", "persistence"), ("Bank type", "banktype"), ("Question hub", "questionhub"), ("Random weight", "randweight"), ("Comment", "comment"))
+        
+        popup = QWidget(FlGlob.mainwindow, Qt.Dialog)
+        popup.setWindowTitle("Search fields")
+        poplayout = QVBoxLayout(popup)
+        for group in checks.keys():
+            box = QGroupBox(group, popup)
+            boxlayout = QVBoxLayout(box)
+            for label, field in checks[group]:
+                check = QCheckBox(label, box)
+                check.stateChanged.connect(self.adv_factory(field))
+                if field in self.fields:
+                    check.setChecked(self.fields[field])
+                boxlayout.addWidget(check)
+            boxlayout.addStretch()
+            poplayout.addWidget(box)
+        popup.show()
 
 class NodeListItem (QListWidgetItem):
     IDRole = Qt.UserRole + 1
@@ -2261,14 +2296,50 @@ class TreeEditor (object):
                 col = True
         self.itembyfullID(fullID).collapse(col)
     
-    def search (self, query):
-        if not query:
+    def getfield (self, nodeobj, field):
+        objdict = nodeobj.__dict__
+        if field in objdict:
+            return str(objdict[field])
+        elif field == "entername":
+            return "\n".join([s.funcname for s in nodeobj.enterscripts])
+        elif field == "enterarg":
+            return "\n".join(["\n".join([str(p) for p in s.funcparams]) for s in nodeobj.enterscripts])
+        elif field == "exitname":
+            return "\n".join([s.funcname for s in nodeobj.exitscripts])
+        elif field == "exitarg":
+            return "\n".join(["\n".join([str(p) for p in s.funcparams]) for s in nodeobj.exitscripts])
+        elif field == "condname":
+            retval = ""
+            conds = [nodeobj.condition]
+            while conds:
+                cond = conds.pop(-1)
+                for call in cond.calls:
+                    if call.typename == "script":
+                        retval += call.funcname+"\n"
+                    elif call.typename == "cond":
+                        conds.append(call)
+            return retval
+        elif field == "condarg":
+            retval = ""
+            conds = [nodeobj.condition]
+            while conds:
+                cond = conds.pop(-1)
+                for call in cond.calls:
+                    if call.typename == "script":
+                        retval += "\n".join([str(p) for p in call.funcparams])
+                    elif call.typename == "cond":
+                        conds.append(call)
+            return retval
+    
+    def search (self, query, fields):
+        if not query or not fields:
             self.hits = None
         else:
             hits = []
             for nodeID, nodeobj in self.nodecontainer.nodes.items():
-                if query in nodeobj.text.casefold():
-                    hits.append(nodeID)
+                for field in fields:
+                    if field and query in self.getfield(nodeobj, field).casefold():
+                        hits.append(nodeID)
             self.hits = hits
     
     def removenodes (self, nodeIDs):
