@@ -42,6 +42,8 @@ class FlPalette (object):
     rootvar = QColor(153, 153, 153) # root active
     root    = QColor(128, 128, 128) # root normal
     bg      = QColor( 90,  94,  98) # scene, bank background
+    hit     = QColor(120, 255, 180) # search input BG on hit
+    miss    = QColor(255, 150, 150) # search input BG on miss
 
 class FlNodeStyle (object):    
     def __init__ (self, font):
@@ -1567,10 +1569,23 @@ class SearchWidget (QWidget):
         self.fields = {"text": True}
     
     def search (self):
+        palette = QPalette()
+        defbase = palette.color(QPalette.Base)
+        deftext = palette.color(QPalette.Text)
         query = self.inputline.text().casefold()
         view = self.parent().view
         if view is not None:
             view.search(query, self.fields)
+            if view.hits is None:
+                palette.setColor(QPalette.Base, defbase)
+                palette.setColor(QPalette.Text, deftext)
+            elif view.hits:
+                palette.setColor(QPalette.Base, FlPalette.hit)
+                palette.setColor(QPalette.Text, FlPalette.dark)
+            else:
+                palette.setColor(QPalette.Base, FlPalette.miss)
+                palette.setColor(QPalette.Text, FlPalette.dark)
+            self.inputline.setPalette(palette)
             self.searched.emit()
     
     def adv_factory (self, field):
@@ -2332,7 +2347,7 @@ class TreeEditor (object):
             return retval
     
     def search (self, query, fields):
-        if not query or not fields:
+        if not query or True not in fields.values():
             self.hits = None
         else:
             hits = []
