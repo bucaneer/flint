@@ -2686,6 +2686,8 @@ class TreeView (TreeEditor, QGraphicsView):
         subitems.append(subitem)
         while subitems:
             subitem = subitems.popleft()
+            if subitem is None:
+                continue
             self.nodeorder[subitem.id()] = None
             for subID in subitem.nodeobj.subnodes:
                 subitems.append(self.itembyID(subID))
