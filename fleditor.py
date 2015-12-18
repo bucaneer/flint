@@ -1559,42 +1559,14 @@ class SearchWidget (QWidget):
         searchbutton.setIcon(QIcon.fromTheme("edit-find"))
         searchbutton.setToolTip("Search")
         searchbutton.clicked.connect(self.search)
-        advbutton = QPushButton("Advanced", self)
+        advbutton = QPushButton(self)
+        advbutton.setIcon(QIcon.fromTheme("preferences-other"))
+        advbutton.setToolTip("Search Fields")
         advbutton.clicked.connect(self.advancedpopup)
         
-        layout.addWidget(self.inputline)
-        layout.addWidget(searchbutton)
-        layout.addWidget(advbutton)
-        
+        self.popup = None
         self.fields = {"text": True}
-    
-    def search (self):
-        palette = QPalette()
-        defbase = palette.color(QPalette.Base)
-        deftext = palette.color(QPalette.Text)
-        query = self.inputline.text().casefold()
-        view = self.parent().view
-        if view is not None:
-            view.search(query, self.fields)
-            if view.hits is None:
-                palette.setColor(QPalette.Base, defbase)
-                palette.setColor(QPalette.Text, deftext)
-            elif view.hits:
-                palette.setColor(QPalette.Base, FlPalette.hit)
-                palette.setColor(QPalette.Text, FlPalette.dark)
-            else:
-                palette.setColor(QPalette.Base, FlPalette.miss)
-                palette.setColor(QPalette.Text, FlPalette.dark)
-            self.inputline.setPalette(palette)
-            self.searched.emit()
-    
-    def adv_factory (self, field):
-        def adv (state):
-            self.fields[field] = bool(state)
-        return adv
-    
-    @pyqtSlot()
-    def advancedpopup (self):
+        
         checks = OrderedDict()
         checks["Text"] = (("Text", "text"), ("Speaker", "speaker"), ("Listener", "listener"))
         checks["Enter Scripts"] = (("Function name", "entername"), ("Arguments", "enterarg"))
@@ -1603,7 +1575,7 @@ class SearchWidget (QWidget):
         checks["Properties"] = (("Persistence", "persistence"), ("Bank type", "banktype"), ("Question hub", "questionhub"), ("Random weight", "randweight"), ("Comment", "comment"))
         
         popup = QWidget(FlGlob.mainwindow, Qt.Dialog)
-        popup.setWindowTitle("Search fields")
+        popup.setWindowTitle("Fields")
         poplayout = QVBoxLayout(popup)
         for group in checks.keys():
             box = QGroupBox(group, popup)
@@ -1616,7 +1588,41 @@ class SearchWidget (QWidget):
                 boxlayout.addWidget(check)
             boxlayout.addStretch()
             poplayout.addWidget(box)
-        popup.show()
+        self.popup = popup
+        
+        layout.addWidget(self.inputline)
+        layout.addWidget(searchbutton)
+        layout.addWidget(advbutton)
+    
+    def search (self):
+        palette = QPalette()
+        defbase = palette.color(QPalette.Base)
+        deftext = palette.color(QPalette.Text)
+        query = self.inputline.text().casefold()
+        view = self.parent().view
+        if view is not None:
+            view.search(query, self.fields)
+            self.searched.emit()
+            
+            if view.hits is None:
+                palette.setColor(QPalette.Base, defbase)
+                palette.setColor(QPalette.Text, deftext)
+            elif view.hits:
+                palette.setColor(QPalette.Base, FlPalette.hit)
+                palette.setColor(QPalette.Text, FlPalette.dark)
+            else:
+                palette.setColor(QPalette.Base, FlPalette.miss)
+                palette.setColor(QPalette.Text, FlPalette.dark)
+            self.inputline.setPalette(palette)
+    
+    def adv_factory (self, field):
+        def adv (state):
+            self.fields[field] = bool(state)
+        return adv
+    
+    @pyqtSlot()
+    def advancedpopup (self):
+        self.popup.setVisible(not self.popup.isVisible())
 
 class NodeListItem (QListWidgetItem):
     IDRole = Qt.UserRole + 1
