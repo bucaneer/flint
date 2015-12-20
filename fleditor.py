@@ -2419,6 +2419,8 @@ class TreeView (TreeEditor, QGraphicsView):
         self.updatedocs()
         self.traverse()
         self.constructed = self.applychanges()
+        for child in self.treeroot().childlist():
+            child().setrank(self.treeroot())
         self.updatelayout()
         FlGlob.mainwindow.viewUpdated.emit()
         
@@ -2498,8 +2500,6 @@ class TreeView (TreeEditor, QGraphicsView):
             i = self.itemindex[toID].index(nodeitem)
             index[0], index[i] = index[i], index[0]
         nodeitem.setstate(state)
-        if state != -1:
-            nodeitem.setrank(self.itembyID(fromID))
     
     def tableitem (self, fullID, nodeitem):
         fromID, toID = fullID
