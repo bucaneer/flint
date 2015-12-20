@@ -126,6 +126,7 @@ class QGraphicsTextItemCond (QGraphicsTextItem):
 class QGraphicsPixmapItemCond (QGraphicsPixmapItem):
     def __init__ (self, pixmap, parent, cond=None):
         super().__init__(pixmap, parent)
+        self.setShapeMode(QGraphicsPixmapItem.BoundingRectShape)
         self.cond = cond
     
     def paint (self, painter, style, widget):
@@ -488,26 +489,46 @@ class NodeItem(QGraphicsItem):
         icons = {True: "key", False: "blank"}
         pixmap = self.pixmap("images/%s.png" % icons[self.nodeobj.hascond()])
         self.condicon.setPixmap(pixmap)
+        if self.nodeobj.hascond():
+            self.condicon.setToolTip("Condition")
+        else:
+            self.condicon.setToolTip("")
     
     def updateenterscripts (self):
         icons = {True: "script-enter", False: "blank"}
         pixmap = self.pixmap("images/%s.png" % icons[self.nodeobj.hasenterscripts()])
         self.entericon.setPixmap(pixmap)
+        if self.nodeobj.hasenterscripts():
+            self.entericon.setToolTip("Enter Scripts")
+        else:
+            self.entericon.setToolTip("")
     
     def updateexitscripts (self):
         icons = {True: "script-exit", False: "blank"}
         pixmap = self.pixmap("images/%s.png" % icons[self.nodeobj.hasexitscripts()])
         self.exiticon.setPixmap(pixmap)
+        if self.nodeobj.hasexitscripts():
+            self.exiticon.setToolTip("Exit Scripts")
+        else:
+            self.exiticon.setToolTip("")
     
     def updaterandweight (self):
         icons = {True: "dice", False: "blank"}
         pixmap = self.pixmap("images/%s.png" % icons[bool(self.nodeobj.randweight)])
         self.randicon.setPixmap(pixmap)
+        if self.nodeobj.randweight:
+            self.randicon.setToolTip("Random Weight: %s" % self.nodeobj.randweight)
+        else:
+            self.randicon.setToolTip("")
     
     def updatepersistence (self):
         icons = {"Mark": "mark", "OncePerConv": "once", "OnceEver": "onceever", "": "blank"}
         pixmap = self.pixmap("images/%s.png" % icons[self.nodeobj.persistence])
         self.persisticon.setPixmap(pixmap)
+        if self.nodeobj.persistence:
+            self.persisticon.setToolTip("Persistence: %s" % self.nodeobj.persistence)
+        else:
+            self.persisticon.setToolTip("")
     
     def updatecomment (self):
         self.fggroup.removeFromGroup(self.comment)
@@ -665,6 +686,10 @@ class TalkNodeItem (TextNodeItem):
         icons = {"ShowOnce": "question-once", "ShowNever": "question-never", "": "blank"}
         pixmap = self.pixmap("images/%s.png" % icons[self.nodeobj.questionhub])
         self.qhubicon.setPixmap(pixmap)
+        if self.nodeobj.questionhub:
+            self.qhubicon.setToolTip("Question hub: %s" % self.nodeobj.questionhub)
+        else:
+            self.qhubicon.setToolTip("")
 
 class ResponseNodeItem (TextNodeItem):
     maincolor = FlPalette.hl2
@@ -737,6 +762,10 @@ class BankNodeItem (NodeItem):
         icons = {"First": "bank-first", "All": "bank-all", "Append": "bank-append", "": "blank"}
         pixmap = self.pixmap("images/%s.png" % icons[self.nodeobj.banktype])
         self.btypeicon.setPixmap(pixmap)
+        if self.nodeobj.banktype:
+            self.btypeicon.setToolTip("Bank type: %s" % self.nodeobj.banktype)
+        else:
+            self.btypeicon.setToolTip("")
     
     def updatecenterbox (self):
         verticalpos = self.centerbox.y()
