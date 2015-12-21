@@ -44,10 +44,13 @@ class ConditionCall (object):
             self.calls.append( typename(call, scripts) )
     
     def run (self):
+        if not self.calls:
+            return (True, None)
         for call in self.calls:
+            callsig = (call.funcname, call.funcparams)
             if call.run() != self.operator:
-                return not self.operator
-        return self.operator
+                return (not self.operator, callsig)
+        return (self.operator, callsig)
     
     def setoperator (self, operatorname):
         self.operatorname = operatorname
