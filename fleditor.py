@@ -712,7 +712,7 @@ class BankNodeItem (NodeItem):
         self.rect = QRectF()
         self.setZValue(-1)
         self.updatecomment()
-        self.updatebanktype()
+        self.updatebankmode()
     
     def nudgechildren(self):
         super().nudgechildren()
@@ -758,12 +758,12 @@ class BankNodeItem (NodeItem):
         self.centerbox.setPos(0, self.nodelabel.y()+self.nodelabel.boundingRect().height()+self.style.itemmargin*2)
         self.fggroup.addToGroup(self.centerbox)
     
-    def updatebanktype (self):
+    def updatebankmode (self):
         icons = {"First": "bank-first", "All": "bank-all", "Append": "bank-append", "": "blank"}
-        pixmap = self.pixmap("images/%s.png" % icons[self.nodeobj.banktype])
+        pixmap = self.pixmap("images/%s.png" % icons[self.nodeobj.bankmode])
         self.btypeicon.setPixmap(pixmap)
-        if self.nodeobj.banktype:
-            self.btypeicon.setToolTip("Bank type: %s" % self.nodeobj.banktype)
+        if self.nodeobj.bankmode:
+            self.btypeicon.setToolTip("Bank mode: %s" % self.nodeobj.bankmode)
         else:
             self.btypeicon.setToolTip("")
     
@@ -1453,13 +1453,13 @@ class PropertiesEditWidget (QWidget):
         l_persistence.setBuddy(persistence)
         self.persistence = persistence
         
-        l_banktype = QLabel("&Bank play type", self)
-        banktype = QComboBox(self)
-        banktypes = ("First", "All", "Append")
-        banktype.insertItems(len(banktypes), banktypes)
-        banktype.currentTextChanged.connect(self.banktypechanged)
-        l_banktype.setBuddy(banktype)
-        self.banktype = banktype
+        l_bankmode = QLabel("&Bank play mode", self)
+        bankmode = QComboBox(self)
+        bankmodes = ("First", "All", "Append")
+        bankmode.insertItems(len(bankmodes), bankmodes)
+        bankmode.currentTextChanged.connect(self.bankmodechanged)
+        l_bankmode.setBuddy(bankmode)
+        self.bankmode = bankmode
         
         l_questionhub = QLabel("&Question hub", self)
         questionhub = QComboBox(self)
@@ -1486,7 +1486,7 @@ class PropertiesEditWidget (QWidget):
         l_comment.setBuddy(comment)
         
         layout.addRow(l_persistence, persistence)
-        layout.addRow(l_banktype, banktype)
+        layout.addRow(l_bankmode, bankmode)
         layout.addRow(l_questionhub, questionhub)
         layout.addRow(l_randweight, randweight)
         layout.addRow(l_comment, comment)
@@ -1509,10 +1509,10 @@ class PropertiesEditWidget (QWidget):
             self.persistence.setCurrentText(nodeobj.persistence)
             
             if nodeobj.typename == "bank":
-                self.banktype.setCurrentText(nodeobj.banktype)
-                self.banktype.setEnabled(True)
+                self.bankmode.setCurrentText(nodeobj.bankmode)
+                self.bankmode.setEnabled(True)
             else:
-                self.banktype.setEnabled(False)
+                self.bankmode.setEnabled(False)
             
             if nodeobj.typename == "talk":
                 self.questionhub.setCurrentText(nodeobj.questionhub)
@@ -1528,7 +1528,7 @@ class PropertiesEditWidget (QWidget):
         else:
             self.setEnabled(False)
             self.persistence.setCurrentText("")
-            self.banktype.setCurrentText("")
+            self.bankmode.setCurrentText("")
             self.questionhub.setCurrentText("")
             self.randweight.setText("")
             self.comment.setDocument(self.blankdoc)
@@ -1543,13 +1543,13 @@ class PropertiesEditWidget (QWidget):
         view.callupdates(self.nodeobj.ID, "updatepersistence")
     
     @pyqtSlot()
-    def banktypechanged (self):
+    def bankmodechanged (self):
         if self.nodeobj is None:
             return
-        banktype = self.banktype.currentText()
-        self.nodeobj.banktype = banktype
+        bankmode = self.bankmode.currentText()
+        self.nodeobj.bankmode = bankmode
         view = FlGlob.mainwindow.activeview
-        view.callupdates(self.nodeobj.ID, "updatebanktype")
+        view.callupdates(self.nodeobj.ID, "updatebankmode")
     
     @pyqtSlot()
     def questionhubchanged (self):
@@ -1602,7 +1602,7 @@ class SearchWidget (QWidget):
         checks["Enter Scripts"] = (("Function name", "entername"), ("Arguments", "enterarg"))
         checks["Exit Scripts"] = (("Function name", "exitname"), ("Arguments", "exitarg"))
         checks["Condition"] = (("Function name", "condname"), ("Arguments", "condarg"))
-        checks["Properties"] = (("Persistence", "persistence"), ("Bank type", "banktype"), ("Question hub", "questionhub"), ("Random weight", "randweight"), ("Comment", "comment"))
+        checks["Properties"] = (("Persistence", "persistence"), ("Bank mode", "bankmode"), ("Question hub", "questionhub"), ("Random weight", "randweight"), ("Comment", "comment"))
         
         popup = QWidget(FlGlob.mainwindow, Qt.Dialog)
         popup.setWindowTitle("Fields")
@@ -1735,7 +1735,7 @@ class NodeListWidget (QWidget):
         if   typename == "root":
             descr = ""
         elif typename == "bank":
-            descr = "(%s) %s" % (nodeobj.banktype, ", ".join(nodeobj.subnodes))
+            descr = "(%s) %s" % (nodeobj.bankmode, ", ".join(nodeobj.subnodes))
         elif typename == "talk":
             descr = "[%s]" % elidestring(nodeobj.text, 30)
         elif typename == "response":

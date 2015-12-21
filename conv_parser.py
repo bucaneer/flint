@@ -94,7 +94,7 @@ class ChartNode (object):
         self.comment     = node_dict.get("comment",          "")
         self.persistence = node_dict.get("persistence",      "")
         self.subnodes    = node_dict.get("subnodes",         [])
-        self.banktype    = node_dict.get("banktype",         "")
+        self.bankmode    = node_dict.get("bankmode",         "")
         self.questionhub = node_dict.get("questionhub",      "")
     
     def reinitscripts (self):
@@ -196,15 +196,15 @@ class ResponseNode (TextNode):
 class BankNode (ChartNode):
     def __init__ (self, container, node_dict, nodeID):
         super().__init__(container, node_dict, nodeID)
-        if not self.banktype:
-            self.banktype = "First"
+        if not self.bankmode:
+            self.bankmode = "First"
     
     def todict (self):
         node_dict = super().todict()
         if self.subnodes:
             node_dict["subnodes"] = self.subnodes
-        if self.banktype != "First":
-            node_dict["banktype"] = self.banktype
+        if self.bankmode and self.bankmode != "First":
+            node_dict["bankmode"] = self.bankmode
         return node_dict
 
 class NodesContainer (object):
