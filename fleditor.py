@@ -712,6 +712,7 @@ class BankNodeItem (NodeItem):
         self.rect = QRectF()
         self.setZValue(-1)
         self.updatecomment()
+        self.updatebanktype()
         self.updatebankmode()
     
     def nudgechildren(self):
@@ -757,6 +758,10 @@ class BankNodeItem (NodeItem):
         self.centerbox.setPen(nopen)
         self.centerbox.setPos(0, self.nodelabel.y()+self.nodelabel.boundingRect().height()+self.style.itemmargin*2)
         self.fggroup.addToGroup(self.centerbox)
+    
+    def updatebanktype (self):
+        types = {"talk": "(T)", "response": "(R)", "": ""}
+        self.nodelabel.setText("%s Bank %s" % (self.realid(), types[self.nodeobj.banktype]))
     
     def updatebankmode (self):
         icons = {"First": "bank-first", "All": "bank-all", "Append": "bank-append", "": "blank"}
@@ -2141,6 +2146,10 @@ class TreeEditor (object):
         nodedictmod["nodebank"] = nodeID
         newobj = self.nodecontainer.newnode(nodedictmod, bankID=nodeID)
         newid = newobj.ID
+        if newobj.typename in ("talk", "response"):
+            self.changebanktype(nodeID, newobj.typename)
+        elif newobj.typename == "bank":
+            newobj.banktype = self.nodecontainer.nodes[nodeID].banktype
         
         if not undo:
             pos = self.nodecontainer.nodes[nodeID].subnodes.index(newid)
@@ -2151,6 +2160,23 @@ class TreeEditor (object):
                 "Add new subnode %s to node %s" % (newid, nodeID))
             self.addundoable(hist)
         return newid
+    
+    def changebanktype (self, bankID, banktype):
+        nodes = self.nodecontainer.nodes
+        bankobj = nodes[bankID]
+        bankobj.banktype = banktype
+        if bankobj.nodebank != -1:
+            if nodes[bankobj.nodebank].banktype:
+                return
+            self.changebanktype(bankobj.nodebank, banktype)
+        else:
+            bankobj.banktype = banktype
+            subbanks = [nodes[subID] for subID in bankobj.subnodes if nodes[subID].typename == "bank"]
+            while subbanks:
+                subbank = subbanks.pop(-1)
+                if subbank.banktype != banktype:
+                    self.changebanktype(subbank.ID, banktype)
+                subbanks.extend([nodes[subID] for subID in subbank.subnodes if nodes[subID].typename == "bank"])
     
     def unlink (self, nodeID, refID, undo=False):
         nodeitem = self.itembyID(nodeID)
@@ -2666,6 +2692,10 @@ class TreeView (TreeEditor, QGraphicsView):
             self.updateview()
             self.shownode(self.itembyID(newid))
     
+    def changebanktype (self, bankID, banktype):
+        super().changebanktype(bankID, banktype)
+        self.callupdates(bankID, "updatebanktype")
+    
     def unlink (self, nodeID, refID, undo=False):
         super().unlink(nodeID, refID, undo)
         if not undo:
@@ -3173,8 +3203,11 @@ class EditorWindow (QMainWindow):
                             "pasteclone", "pastelink", "parentswap", "splitnode")
                 elif nodeobj.typename == "bank":
                     actions = ("copynode", "moveup", "movedown", "unlinknode",
-                        "unlinkstree", "newtalksub", "newresponsesub", "pastesubnode",
-                        "newbanksub", "settemplate")
+                        "unlinkstree", "pastesubnode", "newbanksub", "settemplate")
+                    if not nodeobj.banktype or nodeobj.banktype == "talk":
+                        actions += ("newtalksub",)
+                    if not nodeobj.banktype or nodeobj.banktype == "response":
+                        actions += ("newresponsesub",)
                     if nodeobj.nodebank == -1:
                         actions += ("newtalk", "newresponse", "newbank", 
                             "pasteclone", "pastelink", "parentswap", "splitnode")

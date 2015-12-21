@@ -94,6 +94,7 @@ class ChartNode (object):
         self.comment     = node_dict.get("comment",          "")
         self.persistence = node_dict.get("persistence",      "")
         self.subnodes    = node_dict.get("subnodes",         [])
+        self.banktype    = node_dict.get("banktype",         "")
         self.bankmode    = node_dict.get("bankmode",         "")
         self.questionhub = node_dict.get("questionhub",      "")
     
@@ -205,6 +206,8 @@ class BankNode (ChartNode):
             node_dict["subnodes"] = self.subnodes
         if self.bankmode and self.bankmode != "First":
             node_dict["bankmode"] = self.bankmode
+        if self.banktype:
+            node_dict["banktype"] = self.banktype
         return node_dict
 
 class NodesContainer (object):
