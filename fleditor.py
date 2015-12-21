@@ -365,13 +365,13 @@ class NodeItem(QGraphicsItem):
         maxdepth = abs(depth)
         if children and depth:
             nextdepth = depth-1
-            ymin = ymax = None
-            """Doing this as a single list comprehension causes slowdowns with big trees."""
+            ymin = self.y_top()
+            ymax = self.y_bottom()
             for child in children:
-                stree = child.subtreesize(nextdepth)
-                ymin = min(ymin, child.y_top(), stree[0]) if ymin is not None else stree[0]
-                ymax = max(ymax, child.y_bottom(), stree[1]) if ymax is not None else stree[1]
-                maxdepth = max(maxdepth, stree[2])
+                top, bottom, depth = child.subtreesize(nextdepth)
+                ymin = min(ymin, top)
+                ymax = max(ymax, bottom)
+                maxdepth = max(maxdepth, depth)
         else:
             ymin = self.y_top()
             ymax = self.y_bottom()
