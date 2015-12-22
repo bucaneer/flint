@@ -2300,6 +2300,7 @@ class TreeEditor (object):
         
         bankdict = nodedict.copy()
         bankdict["type"] = "bank"
+        bankdict["banktype"] = nodedict["type"]
         clonedict = nodedict.copy()
         clonedict["links"] = []
         clonedict["nodebank"] = nodeID
