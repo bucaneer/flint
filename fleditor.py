@@ -41,6 +41,8 @@ class FlPalette (object):
     bank    = QColor(130, 150, 140) # bank normal
     rootvar = QColor(153, 153, 153) # root active
     root    = QColor(128, 128, 128) # root normal
+    trigvar = QColor(181, 219,  29) # trigger active
+    trig    = QColor(172, 204,  42) # trigger normal
     bg      = QColor( 90,  94,  98) # scene, bank background
     hit     = QColor(120, 255, 180) # search input BG on hit
     miss    = QColor(255, 150, 150) # search input BG on miss
@@ -843,6 +845,55 @@ class BankNodeItem (NodeItem):
         if not menu.isEmpty():
             menu.exec_(event.screenPos())
 
+class TriggerNodeItem (NodeItem):
+    maincolor = FlPalette.trig
+    altcolor = FlPalette.trigvar
+    label = "%s Trigger"
+    
+    def graphicsetup (self):
+        super().graphicsetup()
+        
+        lightbrush = QBrush(FlPalette.light)
+        nopen = QPen(0)
+        viewport = self.view.viewport()
+        
+        self.triggerbox = QGraphicsRectItemCond(self, viewport)
+        self.triggerbox.setBrush(lightbrush)
+        self.triggerbox.setPen(nopen)
+        self.fggroup.addToGroup(self.triggerbox)
+        
+        self.triggerlabel = QGraphicsTextItemCond(self, viewport)
+        self.triggerlabel.setTextWidth(self.style.nodetextwidth)
+        self.triggerlabel.setDefaultTextColor(FlPalette.dark)
+        self.triggerlabel.setPos(0, self.nodelabel.y()+self.nodelabel.boundingRect().height()+self.style.itemmargin)
+        self.fggroup.addToGroup(self.triggerlabel)
+        
+        self.updatetrigger()
+        self.updatecomment()
+    
+    def updatetrigger (self):
+        self.triggerlabel.setPlainText(self.nodeobj.triggerconv)
+        textrect = self.triggerlabel.mapRectToParent(self.triggerlabel.boundingRect())
+        self.triggerbox.setRect(textrect)
+        self.comment.setY(textrect.bottom()+self.style.itemmargin)
+        self.updatelayout()
+    
+    def contextMenuEvent (self, event):
+        menu = QMenu()
+        if self.isselected():
+            window = FlGlob.mainwindow
+            menu.addAction(window.actions["collapse"])
+            if self.isghost():
+                menu.addAction(window.actions["selectreal"])
+            menu.addAction(window.actions["copynode"])
+            menu.addAction(window.actions["moveup"])
+            menu.addAction(window.actions["movedown"])
+            menu.addAction(window.actions["unlinknode"])
+            menu.addAction(window.actions["unlinkstree"])
+            menu.addAction(window.actions["settemplate"])
+            menu.addMenu(window.transformmenu)
+        if not menu.isEmpty():
+            menu.exec_(event.screenPos())
 
 class EdgeItem (QGraphicsItem):
     def __init__ (self, source):
@@ -1474,6 +1525,12 @@ class PropertiesEditWidget (QWidget):
         l_questionhub.setBuddy(questionhub)
         self.questionhub = questionhub
         
+        l_trigger = QLabel("&Trigger conversation", self)
+        trigger = QComboBox(self)
+        trigger.currentTextChanged.connect(self.triggerchanged)
+        l_trigger.setBuddy(trigger)
+        self.trigger = trigger
+        
         l_randweight = QLabel("&Random weight", self)
         randweight = QLineEdit(self)
         rwvalidator = QDoubleValidator(self)
@@ -1493,6 +1550,7 @@ class PropertiesEditWidget (QWidget):
         layout.addRow(l_persistence, persistence)
         layout.addRow(l_bankmode, bankmode)
         layout.addRow(l_questionhub, questionhub)
+        layout.addRow(l_trigger, trigger)
         layout.addRow(l_randweight, randweight)
         layout.addRow(l_comment, comment)
         
@@ -1524,6 +1582,18 @@ class PropertiesEditWidget (QWidget):
                 self.questionhub.setEnabled(True)
             else:
                 self.questionhub.setEnabled(False)
+            
+            if nodeobj.typename == "trigger" and view.nodecontainer.proj is not None:
+                proj = view.nodecontainer.proj
+                convs = [""] + proj.convs
+                # nodeobj.triggerconv will be reset with clear(), so we save it
+                triggerconv = nodeobj.triggerconv
+                self.trigger.clear()
+                self.trigger.insertItems(len(convs), convs)
+                self.trigger.setCurrentText(triggerconv)
+                self.trigger.setEnabled(True)
+            else:
+                self.trigger.setEnabled(False)
             
             self.randweight.setText(str(nodeobj.randweight))
             
@@ -1564,6 +1634,15 @@ class PropertiesEditWidget (QWidget):
         self.nodeobj.questionhub = questionhub
         view = FlGlob.mainwindow.activeview
         view.callupdates(self.nodeobj.ID, "updatequestionhub")
+    
+    @pyqtSlot()
+    def triggerchanged (self):
+        if self.nodeobj is None:
+            return
+        trigger = self.trigger.currentText()
+        self.nodeobj.triggerconv = trigger
+        view = FlGlob.mainwindow.activeview
+        view.callupdates(self.nodeobj.ID, "updatetrigger")
     
     @pyqtSlot()
     def randweightchanged (self):
@@ -2148,6 +2227,8 @@ class TreeEditor (object):
         newid = newobj.ID
         if newobj.typename in ("talk", "response"):
             self.changebanktype(nodeID, newobj.typename)
+        elif newobj.typename == "trigger":
+            self.changebanktype(nodeID, "talk")
         elif newobj.typename == "bank":
             newobj.banktype = self.nodecontainer.nodes[nodeID].banktype
         
@@ -2300,7 +2381,7 @@ class TreeEditor (object):
         
         bankdict = nodedict.copy()
         bankdict["type"] = "bank"
-        bankdict["banktype"] = nodedict["type"]
+        bankdict["banktype"] = nodedict["type"] if nodedict["type"] in ("talk", "response") else "talk"
         clonedict = nodedict.copy()
         clonedict["links"] = []
         clonedict["nodebank"] = nodeID
@@ -2436,7 +2517,7 @@ class TreeEditor (object):
 
 class TreeView (TreeEditor, QGraphicsView):
     __types = {'talk': TalkNodeItem, 'response': ResponseNodeItem, 
-        'bank': BankNodeItem, 'root': RootNodeItem}
+        'bank': BankNodeItem, 'root': RootNodeItem, 'trigger': TriggerNodeItem}
     
     def __init__ (self, nodecontainer, parent=None):
         TreeEditor.__init__(self, nodecontainer)
@@ -2924,6 +3005,8 @@ class EditorWindow (QMainWindow):
             (QKeySequence(Qt.ControlModifier+Qt.Key_R)), "insert-object", "Add new Response node")
         self.actions["newbank"] = self.createaction("New &Bank Node", self.newbank,
             (QKeySequence(Qt.ControlModifier+Qt.Key_B)), "insert-object", "Add new Bank node")
+        self.actions["newtrigger"] = self.createaction("New Tri&gger Node", self.newtrigger,
+            (QKeySequence(Qt.ControlModifier+Qt.Key_G)), "insert-object", "Add new Trigger node")
         self.actions["copynode"] = self.createaction("&Copy Node", self.copynode,
             (QKeySequence.Copy), "edit-copy", "Copy node")
         self.actions["pasteclone"] = self.createaction("Paste &Clone", self.pasteclone,
@@ -2946,6 +3029,8 @@ class EditorWindow (QMainWindow):
             (QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_B)), "insert-object", "Add new Bank subnode")
         self.actions["newresponsesub"] = self.createaction("New &Response Subnode", self.newresponsesub,
             (QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_R)), "insert-object", "Add new Response subnode")
+        self.actions["newtriggersub"] = self.createaction("New Tri&gger Subnode", self.newtriggersub,
+            (QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_G)), "insert-object", "Add new Trigger subnode")
         self.actions["pastesubnode"] = self.createaction("&Paste Subnode", self.pastesubnode,
             (QKeySequence(Qt.ControlModifier+Qt.ShiftModifier+Qt.Key_C)), "edit-paste", "Paste cloned node as subnode")
         self.actions["parentswap"] = self.createaction("S&wap with Parent", self.parentswap,
@@ -2996,6 +3081,7 @@ class EditorWindow (QMainWindow):
         addmenu.addAction(self.actions["newtalk"])
         addmenu.addAction(self.actions["newresponse"])
         addmenu.addAction(self.actions["newbank"])
+        addmenu.addAction(self.actions["newtrigger"])
         addmenu.setIcon(QIcon.fromTheme("insert-object"))
         self.addmenu = addmenu
         
@@ -3005,6 +3091,7 @@ class EditorWindow (QMainWindow):
         subnodemenu.addAction(self.actions["newtalksub"])
         subnodemenu.addAction(self.actions["newresponsesub"])
         subnodemenu.addAction(self.actions["newbanksub"])
+        subnodemenu.addAction(self.actions["newtriggersub"])
         subnodemenu.setIcon(QIcon.fromTheme("insert-object"))
         self.subnodemenu = subnodemenu
         
@@ -3200,23 +3287,26 @@ class EditorWindow (QMainWindow):
                     actions = ("copynode", "moveup", "movedown", "unlinknode", 
                         "unlinkstree", "settemplate", "nodetobank")
                     if nodeobj.nodebank == -1:
-                        actions += ("newtalk", "newresponse", "newbank", 
+                        actions += ("newtalk", "newresponse", "newbank", "newtrigger",
                             "pasteclone", "pastelink", "parentswap", "splitnode")
                 elif nodeobj.typename == "bank":
                     actions = ("copynode", "moveup", "movedown", "unlinknode",
                         "unlinkstree", "pastesubnode", "newbanksub", "settemplate")
                     if not nodeobj.banktype or nodeobj.banktype == "talk":
-                        actions += ("newtalksub",)
+                        actions += ("newtalksub", "newtriggersub")
                     if not nodeobj.banktype or nodeobj.banktype == "response":
                         actions += ("newresponsesub",)
                     if nodeobj.nodebank == -1:
-                        actions += ("newtalk", "newresponse", "newbank", 
+                        actions += ("newtalk", "newresponse", "newbank", "newtrigger",
                             "pasteclone", "pastelink", "parentswap", "splitnode")
                     if len(nodeobj.subnodes) == 1:
                         actions += ("banktonode",)
                 elif nodeobj.typename == "root":
                     actions = ("newtalk", "newresponse", "newbank", "pasteclone",
                         "pastelink")
+                elif nodeobj.typename == "trigger":
+                    actions = ("copynode", "settemplate", "moveup", "movedown",
+                        "unlinknode", "unlinkstree", "nodetobank")
         
         actions += genericactions
         for name, action in self.actions.items():
@@ -3539,6 +3629,12 @@ class EditorWindow (QMainWindow):
         view.addnode(nodeID, typename="bank")
     
     @pyqtSlot()
+    def newtrigger (self):
+        view = self.activeview
+        nodeID = view.selectednode.realid()
+        view.addnode(nodeID, typename="trigger")
+    
+    @pyqtSlot()
     def newtalksub (self):
         view = self.activeview
         nodeID = view.selectednode.realid()
@@ -3555,6 +3651,12 @@ class EditorWindow (QMainWindow):
         view = self.activeview
         nodeID = view.selectednode.realid()
         view.addsubnode(nodeID, typename="bank")
+    
+    @pyqtSlot()
+    def newtriggersub (self):
+        view = self.activeview
+        nodeID = view.selectednode.realid()
+        view.addsubnode(nodeID, typename="trigger")
     
     @pyqtSlot()
     def copynode (self):

@@ -97,6 +97,7 @@ class ChartNode (object):
         self.banktype    = node_dict.get("banktype",         "")
         self.bankmode    = node_dict.get("bankmode",         "")
         self.questionhub = node_dict.get("questionhub",      "")
+        self.triggerconv = node_dict.get("triggerconv",      "")
     
     def reinitscripts (self):
         if self.container.proj:
@@ -210,9 +211,16 @@ class BankNode (ChartNode):
             node_dict["banktype"] = self.banktype
         return node_dict
 
+class TriggerNode (ChartNode):
+    def todict (self):
+        node_dict = super().todict()
+        if self.triggerconv:
+            node_dict["triggerconv"] = self.triggerconv
+        return node_dict
+
 class NodesContainer (object):
     types = { 'talk': TalkNode, 'response': ResponseNode, 'bank': BankNode,
-        'root': ChartNode }
+        'root': ChartNode, 'trigger': TriggerNode }
     def __init__ (self, nodes_dict, filename="", proj=None):
         self.defaultcond = {"type":"cond","operator":"and","calls":[]}
         self.defaultcondcall = ConditionCall(self.defaultcond)
@@ -228,7 +236,8 @@ class NodesContainer (object):
         self.defaulttemplates = {
             "bank":    {"type": "bank"},
             "talk":    {"type": "talk"},
-            "response":{"type": "response"}
+            "response":{"type": "response"},
+            "trigger": {"type": "trigger"}
             }
         self.templates = self.defaulttemplates.copy()
         self.templates.update(nodes_dict.get('templates', dict()))
