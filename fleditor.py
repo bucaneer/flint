@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtOpenGL import *
 import conv_parser as cp
 import proj_parser as pp
+import conv_player as play
 import os
 import weakref
 import inspect as insp
@@ -2989,6 +2990,8 @@ class EditorWindow (QMainWindow):
             (QKeySequence(Qt.Key_F5)), "view-refresh", "Refresh view")
         self.globactions["reloadscripts"] = self.createaction("Reload Scripts", self.reloadscripts,
             None, "view-refresh", "Reload scripts from file")
+        self.globactions["playconv"] = self.createaction("Play Conversation", self.playconv,
+            None, "media-playback-start", "Play Conversation")
         
         self.actions["undo"] = self.createaction("&Undo", self.undofactory(1),
             (QKeySequence.Undo), "edit-undo", "Undo last action")
@@ -3071,6 +3074,8 @@ class EditorWindow (QMainWindow):
         filemenu.addSeparator()
         filemenu.addAction(self.globactions["save"])
         filemenu.addAction(self.globactions["saveas"])
+        filemenu.addSeparator()
+        filemenu.addAction(self.globactions["playconv"])
         filemenu.addSeparator()
         filemenu.addAction(self.globactions["close"])
         
@@ -3165,6 +3170,7 @@ class EditorWindow (QMainWindow):
         filetoolbar.addAction(self.globactions["openfile"])
         filetoolbar.addAction(self.globactions["newproj"])
         filetoolbar.addAction(self.globactions["save"])
+        filetoolbar.addAction(self.globactions["playconv"])
         self.addToolBar(filetoolbar)
         
         historytoolbar = QToolBar("History")
@@ -3253,7 +3259,7 @@ class EditorWindow (QMainWindow):
             actions = ("openfile", "newproj")
         else:
             actions = ("zoomin", "zoomout", "zoomorig", "openfile", 
-                "save", "saveas", "newproj", "close", "refresh")
+                "save", "saveas", "newproj", "close", "refresh", "playconv")
         if self.projwidget.currentproj() is not None:
             actions += ("newconv", "reloadscripts")
         for name, action in self.globactions.items():
@@ -3581,6 +3587,16 @@ class EditorWindow (QMainWindow):
         if newname[1] and newname[0] != "":
             view.nodecontainer.name = newname[0]
             self.tabs.setTabText(index, newname[0])
+    
+    @pyqtSlot()
+    def playconv (self):
+        view = self.activeview
+        proj = view.nodecontainer.proj
+        projfile = proj.filename
+        player = play.TextPlayer(self, projfile)
+        player.setWindowFlags(Qt.Dialog)
+        player.startconv(view.nodecontainer)
+        player.show()
     
     @pyqtSlot()
     def zoomin (self):

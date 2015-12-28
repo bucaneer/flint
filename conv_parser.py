@@ -47,8 +47,13 @@ class ConditionCall (object):
         if not self.calls:
             return (True, None)
         for call in self.calls:
-            callsig = (call.funcname, (*call.funcparams,))
-            if call.run() != self.operator:
+            if call.typename == "script":
+                callsig = (call.funcname, (*call.funcparams,))
+                value = call.run()
+            else:
+                callsig = None
+                value = call.run()[0]
+            if value != self.operator:
                 return (not self.operator, callsig)
         return (self.operator, callsig)
     
