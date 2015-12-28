@@ -1082,22 +1082,20 @@ class ScriptParamWidget (QWidget):
             editor = QCheckBox("True", self)
             signal = editor.stateChanged
             value = lambda: bool(editor.checkState())
-            if default:
-                state = Qt.Checked
-            else:
-                state = Qt.Unchecked
-            editor.setCheckState(state)
+            editor.setChecked(bool(default))
         elif annot is int:
             editor = QSpinBox(self)
             signal = editor.valueChanged
             value = editor.value
-            if default == "":
+            if not default:
                 default = 0
             editor.setValue(int(default))
         else:
             editor = QLineEdit(self)
             signal = editor.textEdited
             value = editor.text
+            if not default:
+                default = ""
             editor.setText(str(default))
         
         layout.addWidget(label)
@@ -1156,7 +1154,7 @@ class ScriptCallWidget (CallWidget):
         name = callobj.funcname
         super().__init__(parent, callobj, name)
         self.nodeID = nodeID
-        params = callobj.funcparams[::-1]
+        params = callobj.funcparams
         layout = QVBoxLayout(self)
         layout.setContentsMargins(9, 4, 9, 4)
         
@@ -1179,7 +1177,7 @@ class ScriptCallWidget (CallWidget):
             for param in signature.parameters.values():
                 pname = param.name
                 annot = param.annotation if param.annotation is not insp._empty else ""
-                default = params.pop()
+                default = params.pop(0) if params else None
                 parwidget = ScriptParamWidget(paramswidget, pname, annot, default)
                 paramslayout.addWidget(parwidget)
                 paramslist.append(parwidget)
