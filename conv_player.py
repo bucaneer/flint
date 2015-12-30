@@ -245,6 +245,7 @@ class ConvPlayer (object):
 class TextPlayer (QTextBrowser):
 	visitedNode = pyqtSignal(str)
 	showedNode = pyqtSignal(str)
+	closed = pyqtSignal()
 	
 	def __init__ (self, parent, projfile):
 		super().__init__(parent)
@@ -262,6 +263,8 @@ class TextPlayer (QTextBrowser):
 	
 	def displaycurrent (self):
 		nd = self.player.currentnode
+		self.emitshow(nd.ids)
+		self.emitvisit(nd.ids)
 		display = "<p>%s</p>" % nd.text
 		choices = self.player.nextlist
 		self.choices = dict()
@@ -298,6 +301,10 @@ class TextPlayer (QTextBrowser):
 			self.displaycurrent()
 		else:
 			self.window().close()
+	
+	def closeEvent (self, event):
+		self.closed.emit()
+		super().closeEvent(event)
 	
 	def emitshow (self, nodeIDs):
 		for nodeID in nodeIDs:

@@ -239,6 +239,12 @@ class NodeItem(QGraphicsItem):
         elif state == -1: # hidden
             self.hide()
     
+    def setplaymode (self, playmode):
+        if playmode:
+            self.setOpacity(0.5)
+        else:
+            self.setOpacity(1)
+    
     def setY (self, y):
         parent = self.view.itembyID(self.refID)
         y += self.getyoffset()
@@ -2539,6 +2545,7 @@ class TreeView (TreeEditor, QGraphicsView):
         self.zoomscale = 1
         self.activenode = None
         self.selectednode = None
+        self.playmode = False
         self.itemtable = dict()
         self.itemindex = dict()
         
@@ -2724,6 +2731,8 @@ class TreeView (TreeEditor, QGraphicsView):
         if FlGlob.mainwindow.activeview is not self:
             return
         log("verbose", "%s.selectbyID(%s)" % (self, nodeID))
+        if self.playmode:
+            return
         if self.selectednode is not None and self.selectednode.realid() == nodeID:
             self.shownode(self.selectednode)
             return
@@ -2753,6 +2762,8 @@ class TreeView (TreeEditor, QGraphicsView):
         if FlGlob.mainwindow.activeview is not self:
             return
         log("verbose", "%s.activatebyID(%s)" % (self, nodeID))
+        if self.playmode:
+            return
         if nodeID in self.itemindex:
             nodeitem = self.itembyID(nodeID)
             if self.activenode:
@@ -2770,6 +2781,25 @@ class TreeView (TreeEditor, QGraphicsView):
                 func = getattr(nodeitem, funcname, None)
                 if func is not None:
                     func()
+    
+    def setplaymode (self, playmode):
+        self.playmode = playmode
+        for item in (i for items in self.itemindex.values() for i in items):
+            item.setplaymode(playmode)
+            item.setactive(False)
+    
+    @pyqtSlot(str)
+    def playshowID (self, nodeID):
+        if nodeID in self.itemindex:
+            for nodeitem in self.itemindex[nodeID]:
+                nodeitem.setplaymode(False)
+    
+    @pyqtSlot(str)
+    def playvisitID (self, nodeID):
+        if nodeID in self.itemindex:
+            for nodeitem in self.itemindex[nodeID]:
+                nodeitem.setactive(True)
+                self.shownode(nodeitem)
     
     def linknode (self, nodeID, refID, pos=None, undo=False):
         super().linknode(nodeID, refID, pos, undo)
@@ -3272,7 +3302,9 @@ class EditorWindow (QMainWindow):
             actions = ("openfile", "newproj")
         else:
             actions = ("zoomin", "zoomout", "zoomorig", "openfile", 
-                "save", "saveas", "newproj", "close", "refresh", "playconv")
+                "save", "saveas", "newproj", "close")
+            if not view.playmode:
+                actions += ("refresh", "playconv")
         if self.projwidget.currentproj() is not None:
             actions += ("newconv", "reloadscripts")
         for name, action in self.globactions.items():
@@ -3286,7 +3318,7 @@ class EditorWindow (QMainWindow):
         view = self.activeview
         genericactions = ()
         actions = ()
-        if view:
+        if view and not view.playmode:
             if view.undohistory:
                 genericactions += ("undo",)
             if view.redohistory:
@@ -3608,8 +3640,22 @@ class EditorWindow (QMainWindow):
         projfile = proj.filename
         player = play.TextPlayer(self, projfile)
         player.setWindowFlags(Qt.Dialog)
+        view.setplaymode(True)
+        player.showedNode.connect(view.playshowID)
+        player.visitedNode.connect(view.playvisitID)
+        player.closed.connect(self.playquitfactory(view))
         player.startconv(view.nodecontainer)
         player.show()
+        self.filterglobactions()
+        self.filteractions()
+    
+    def playquitfactory (self, view):
+        @pyqtSlot()
+        def playquit ():
+            view.setplaymode(False)
+            self.filterglobactions()
+            self.filteractions()
+        return playquit
     
     @pyqtSlot()
     def zoomin (self):
