@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# Copyright (C) 2015 Justas Lavišius
+# Copyright (C) 2015, 2016 Justas Lavišius
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -1181,10 +1181,7 @@ class ScriptCallWidget (CallWidget):
         
         if cond:
             notcheck = QCheckBox("Not", self)
-            if callobj._not:
-                notcheck.setCheckState(Qt.Checked)
-            else:
-                notcheck.setCheckState(Qt.Unchecked)
+            notcheck.setChecked(callobj._not)
             notcheck.stateChanged.connect(self.notchanged)
             layout.addWidget(notcheck)
             self.toggled.connect(notcheck.setVisible)

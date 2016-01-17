@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# Copyright (C) 2015 Justas Lavišius
+# Copyright (C) 2015, 2016 Justas Lavišius
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -41,7 +41,10 @@ class FlintProject (object):
                 scriptmod = importlib.import_module(modname)
                 if reinit:
                     scriptmod = importlib.reload(scriptmod)
-                return scriptmod.ScriptCalls.scripts
+                scripts = scriptmod.ScriptCalls
+                if not isinstance(scripts, dict):
+                    raise RuntimeError("ScriptCalls is not a dict: %s" % relpath)
+                return scripts
             else:
                 raise RuntimeError("Invalid script path: %s" % relpath)
         else:
@@ -113,20 +116,20 @@ def newscriptfile (filename):
     with open(filename, 'x') as f:
         f.write(
 """\
-class ScriptCalls (object):
-    scripts = dict()
-    
-    def __init__ (self, func):
-        self.scripts[func.__name__] = func
+ScriptCalls = dict()
 
-# Add function definitions decorated with "@ScriptCalls", like this:
+def scriptcall (func):
+    global ScriptCalls
+    ScriptCalls[func.__name__] = func
+
+# Add function definitions decorated with "@scriptcall", like this:
 #
-#@ScriptCalls
+#@scriptcall
 #def exampleScript (arg1: bool, arg2: int):
 #    pass
 #
-#@ScriptCalls
+#@scriptcall
 #def exampleCondition (arg: str) -> bool:
 #    pass
 """
-)
+        )
