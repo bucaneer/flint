@@ -20,16 +20,67 @@ import os.path as path
 import sys
 import importlib
 import conv_parser as cp
+from warnings import warn
+
+class NodePropertyValue (object):
+    def __init__ (self, valname, valbody):
+        if not valname or not isinstance(dict, valbody):
+            raise RuntimeError("Malformed node property value: <%s>, <%s>" % (valname, valbody))
+        self.default = bool(valbody.get("default", False))
+        self.icon = valbody.get("icon", "")
+    
+    def __lt__ (self, other):
+        if self.default != other.default:
+            return self.default
+        else:
+            return self.name < other.name
+
+class NodeProperty (object):
+    types = ("choice", "float", "int", "bool", "line", "paragraph")
+    
+    def __init__ (self, propname, propbody):
+        if not propname or not isinstance(dict, propbody):
+            raise RuntimeError("Malformed node property: <%s>, <%s>" % (propname, propbody))
+        proptype = propbody.get("type", None)
+        if proptype not in self.types:
+            raise RuntimeError("Unknown property type: <%s>" % proptype)
+        self.name = propname
+        self.type = proptype
+        self.displayname = propbody.get("displayname", self.name)
+        self.tip = propbody.get("tip", "")
+        self.values = self.initvalues(propbody.get("values", {}))
+    
+    def initvalues (self, valuesdict):
+        values = []
+        for name, body in valuesdict.items():
+            values.append(NodePropertyValue(name, body))
+        values.sort()
+        if values:
+            if not values[0].default:
+                warn("No explicit default value for property <%s>, using <%s>." % (self.name, values[0]))
+            elif len(values) > 1 and values[1].default:
+                raise RuntimeError("Multiple default values for property <%s>" % self.name)
+        return values
+    
+    def __lt__ (self, other):
+        return self.name < other.name
 
 class FlintProject (object):
     def __init__ (self, projdict, filename=""):
         self.filename = path.abspath(filename)
         self.name = projdict.get("name", "")
         self.path = path.dirname(self.filename)
+        self.properties = self.initproperties(projdict.get("properties", {}))
         self.scriptfile = projdict.get("scripts", "")
         self.scripts = self.initscripts(self.scriptfile)
         self.convs = self.initconvs(projdict.get("convs", []))
         self.tempconvs = []
+    
+    def initproperties (self, propsdict):
+        props = []
+        for name, body in propsdict.items():
+            props.append(NodeProperty(name, body))
+        return props
     
     def initscripts (self, relpath, reinit=False):
         if relpath:
