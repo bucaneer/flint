@@ -1093,6 +1093,7 @@ class TextEditWidget (QWidget):
             return
         self.nodeobj.text = self.nodetext.toPlainText()
 
+"""
 class ScriptParamWidget (QWidget):
     def __init__ (self, parent, name, annot, default):
         super().__init__(parent)
@@ -1133,7 +1134,7 @@ class CallWidget (QGroupBox):
     def __init__ (self, parent, callobj, name):
         super().__init__ (name, parent)
         self.callobj = callobj
-        self.setStyleSheet("""
+        self.setStyleSheet('''
             QGroupBox::indicator:unchecked {
                 image: url(images/plus.png);
             }
@@ -1151,7 +1152,7 @@ class CallWidget (QGroupBox):
             QGroupBox::title {
                 subcontrol-origin:margin;
             }
-            """)
+            ''')
         self.setCheckable(True)
         
         actremove = QAction("&Remove", self)
@@ -1511,6 +1512,166 @@ class ScriptEditWidget (CallEditWidget):
         view.callupdates(self.nodeobj.ID, "update%sscripts" % self.slot)
         scwidget = None
         gc.collect()
+"""
+
+class ScriptHighlighter (QSyntaxHighlighter):
+    def __init__(self, document):
+        super().__init__(document)
+
+        styles = {
+            'keyword': self.textformat('blue', 'bold'),
+            'bool': self.textformat('green', 'bold'),
+            'string': self.textformat('yellowgreen'),
+            'numbers': self.textformat('green'),
+        }
+        
+        rules = []
+        
+        rules += [(r'\b%s\b' % w, styles['keyword']) for w in ('and', 'or', 'not')]
+        rules += [(r'\b%s\b' % w, styles['bool']) for w in ('true', 'false')]
+        
+        rules += [
+            # Double-quoted string, possibly containing escape sequences
+            (r'"[^"\\]*(\\.[^"\\]*)*"', styles['string']),
+            # Single-quoted string, possibly containing escape sequences
+            (r"'[^'\\]*(\\.[^'\\]*)*'", styles['string']),
+
+            # Numeric literals
+            (r'\b[+-]?[0-9]+[lL]?\b', styles['numbers']),
+            (r'\b[+-]?0[xX][0-9A-Fa-f]+[lL]?\b', styles['numbers']),
+            (r'\b[+-]?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\b', styles['numbers']),
+        ]
+
+        # Build a QRegExp for each pattern
+        self.rules = [(QRegExp(pat, cs=Qt.CaseInsensitive), fmt) for (pat, fmt) in rules]
+
+    def textformat (self, color, style=''):   
+        tformat = QTextCharFormat()
+        tformat.setForeground(QColor(color))
+        if 'bold' in style:
+            tformat.setFontWeight(QFont.Bold)
+        if 'italic' in style:
+            tformat.setFontItalic(True)
+    
+        return tformat
+
+    
+    def highlightBlock(self, text):
+        for exp, fmt in self.rules:
+            index = exp.indexIn(text, 0)
+
+            while index >= 0:
+                length = len(exp.cap())
+                self.setFormat(index, length, fmt)
+                index = exp.indexIn(text, index + length)
+
+        self.setCurrentBlockState(0)
+
+class ScriptTextEdit (QPlainTextEdit):
+    def __init__ (self, parent):
+        super().__init__(parent)
+        self.completer = None
+        self.highlighter = ScriptHighlighter(self)
+    
+    def setcompleter (self, completer):
+        completer.setWidget(self)
+        completer.setCompletionMode(QCompleter.PopupCompletion)
+        completer.setCaseSensitivity(Qt.CaseInsensitive)
+        completer.activated.connect(self.insertcompletion)
+        self.completer = completer
+    
+    def setDocument (self, document):
+        super().setDocument(document)
+        self.highlighter.setDocument(document)
+    
+    @pyqtSlot(str)
+    def insertcompletion (self, completion):
+        c = self.completer
+        tc = self.textCursor();
+        extra = len(c.completionPrefix())
+        print(completion, c.completionPrefix(), extra)
+        tc.movePosition(QTextCursor.Left)
+        tc.movePosition(QTextCursor.EndOfWord)
+        tc.insertText(completion[extra:])
+        self.setTextCursor(tc)
+    
+    def textundercursor (self):
+        cur = self.textCursor()
+        cur.select(QTextCursor.WordUnderCursor)
+        return cur.selectedText()
+    
+    def keyPressEvent (self, event):
+        c = self.completer
+        if c and c.popup().isVisible():
+            if event.key() in (Qt.Key_Enter,Qt.Key_Return,Qt.Key_Escape,Qt.Key_Tab,Qt.Key_Backtab):
+                event.ignore()
+                return
+        super().keyPressEvent(event)
+        if not c:
+            return
+        p = c.popup()
+        t = event.text()
+        prefix = self.textundercursor()
+        if not t or len(prefix) < 3 or t[-1] in "~!@#$%^&*()_+{}|:\"<>?,./;'[]\\-=":
+            c.popup().hide()
+            return
+        #print(prefix)
+        if prefix != c.completionPrefix():
+            c.setCompletionPrefix(prefix)
+            p.setCurrentIndex(c.completionModel().index(0, 0))
+        cr = self.cursorRect()
+        cr.setWidth(p.sizeHintForColumn(0) + p.verticalScrollBar().sizeHint().width())
+        c.complete(cr)
+
+class ScriptWidget (QWidget):
+    def __init__ (self, parent, slot):
+        super().__init__(parent)
+        
+        self.setEnabled(False)
+        self.slot = slot
+        
+        layout = QVBoxLayout(self)
+        
+        textedit = ScriptTextEdit(self)
+        #textedit = QPlainTextEdit(self)
+        #completer = QCompleter(self.getscripts().keys(), self)
+        #textedit.setcompleter(completer)
+        #self.highlight = ScriptHighlighter(textedit.document())
+        #textedit.setPlainText("QWE('rty') and not asd(false)")
+        self.textedit = textedit
+        
+        layout.addWidget(textedit)
+    
+    @pyqtSlot(str)
+    def loadnode (self, nodeID):
+        view = FlGlob.mainwindow.activeview
+        if view is not None:
+            nodeobj = view.nodecontainer.nodes.get(nodeID, None)
+        else:
+            nodeobj = None
+        
+        if nodeobj is not None:
+            #scriptdoc = view.nodedocs[nodeID].get("script", None)
+            #if self.slot not in view.nodedocs[nodeID]:
+            #    view.nodedocs[nodeID][self.slot] = self.scripttodoc(nodeID)
+                
+            scriptdoc = view.nodedocs[nodeID][self.slot]
+            completer = QCompleter(self.getscripts().keys(), self)
+            self.textedit.setcompleter(completer)
+            self.textedit.setDocument(scriptdoc)
+            self.setEnabled(True)
+        else:
+            self.setEnabled(False)
+        
+    
+    def getscripts (self, strict=False):
+        view = FlGlob.mainwindow.activeview
+        if view is not None and view.nodecontainer.proj is not None:
+            return view.nodecontainer.proj.scripts
+        elif strict:
+            return None
+        else:
+            return dict()
 
 class PropertiesEditWidget (QWidget):
     def __init__ (self, parent):
@@ -2191,7 +2352,36 @@ class TreeEditor (object):
                 commentdoc.setDocumentLayout(QPlainTextDocumentLayout(commentdoc))
                 commentdoc.setPlainText(nodeobj.comment)
                 newnodedocs[nodeID]["comment"] = commentdoc
+                
+                for s in ("enterscripts", "exitscripts", "condition"):
+                    scriptdoc = QTextDocument(self)
+                    scriptdoc.setDocumentLayout(QPlainTextDocumentLayout(scriptdoc))
+                    scriptdoc.setPlainText(self.scripttotext(nodeobj.__dict__[s]))
+                    newnodedocs[nodeID][s] = scriptdoc
         self.nodedocs = newnodedocs
+    
+    def scripttotext (self, script):
+        def calltotext (call):
+            text = ""
+            if call.typename == "script":
+                text += call.funcname
+                paramstr = []
+                for p in call.funcparams:
+                    if isinstance(p, str):
+                        paramstr.append('"%s"' % p)
+                    else:
+                        paramstr.append('%s' % p)
+                text += "(%s)" % ", ".join(paramstr)
+            elif call.typename == "cond":
+                text += "["
+                text += " {op} ".format(op=call.operatorname).join(calltotext(c) for c in call.calls)
+                text += "]"
+            return text
+        
+        if isinstance(script, list):
+            return "; ".join(calltotext(c) for c in script)
+        else:
+            return calltotext(script)
     
     def addundoable (self, hist):
         self.undohistory.appendleft(hist)
@@ -3248,16 +3438,20 @@ class EditorWindow (QMainWindow):
         self.editdocks["text"] = textdock
         
         conddock = QDockWidget("&Condition", self)
-        conddock.setWidget(ConditionEditWidget(self))
+        conddock.setWidget(ScriptWidget(self, "condition"))
         self.editdocks["cond"] = conddock
         
         onenterdock = QDockWidget("On E&nter", self)
-        onenterdock.setWidget(ScriptEditWidget(self, slot="enter"))
+        onenterdock.setWidget(ScriptWidget(self, "enterscripts"))
         self.editdocks["enter"] = onenterdock
         
         onexitdock = QDockWidget("On E&xit", self)
-        onexitdock.setWidget(ScriptEditWidget(self, slot="exit"))
+        onexitdock.setWidget(ScriptWidget(self, "exitscripts"))
         self.editdocks["exit"] = onexitdock
+        
+        """scriptdock = QDockWidget("&Script", self)
+        scriptdock.setWidget(ScriptWidget(self, "condition"))
+        self.editdocks["script"] = scriptdock"""
         
         propdock = QDockWidget("&Properties", self)
         propdock.setWidget(PropertiesEditWidget(self))
@@ -3287,7 +3481,9 @@ class EditorWindow (QMainWindow):
         self.tabifyDockWidget(conddock, onenterdock)
         self.tabifyDockWidget(onenterdock, onexitdock)
         self.tabifyDockWidget(onexitdock, propdock)
-        textdock.raise_()
+        #self.tabifyDockWidget(textdock, propdock)
+        #self.tabifyDockWidget(propdock, scriptdock)
+        #textdock.raise_()
         
         self.addDockWidget(Qt.LeftDockWidgetArea, projdock)
         self.addDockWidget(Qt.LeftDockWidgetArea, listdock)
