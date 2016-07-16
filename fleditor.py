@@ -1545,7 +1545,7 @@ class ScriptHighlighter (QSyntaxHighlighter):
         # Build a QRegExp for each pattern
         self.rules = [(QRegExp(pat, cs=Qt.CaseInsensitive), fmt) for (pat, fmt) in rules]
 
-    def textformat (self, color, style=''):   
+    def textformat (self, color, style=''):
         tformat = QTextCharFormat()
         tformat.setForeground(QColor(color))
         if 'bold' in style:
@@ -2017,7 +2017,7 @@ class NodeListWidget (QWidget):
         item.setData(item.TrashRole, trash)
         return item
     
-    @pyqtSlot(NodeListItem, NodeListItem)
+    @pyqtSlot(QListWidgetItem, QListWidgetItem)
     def selectnode (self, listitem, olditem):
         if listitem is None:
             return
@@ -2032,7 +2032,7 @@ class NodeListWidget (QWidget):
         seltrash = [item for item in selected if item.data(item.TrashRole)]
         self.remselaction.setEnabled(bool(seltrash))
     
-    @pyqtSlot(NodeListItem)
+    @pyqtSlot(QListWidgetItem)
     def activatenode (self, listitem):
         window = FlGlob.mainwindow
         view = window.activeview
@@ -2372,7 +2372,7 @@ class TreeEditor (object):
                     else:
                         paramstr.append('%s' % p)
                 text += "(%s)" % ", ".join(paramstr)
-            elif call.typename == "cond":
+            elif call.typename == "wrap":
                 text += "["
                 text += " {op} ".format(op=call.operatorname).join(calltotext(c) for c in call.calls)
                 text += "]"
@@ -2682,7 +2682,7 @@ class TreeEditor (object):
                 for call in cond.calls:
                     if call.typename == "script":
                         retval += call.funcname+"\n"
-                    elif call.typename == "cond":
+                    elif call.typename == "wrap":
                         conds.append(call)
             return retval
         elif field == "condarg":
@@ -2693,7 +2693,7 @@ class TreeEditor (object):
                 for call in cond.calls:
                     if call.typename == "script":
                         retval += "\n".join([str(p) for p in call.funcparams])
-                    elif call.typename == "cond":
+                    elif call.typename == "wrap":
                         conds.append(call)
             return retval
     

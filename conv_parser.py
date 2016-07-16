@@ -18,6 +18,33 @@
 import json
 import os.path as path
 
+def scripttotext (script):
+    def calltotext (call):
+        text = ""
+        if call.typename == "script":
+            text += call.funcname
+            paramstr = []
+            for p in call.funcparams:
+                if isinstance(p, str):
+                    paramstr.append('"%s"' % p)
+                else:
+                    paramstr.append('%s' % p)
+            text += "(%s)" % ", ".join(paramstr)
+        elif call.typename == "cond":
+            text += "["
+            text += " {op} ".format(op=call.operatorname).join(calltotext(c) for c in call.calls)
+            text += "]"
+        return text
+    
+    if isinstance(script, list):
+        return "; ".join(calltotext(c) for c in script)
+    else:
+        return calltotext(script)
+
+def parsescript (script):
+    pass
+    #lines = 
+
 class ScriptCall (object):
     def __init__ (self, sc_dict, scripts=None):
         self.typename = sc_dict['type']
@@ -48,13 +75,13 @@ class ScriptCall (object):
             sc_dict['not'] = self._not
         return sc_dict
 
-class ConditionCall (object):
+class ScriptWrapper (object):
     def __init__ (self, cond_dict, scripts=None):
-        self.types = {"script":ScriptCall, "cond":ConditionCall}
-        self.operators = {"and":True, "or":False}
+        self.types = {"script":ScriptCall, "wrap":ScriptWrapper}
+        self.operators = {"and":True, "or":False, ";":None}
         self.typename = cond_dict['type']
         self.operatorname = cond_dict['operator']
-        self.operator = self.operators[cond_dict['operator']]
+        self.operator = self.operators[self.operatorname]
         self.calls = []
         for call in cond_dict['calls']:
             typename = self.types[ call['type'] ]
@@ -70,9 +97,9 @@ class ConditionCall (object):
             else:
                 callsig = None
                 value = call.run()[0]
-            if value != self.operator:
-                return (not self.operator, callsig)
-        return (self.operator, callsig)
+            if self.operator is not None and bool(value) != self.operator:
+                return (value, callsig)
+        return (value, callsig)
     
     def setoperator (self, operatorname):
         self.operatorname = operatorname
@@ -81,12 +108,6 @@ class ConditionCall (object):
     def todict (self):
         return {"type": self.typename, "operator": self.operatorname, 
             "calls": [call.todict() for call in self.calls] }
-
-class MetaCall (object):
-    def __init__ (self, call_dict, scripts=None):
-        types = {"script":ScriptCall, "cond":ConditionCall}
-        typename = call_dict["type"]
-        self.callobj = types[typename](call_dict, scripts=scripts)
 
 class ChartNode (object):
     def __init__ (self, container, node_dict, nodeID):
@@ -102,7 +123,7 @@ class ChartNode (object):
         for link in node_dict.get('links', []):
             self.addlink(str(link))
         
-        self.condition = ConditionCall(node_dict.get('condition', self.container.defaultcond), scripts)
+        self.condition = ScriptWrapper(node_dict.get('condition', self.container.defaultcond), scripts)
         
         self.enterscripts = [ScriptCall(s, scripts) for s in node_dict.get('enterscripts', [])]
         self.exitscripts  = [ScriptCall(s, scripts) for s in node_dict.get('exitscripts',  [])]
@@ -128,7 +149,7 @@ class ChartNode (object):
             scripts = None
         self.enterscripts = [ScriptCall(s.todict(), scripts) for s in self.enterscripts]
         self.exitcripts   = [ScriptCall(s.todict(), scripts) for s in self.exitscripts]
-        self.condition = ConditionCall(self.condition.todict(), scripts)
+        self.condition = ScriptWrapper(self.condition.todict(), scripts)
     
     def checkcond (self):
         return self.condition.run()
@@ -245,7 +266,7 @@ class NodesContainer (object):
         'root': ChartNode, 'trigger': TriggerNode }
     def __init__ (self, nodes_dict, filename="", proj=None):
         self.defaultcond = {"type":"cond","operator":"and","calls":[]}
-        self.defaultcondcall = ConditionCall(self.defaultcond)
+        self.defaultcondcall = ScriptWrapper(self.defaultcond)
         self.filename = path.abspath(filename) if filename else ""
         self.projfile = nodes_dict.get("project", "")
         self.proj = proj
