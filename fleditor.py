@@ -1529,6 +1529,7 @@ class ScriptHighlighter (QSyntaxHighlighter):
         
         rules += [(r'\b%s\b' % w, styles['keyword']) for w in ('and', 'or', 'not')]
         rules += [(r'\b%s\b' % w, styles['bool']) for w in ('true', 'false')]
+        rules += [(r'\s!' , styles['keyword'])]
         
         rules += [
             # Double-quoted string, possibly containing escape sequences
@@ -1537,8 +1538,10 @@ class ScriptHighlighter (QSyntaxHighlighter):
             (r"'[^'\\]*(\\.[^'\\]*)*'", styles['string']),
 
             # Numeric literals
-            (r'\b[+-]?[0-9]+[lL]?\b', styles['numbers']),
-            (r'\b[+-]?0[xX][0-9A-Fa-f]+[lL]?\b', styles['numbers']),
+            (r'\b[+-]?[0-9]+\b', styles['numbers']),
+            (r'\b[+-]?0[bB][01]+\b', styles['numbers']),
+            (r'\b[+-]?0[oO][0-7]+\b', styles['numbers']),
+            (r'\b[+-]?0[xX][0-9A-Fa-f]+\b', styles['numbers']),
             (r'\b[+-]?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?\b', styles['numbers']),
         ]
 
