@@ -15,8 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import proj_parser as pp
-import conv_parser as cp
+import flint.parsers.proj as pp
+import flint.parsers.conv as cp
 import random
 from PyQt5.QtWidgets import QTextBrowser, QApplication
 from PyQt5.QtCore import pyqtSlot, pyqtSignal, QUrl

@@ -19,7 +19,6 @@ import json
 import os.path as path
 import sys
 import importlib
-import conv_parser as cp
 from warnings import warn
 
 class NodePropertyValue (object):

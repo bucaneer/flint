@@ -20,9 +20,9 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 from PyQt5.QtOpenGL import *
-import conv_parser as cp
-import proj_parser as pp
-import conv_player as play
+import flint.parsers.conv as cp
+import flint.parsers.proj as pp
+import flint.conv_player as play
 import os
 import weakref
 import inspect as insp
