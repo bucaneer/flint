@@ -15,24 +15,24 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from flint.fleditor import FlGlob, EditorWindow, log
-import sys
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QApplication
+class FlGlob:
+    loglevels = {"quiet": 0, "error": 1, "warn": 2, "info": 3, "debug": 4, "verbose": 5}
+    loglevel = 3
+    mainwindow = None
 
-app = QApplication(sys.argv)
-for arg in sys.argv[1:]:
-	split = arg.split("=", maxsplit=1)
-	argname = split[0]
-	param = split[1] if len(split)>1 else None
-	if argname == "--loglevel":
-		if param in FlGlob.loglevels:
-			FlGlob.loglevel = FlGlob.loglevels[param]
-			log("info", "Loglevel: %s" % param)
-		else:
-			log("warn", "Unrecognized loglevel: %s" % param)
-	elif argname == "--icontheme":
-		QIcon.setThemeName(param)
-window = EditorWindow()
-window.show()
-sys.exit(app.exec_())
+def log (level, text):
+    if level not in FlGlob.loglevels:
+        print("[warn] Unknown loglevel: %s" % level)
+        level = "warn"
+    if FlGlob.loglevels[level] <= FlGlob.loglevel:
+        print("[%s] %s" % (level, text))
+        if level == "warn":
+            QMessageBox.warning(FlGlob.mainwindow, "Warning", text)
+        elif level == "error":
+            QMessageBox.critical(FlGlob.mainwindow, "Error", text)
+
+def elidestring (string, length):
+    if len(string) <= length:
+        return string
+    else:
+        return string[:length-1]+"…"
