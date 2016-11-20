@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from flint.fleditor import FlGlob, EditorWindow, log
+from flint.editorwindow import FlGlob, EditorWindow, log
 import sys
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication
